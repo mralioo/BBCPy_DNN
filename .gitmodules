@@ -1,0 +1,3 @@
+[submodule "bbcpy"]
+	path = bbcpy
+	url = git@github.com:bbcpy/bbcpy.git
