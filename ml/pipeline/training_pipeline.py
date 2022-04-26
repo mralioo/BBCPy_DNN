@@ -12,9 +12,9 @@ from pytorch_lightning import (
 )
 from pytorch_lightning.loggers import LightningLoggerBase
 
-from ml import utils
+from lightning_torch.utils import logging
 
-log = utils.get_logger(__name__)
+log = logging.get_logger(__name__)
 
 
 def train(config: DictConfig) -> Optional[float]:
@@ -71,7 +71,7 @@ def train(config: DictConfig) -> Optional[float]:
 
     # Send some parameters from config to all lightning loggers
     log.info("Logging hyperparameters!")
-    utils.log_hyperparameters(
+    logging.log_hyperparameters(
         config=config,
         model=model,
         datamodule=datamodule,
@@ -104,7 +104,7 @@ def train(config: DictConfig) -> Optional[float]:
 
     # Make sure everything closed properly
     log.info("Finalizing!")
-    utils.finish(
+    logging.finish(
         config=config,
         model=model,
         datamodule=datamodule,
