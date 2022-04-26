@@ -8,20 +8,23 @@ import torch
 import torch.nn.functional as F
 import torchmetrics
 from torch.optim import Optimizer
+from lightning_torch.utils.file_mgmt import get_dir_by_indicator
 
-from nn_core.common import PROJECT_ROOT
-from nn_core.model_logging import NNLogger
 
-from .datamodule_base import BaseDataset
+# from nn_core.model_logging import NNLogger
+
+
+PROJECT_ROOT = get_dir_by_indicator(indicator="ROOT")
+
+from lightning_torch.core.datamodule_base import BaseDataset
 from lightning_torch.torch_nn.simple_dense_net import SimpleDenseNet
 
 pylogger = logging.getLogger(__name__)
 
 
 class MyLightningModule(pl.LightningModule):
-    logger: NNLogger
 
-    def __init__(self, metadata: Optional[MetaData] = None, *args, **kwargs) -> None:
+    def __init__(self, metadata: Optional[BaseDataset] = None, *args, **kwargs) -> None:
         super().__init__()
 
         # Populate self.hparams with args and kwargs automagically!
