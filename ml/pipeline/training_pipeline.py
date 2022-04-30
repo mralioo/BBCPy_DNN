@@ -1,3 +1,8 @@
+"""
+  Taken from this repository:
+  https://github.com/ashleve/lightning-hydra-template/blob/main/src/utils/template_utils.py
+"""
+
 import os
 from typing import List, Optional
 

@@ -1,31 +1,40 @@
 import logging
-from typing import Any, Mapping, Optional, Sequence, Tuple, Union
+from typing import Any, Mapping, Optional
 
-import hydra
-import omegaconf
 import pytorch_lightning as pl
 import torch
-import torch.nn.functional as F
 import torchmetrics
-from torch.optim import Optimizer
-from lightning_torch.utils.file_mgmt import get_dir_by_indicator
 
+from lightning_torch.core.datamodule_base import BaseDataset
+from lightning_torch.utils.file_mgmt import get_dir_by_indicator
 
 # from nn_core.model_logging import NNLogger
 
 
 PROJECT_ROOT = get_dir_by_indicator(indicator="ROOT")
 
-from lightning_torch.core.datamodule_base import BaseDataset
-from lightning_torch.torch_nn.simple_dense_net import SimpleDenseNet
-
 pylogger = logging.getLogger(__name__)
 
 
 class MyLightningModule(pl.LightningModule):
 
-    def __init__(self, metadata: Optional[BaseDataset] = None, *args, **kwargs) -> None:
+    def __init__(self,
+                 net: torch.nn.Module,
+                 metadata: Optional[BaseDataset] = None,
+                 *args, **kwargs) -> None:
         super().__init__()
+
+        """ MyLightningModule is a wrapper class from the pytorch_lightning library 
+        
+            A LightningModule organizes your PyTorch code into 5 sections:
+                - Computations (init).
+                - Train loop (training_step)
+                - Validation loop (validation_step)
+                - Test loop (test_step)
+                - Optimizers (configure_optimizers)
+            Read the docs:
+                https://pytorch-lightning.readthedocs.io/en/latest/common/lightning_module.html
+        """
 
         # Populate self.hparams with args and kwargs automagically!
         # We want to skip metadata since it is saved separately by the NNCheckpointIO object.
@@ -40,7 +49,10 @@ class MyLightningModule(pl.LightningModule):
         self.val_accuracy = metric.clone()
         self.test_accuracy = metric.clone()
 
-        self.model = SimpleDenseNet()
+        # loss function
+        self.criterion = torch.nn.CrossEntropyLoss()
+
+        self.net = net
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """Method for the forward pass.
@@ -52,12 +64,12 @@ class MyLightningModule(pl.LightningModule):
             output_dict: forward output containing the predictions (output logits ecc...) and the loss if any.
         """
         # example
-        return self.model(x)
+        return self.net(x)
 
     def step(self, x, y) -> Mapping[str, Any]:
         # example
-        logits = self(x)
-        loss = F.cross_entropy(logits, y)
+        logits = self.forward(x)
+        loss = self.criterion(logits, y)
         return {"logits": logits.detach(), "loss": loss}
 
     def training_step(self, batch: Any, batch_idx: int) -> Mapping[str, Any]:
@@ -123,43 +135,53 @@ class MyLightningModule(pl.LightningModule):
 
         return step_out
 
-    def configure_optimizers(
-        self,
-    ) -> Union[Optimizer, Tuple[Sequence[Optimizer], Sequence[Any]]]:
+    def configure_optimizers(self):
         """Choose what optimizers and learning-rate schedulers to use in your optimization.
-
         Normally you'd need one. But in the case of GANs or similar you might have multiple.
 
-        Return:
-            Any of these 6 options.
-            - Single optimizer.
-            - List or Tuple - List of optimizers.
-            - Two lists - The first list has multiple optimizers, the second a list of LR schedulers (or lr_dict).
-            - Dictionary, with an 'optimizer' key, and (optionally) a 'lr_scheduler'
-              key whose value is a single LR scheduler or lr_dict.
-            - Tuple of dictionaries as described, with an optional 'frequency' key.
-            - None - Fit will run without any optimizer.
+        See examples here:
+            https://pytorch-lightning.readthedocs.io/en/latest/common/lightning_module.html#configure-optimizers
         """
-        opt = hydra.utils.instantiate(self.hparams.optimizer, params=self.parameters(), _convert_="partial")
-        if "lr_scheduler" not in self.hparams:
-            return [opt]
-        scheduler = hydra.utils.instantiate(self.hparams.lr_scheduler, optimizer=opt)
-        return [opt], [scheduler]
+        return torch.optim.Adam(
+            params=self.parameters(), lr=self.hparams.lr, weight_decay=self.hparams.weight_decay
+        )
 
+    # def configure_optimizers(
+    #         self,
+    # ) -> Union[Optimizer, Tuple[Sequence[Optimizer], Sequence[Any]]]:
+    #     """Choose what optimizers and learning-rate schedulers to use in your optimization.
+    #
+    #     Normally you'd need one. But in the case of GANs or similar you might have multiple.
+    #
+    #     Return:
+    #         Any of these 6 options.
+    #         - Single optimizer.
+    #         - List or Tuple - List of optimizers.
+    #         - Two lists - The first list has multiple optimizers, the second a list of LR schedulers (or lr_dict).
+    #         - Dictionary, with an 'optimizer' key, and (optionally) a 'lr_scheduler'
+    #           key whose value is a single LR scheduler or lr_dict.
+    #         - Tuple of dictionaries as described, with an optional 'frequency' key.
+    #         - None - Fit will run without any optimizer.
+    #     """
+    #     opt = hydra.utils.instantiate(self.hparams.model.optimizer, params=self.parameters(), _convert_="partial")
+    #     if "lr_scheduler" not in self.hparams:
+    #         return [opt]
+    #     scheduler = hydra.utils.instantiate(self.hparams.lr_scheduler, optimizer=opt)
+    #     return [opt], [scheduler]
 
-@hydra.main(config_path=str(PROJECT_ROOT / "conf"), config_name="default")
-def main(cfg: omegaconf.DictConfig) -> None:
-    """Debug main to quickly develop the Lightning Module.
-
-    Args:
-        cfg: the hydra configuration
-    """
-    _: pl.LightningModule = hydra.utils.instantiate(
-        cfg.model,
-        optim=cfg.optim,
-        _recursive_=False,
-    )
-
-
-if __name__ == "__main__":
-    main()
+# @hydra.main(config_path=os.path.join(PROJECT_ROOT, "configs", "debug"), config_name="test_only")
+# def main(cfg: omegaconf.DictConfig) -> None:
+#     """Debug main to quickly develop the Lightning Module.
+#
+#     Args:
+#         cfg: the hydra configuration
+#     """
+#     _: pl.LightningModule = hydra.utils.instantiate(
+#         cfg.model,
+#         optim=cfg.optim,
+#         _recursive_=False,
+#     )
+#
+#
+# if __name__ == "__main__":
+#     main()

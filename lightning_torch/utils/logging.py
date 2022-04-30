@@ -130,14 +130,14 @@ def log_hyperparameters(
     hparams["model/params_not_trainable"] = sum(
         p.numel() for p in model.parameters() if not p.requires_grad
     )
-    hparams["hydra/log_dir"] = config["log_dir"]
+    # hparams["hydra/log_dir"] = config["log_dir"] TODO
 
     # send hparams to all loggers
     trainer.logger.log_hyperparams(hparams)
 
     # disable logging any more hyperparameters for all loggers
     # (this is just a trick to prevent trainer from logging hparams of model, since we already did that above)
-    trainer.logger.log_hyperparams = empty
+    # trainer.logger.log_hyperparams = empty
 
 
 def finish(
