@@ -133,4 +133,6 @@ dmypy.json
 # Log folder
 logs/
 # data folder
-data/
+#data/
+# jupyter checkpoints
+ **/*.ipynb_checkpoints/
