@@ -1,7 +1,5 @@
-"""
-Source from project ss21 BCI
-"""
 import os
+from collections import defaultdict
 from pathlib import Path
 
 import numpy as np
@@ -10,7 +8,7 @@ from scipy.io import loadmat
 from lightning_torch.utils.file_mgmt import get_dir_by_indicator
 
 
-def load_matlab_data_fast(subjectno, sessionno, data_path, outfile=False):
+def load_matlab_data_complete(subjectno, sessionno, data_path, outdir=None):
     if data_path is None:
         root_dir = get_dir_by_indicator(indicator="ROOT")
         DATA_PATH = Path(root_dir).parent / "data" / "raw"  # the data folder has to be in the parent folder!
@@ -37,64 +35,65 @@ def load_matlab_data_fast(subjectno, sessionno, data_path, outfile=False):
     mdata = loadmat(os.path.join(DATA_PATH, group_files[subject][session]), mat_dtype=True)["BCI"]
 
     # data for all 450 trials:
-    data = mdata[0][0][0][:][0]
+    data = mdata["data"][0][0][0]
 
     # time:
-    timepoints = mdata[0][0][1][0]
+    timepoints = mdata["time"][0][0][0]
 
     # srate
-    fs = mdata[0][0][4][0]
+    fs = mdata["SRATE"][0][0][0][0]
 
     # Extracting channel names and mnt info, excluding the reference electrode
-    chan_inf = np.array(mdata[0][0][7][0][0][2][0])
+    # chaninfo = defaultdict(list)
+    # chaninfo_keys = mdata["chaninfo"][0][0][0].dtype.names
+
+    chan_inf = mdata["chaninfo"][0][0][0]["electrodes"][0][0]
     clab = []
     mnt = []
-    for element in chan_inf[:-1]:
+    for element in chan_inf:
         clab.append(str(element[0][0]))
         mnt.append([element[1][0][0], element[2][0][0], element[3][0][0]])
     mnt = np.array(mnt)
     clab = np.array(clab)
 
-    # Extracting marker classes, original range 1-4, modified range 0-3 to match the indices of mrk_className
-    # also extracting task type, original range 1-3, modified range 0-2 to match the indices of task_typeName
-    # trial artifact from the original data set, if bandpass filtered data from any electrode crosses threshold of +-100 μV = True, else False
-    mrk_className = ['right', 'left', 'up', 'down']
-    task_typeName = ['LR', 'UD', '2D']
-    meta = mdata[0][0][5][:][0]
-    task_type = []
-    mrk_class = []
-    trial_artifact = []
-    for i in range(0, len(meta)):
-        task_type.append(meta[i][0][0][0] - 1)
-        mrk_class.append(meta[i][3][0][0] - 1)
-        trial_artifact.append(meta[i][9][0][0])
-    mrk_class = np.array(mrk_class)
-    task_type = np.array(task_type)
-    trial_artifact = np.array(trial_artifact)
+    trial_info = defaultdict(list)
 
-    if (outfile):
-        np.savez(outfile, data=data, fs=fs, clab=clab, mnt=mnt, mrk_class=mrk_class, mrk_className=mrk_className,
-                 task_type=task_type, task_typeName=task_typeName, timepoints=timepoints)
-        return
+    trial_info_keys = mdata["TrialData"][0][0][0].dtype.names
+    for trial in mdata["TrialData"][0][0][0]:
+        for i, key in enumerate(trial_info_keys):
+            trial_info[key].append(trial[i][0][0])
+
+    metadata = dict()
+
+    metadata_keys = mdata["metadata"][0][0][0].dtype.names
+
+    for s in mdata["metadata"][0][0][0]:
+        for i, key in enumerate(metadata_keys):
+            metadata[key] = s[i][0][0]
 
     # trial artifact from the original data set, if bandpass filtered data from any electrode crosses threshold of +-100 μV = True, else False
-    mrk_className = ['right', 'left', 'up', 'down']
-    task_typeName = ['LR', 'UD', '2D']
-    meta = mdata[0][0][5][:][0]
-    task_type = []
-    mrk_class = []
-    trial_artifact = []
-    for i in range(0, len(meta)):
-        task_type.append(meta[i][0][0][0] - 1)
-        mrk_class.append(meta[i][3][0][0] - 1)
-        trial_artifact.append(meta[i][9][0][0])
-    mrk_class = np.array(mrk_class)
-    task_type = np.array(task_type)
-    trial_artifact = np.array(trial_artifact)
-    if (outfile):
-        np.savez(outfile, data=data, fs=fs, clab=clab, mnt=mnt, mrk_class=mrk_class, mrk_className=mrk_className,
-                 task_type=task_type, task_typeName=task_typeName, timepoints=timepoints, trial_artifact=trial_artifact)
+    if outdir is not None:
+        outfile_name = os.path.join(outdir, f"{subject}_{session}")
+        np.savez(outfile_name, X=data, timepoints=timepoints, fs=fs, clab=clab, mnt=mnt, trial_info=trial_info,
+                 metadata=metadata)
         return
 
     else:
-        return data, fs, clab, mnt, mrk_class, mrk_className, task_type, task_typeName, timepoints, trial_artifact
+        return data, timepoints, fs, clab, mnt, trial_info, metadata
+
+
+if __name__ == "__main__":
+    root_dir = get_dir_by_indicator(indicator="ROOT")
+    RAW_DATA_PATH = os.path.join(root_dir, "data/SMR/raw")
+    PREPROCESS_DATA_PATH = os.path.join(root_dir, "data/SMR/processed")
+    # from bbcpy.load import eeg
+    # from bbcpy.datatypes.eeg import Data,Chans,Epo
+    # from bbcpy.functions.statistics import cov
+    # res = eeg.data(fname=os.path.join(PREPROCESS_DATA_PATH,"S1_Session_1.npz"))
+
+    data, timepoints, fs, clab, mnt, trial_info, metadata = \
+    load_matlab_data_complete(subjectno=1, sessionno=1, data_path=RAW_DATA_PATH)
+
+    # obj = Data(X, fs, chans=Chans(clab,mnt))
+
+    # ep = Epo(data=X, time=)
