@@ -149,5 +149,6 @@ def proc_spatialFilter(cnt, clab, chan, neighbors='*'):
     else:
         nidx = [clab.index(neighbors)]
         
-    1cnt_sf = cnt[[cidx],:] - np.mean(cnt[nidx,:], axis=0)
+    cnt_sf = cnt[[cidx],:] - np.mean(cnt[nidx,:], axis=0)
+    
     return cnt_sf

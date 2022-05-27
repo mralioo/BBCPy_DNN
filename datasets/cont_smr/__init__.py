@@ -43,14 +43,14 @@ def load_matlab_data_complete(subjectno, sessionno, data_path, outdir=None):
     # srate
     fs = mdata["SRATE"][0][0][0][0]
 
-    # Extracting channel names and mnt info, excluding the reference electrode
+
     # chaninfo = defaultdict(list)
     # chaninfo_keys = mdata["chaninfo"][0][0][0].dtype.names
-
+    # Extracting channel names and mnt info, excluding the reference electrode (REF)
     chan_inf = mdata["chaninfo"][0][0][0]["electrodes"][0][0]
     clab = []
     mnt = []
-    for element in chan_inf:
+    for element in chan_inf[:-1]:
         clab.append(str(element[0][0]))
         mnt.append([element[1][0][0], element[2][0][0], element[3][0][0]])
     mnt = np.array(mnt)
@@ -80,6 +80,10 @@ def load_matlab_data_complete(subjectno, sessionno, data_path, outdir=None):
 
     else:
         return data, timepoints, fs, clab, mnt, trial_info, metadata
+
+def trial_ids_key(data, keys):
+    pass
+
 
 
 if __name__ == "__main__":

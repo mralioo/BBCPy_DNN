@@ -7,12 +7,8 @@ from plotly.offline import iplot
 from datasets.cont_smr import *
 
 
-def plot_3dSurface_and_heatmap(eeg_data, task_type,clab, group, trial_id):
-    idx_class = np.squeeze(np.argwhere(task_type == group))
-    d = eeg_data[idx_class][trial_id].tolist()
-    index_clab = clab
-
-    temp_df = pd.DataFrame(data=d, index=index_clab)
+def plot_3dSurface_and_heatmap(eeg_data, clab):
+    temp_df = pd.DataFrame(data=eeg_data, index=clab)
     channel = np.arange(62)
     sensor_positions = clab
     data = [go.Surface(z=temp_df, colorscale='Bluered')]
@@ -94,7 +90,7 @@ if __name__ == "__main__":
     DATA_PATH = os.path.join(module_path, "data/SMR/raw")
 
     data, fs, clab, mnt, mrk_class, mrk_className, task_type, task_typeName, timepoints, trial_artifact = \
-        load_matlab_data_fast(subjectno=1, sessionno=1, data_path=DATA_PATH, outfile=False)
+        load_matlab_data_complete(subjectno=1, sessionno=1, data_path=DATA_PATH, outfile=False)
 
     idx_class_0 = np.squeeze(np.argwhere(task_type == 0))
     d = data[idx_class_0][0].tolist()
@@ -104,27 +100,28 @@ if __name__ == "__main__":
     channel = np.arange(62)
     sensor_positions = clab
 
-    list_of_pairs = []
-    j = 0
-    for column in sample_corr_df.columns:
-        j += 1
-        for i in range(j, len(sample_corr_df)):
-            if column != sample_corr_df.index[i]:
-                temp_pair = [column + '-' + sample_corr_df.index[i]]
-                list_of_pairs.append(temp_pair)
-
-    corr_pairs_dict = {}
-    for i in range(len(list_of_pairs)):
-        temp_corr_pair = dict(zip(list_of_pairs[i], [0]))
-        corr_pairs_dict.update(temp_corr_pair)
-
-    j = 0
-    for column in correlation_df.columns:
-        j += 1
-        for i in range(j, len(correlation_df)):
-            if ((correlation_df[column][i] >= threshold) & (column != correlation_df.index[i])):
-                corr_pairs_dict[column + '-' + correlation_df.index[i]] += 1
-
-    corr_count = pd.DataFrame(corr_pairs_dict, index=['count']).T.reset_index(drop=False).rename(columns={'index': 'channel_pair'})
-    print('Channel pairs that have correlation value >= ' + str(threshold) + ' (' + group + ' group):')
-    print(corr_count['channel_pair'][corr_count['count'] > 0].tolist())
+    # list_of_pairs = []
+    # j = 0
+    # for column in sample_corr_df.columns:
+    #     j += 1
+    #     for i in range(j, len(sample_corr_df)):
+    #         if column != sample_corr_df.index[i]:
+    #             temp_pair = [column + '-' + sample_corr_df.index[i]]
+    #             list_of_pairs.append(temp_pair)
+    #
+    # corr_pairs_dict = {}
+    # for i in range(len(list_of_pairs)):
+    #     temp_corr_pair = dict(zip(list_of_pairs[i], [0]))
+    #     corr_pairs_dict.update(temp_corr_pair)
+    #
+    # j = 0
+    # for column in correlation_df.columns:
+    #     j += 1
+    #     for i in range(j, len(correlation_df)):
+    #         if ((correlation_df[column][i] >= threshold) & (column != correlation_df.index[i])):
+    #             corr_pairs_dict[column + '-' + correlation_df.index[i]] += 1
+    #
+    # corr_count = pd.DataFrame(corr_pairs_dict, index=['count']).T.reset_index(drop=False).rename(
+    #     columns={'index': 'channel_pair'})
+    # print('Channel pairs that have correlation value >= ' + str(threshold) + ' (' + group + ' group):')
+    # print(corr_count['channel_pair'][corr_count['count'] > 0].tolist())
