@@ -2,7 +2,7 @@ import pickle
 
 import numpy as np
 
-from datasets.cont_smr import list_all_files
+from datasets.utils import list_all_files
 
 
 def load_dict_pkl(path_name):
