@@ -136,3 +136,5 @@ logs/
 data/
 # jupyter checkpoints
  **/*.ipynb_checkpoints/
+# local folder
+local/
