@@ -54,7 +54,7 @@ def list_all_files(data_path, pattern="*.mat"):
     return group_files
 
 
-def load_data_from_mat(mat_file, key):
+def load_data_from_mat(mat_file, key=None):
     mdata = loadmat(mat_file, mat_dtype=True)["BCI"]
 
     # data for all 450 trials:
@@ -215,7 +215,7 @@ def load_single_mat_session(subjectno, sessionno, data_path, outdir=None):
     # Select the subject person and the session number to load the data
     subject = "S" + str(subjectno)
     session_id = "Session_" + str(sessionno)
-    file_path = os.path.join(DATA_PATH, group_files[subject][session_id])
+    file_path = group_files[subject][session_id]
     if os.path.exists(file_path):
         data, timepoints, fs, clab, mnt, trial_info, metadata = load_data_from_mat(file_path)
     else:
