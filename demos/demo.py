@@ -13,7 +13,7 @@ from sklearn.model_selection import cross_val_score
 if __name__ == "__main__":
     ival = [1000, 4500]
     band = [10.5, 13]
-    imagVPaw = bbcpy.load.eeg.data('../data/bbcpydata/imagVPaw.npz')
+    imagVPaw = bbcpy.load.eeg.data('../local/data/imagVPaw/imagVPaw.npz')
 
     # examples for new advanced indexing:
 
