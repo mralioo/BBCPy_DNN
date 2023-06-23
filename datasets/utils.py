@@ -101,7 +101,6 @@ def load_data_from_mat(mat_file, key=None):
 
         # time:
         timepoints = mdata["time"][0][0][0]
-
         # srate
         fs = mdata["SRATE"][0][0][0][0]
 
@@ -203,33 +202,14 @@ def load_all_mat_sessions(data_path, outdir=None):
     return res
 
 
-def load_single_mat_session(subjectno, sessionno, data_path, outdir=None):
-    if data_path is None:
-        root_dir = get_dir_by_indicator(indicator="ROOT")
-        DATA_PATH = Path(root_dir).parent / "data" / "raw"  # the data folder has to be in the parent folder!
-    else:
-        DATA_PATH = Path(data_path)
+def load_single_mat_session(file_path):
 
-    group_files = list_all_files(DATA_PATH)
-
-    # Select the subject person and the session number to load the data
-    subject = "S" + str(subjectno)
-    session_id = "Session_" + str(sessionno)
-    file_path = group_files[subject][session_id]
     if os.path.exists(file_path):
         data, timepoints, fs, clab, mnt, trial_info, metadata = load_data_from_mat(file_path)
+        return data, timepoints, fs, clab, mnt, trial_info, metadata
+
     else:
         raise FileNotFoundError(f"{file_path} file does not exist !")
-
-    if outdir is not None:
-        if not os.path.exists(outdir):
-            os.makedirs(outdir)
-        outfile_name = os.path.join(outdir, f"{subject}_{session_id}_all.mat")
-        scipy.io.savemat(outfile_name,
-                         {"data": data, "timepoints": timepoints, "fs": fs, "lab": clab, "mnt": mnt,
-                          "trial_info": trial_info, "metadata": metadata})
-    else:
-        return data, timepoints, fs, clab, mnt, trial_info, metadata
 
 
 def load_subjects_info(data_path, outdir=None):

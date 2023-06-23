@@ -1,12 +1,14 @@
-import bbcpy
-import numpy as np
+import copy
+
 import numpy.ma as ma
-from matplotlib import pyplot as plt
-from scipy import signal
-import scipy.io as sio
-from datasets import utils as dutils
+import scipy as sp
+import scipy.signal
+import sklearn
+import pickle
+
+from bbcpy.datatypes.eeg import Chans
 from data.SMR.eeg import *
-from bbcpy.datatypes.eeg import Data, Chans, Marker, Epo
+from datasets import utils as dutils
 
 task_map_dict = {"LR": 1, "UD": 2, "2D": 3}
 target_map_dict = {"R": 1, "L": 2, "U": 3, "D": 4}
@@ -70,13 +72,16 @@ def gettimeindices(orig_key, fs):
     return key
 
 
-def makeepochs_srm(srm_data, timepoints, ival, fs, mrk):
+def makeepochs_srm(srm_data, timepoints, ival, fs, trial_maxlen=None):
     """Reshape trials to have the same length using numpy.ma """
 
     # TODO support time interval selection
+    if trial_maxlen is None:
+        trial_maxlen_id = np.argmax([len(t) for t in timepoints])
+        trial_maxlen = timepoints[trial_maxlen_id].shape[-1]
+    else:
+        trial_maxlen = copy.deepcopy(trial_maxlen)
 
-    trial_maxlen_id = np.argmax([len(t) for t in timepoints])
-    trial_maxlen = timepoints[trial_maxlen_id].shape[-1]
     nChans = srm_data[0].shape[0]
     # Create a masked array with the same size as the largest sub ndarray
     new_srm_data = ma.zeros((srm_data.shape[0], nChans, trial_maxlen))
@@ -109,12 +114,12 @@ def makeepochs_srm(srm_data, timepoints, ival, fs, mrk):
 
     return epo, epo_t
 
+
 class SRM_Marker(np.ndarray):
     global task_map_dict
     global target_map_dict
 
     def __new__(cls, mrk_class, mrk_class_name, trialresult, triallength, mrk_fs=1):
-
         obj = np.asarray(mrk_class).view(cls)
         obj.y = np.array(mrk_class)  # target was presented to the participants (1=right, 2=lef, 3=up, 4=down)
         obj.className = mrk_class_name  # {"R": 1, "L": 2, "U": 3, "D": 4}
@@ -218,7 +223,7 @@ class SRM_Marker(np.ndarray):
         selected, obj.y, obj.className = self.__select_classes__(classes)
 
         # FIXME : should have 450 trials
-        obj.triallength =obj.triallength[selected]
+        obj.triallength = obj.triallength[selected]
         obj.trialresult = obj.trialresult[selected]
         # FIXME index not working on obj with 450 trials
         # obj = obj[selected]
@@ -232,6 +237,69 @@ class SRM_Marker(np.ndarray):
 
     def in_ms(self):
         return self / self.fs * 1000
+
+
+class SRM_Data_Subject():
+    def __init__(self, subject_id, srm_data_path):
+        self.subject_id = subject_id
+        self.srm_data_path = srm_data_path
+
+    def load_sessions(self,
+                      sessions_ids,
+                      ival_orig,
+                      fs,
+                      classes=None,
+                      select_chans=None,
+                      select_timepoints=None):
+
+        if not isinstance(sessions_ids, list):
+            sessions_ids = [sessions_ids]
+
+        self.sessions_data = {}
+        ival = gettimeindices(ival_orig, fs)
+
+        for session_no in sessions_ids:
+            session_key = f"sess_{session_no}"
+            srm_data, timepoints, srm_fs, clab, mnt, trial_info, subject_info = dutils.load_single_mat_session(
+                subjectno=self.subject_id, sessionno=session_no, data_path=self.srm_data_path)
+
+            mrk_class = trial_info["targetnumber"]
+            trialresult = trial_info["result"]
+            triallength = trial_info["triallength"]
+            mrk_class_name = np.unique(mrk_class)
+
+            # data, time = makeepochs_srm(srm_data, timepoints, ival, srm_fs, trial_maxlen=trial_maxlen_inms)
+            data, time = makeepochs_srm(srm_data, timepoints, ival, srm_fs)
+            self.sessions_data[session_key] = SRM_Data(data,
+                                                       time,
+                                                       srm_fs,
+                                                       mrk=SRM_Marker(mrk_class, mrk_class_name, trialresult,
+                                                                      triallength, srm_fs),
+                                                       chans=Chans(clab, mnt))
+
+            # FIXME: select one by one
+            if (classes is not None) and (select_chans is not None) and (select_timepoints is not None):
+                if isinstance(classes, str):
+                    classes = [classes]
+                if select_timepoints == "all":
+                    self.sessions_data[session_key] = copy.deepcopy(
+                        self.sessions_data[session_key][classes][:, select_chans, :])
+                else:
+                    self.sessions_data[session_key] = copy.deepcopy(
+                        self.sessions_data[session_key][classes][:, select_chans, select_timepoints])
+            else:
+                raise NotImplementedError
+
+            self.subject_info = subject_info
+
+        return self.sessions_data
+
+    def get_session_data(self, session_no):
+        return self.sessions_data[session_no]
+
+    def save_subject_data(self, filename):
+        with open(filename, "wb") as f:
+            pickle.dump(self, f)
 
 
 class SRM_Data(np.ndarray):
@@ -264,6 +332,7 @@ class SRM_Data(np.ndarray):
         obj.fs = self.fs.copy()
         obj.mrk = self.mrk.copy()
         obj.chans = self.chans.copy()
+        obj.t = self.t.copy()
         return obj
 
     def __array_finalize__(self, obj, *args, **kwargs):
@@ -272,9 +341,10 @@ class SRM_Data(np.ndarray):
         self.fs = getattr(obj, 'fs', None)
         self.mrk = getattr(obj, 'mrk', None)
         self.chans = getattr(obj, 'chans', None)
+        self.t = getattr(obj, 't', None)
 
     def __initargs__(self):
-        return self.fs, self.mrk, self.chans
+        return self.t, self.fs, self.mrk, self.chans
 
     def __getitem__(self, key):
 
@@ -390,44 +460,21 @@ class SRM_Data(np.ndarray):
         else:  # needed for certain np operations because structure is lost
             obj = np.asarray(self)[key]
         return obj
-        #     if isinstance(key, type(np.newaxis)):
-        #         chans = self.chans.copy()
-        #     elif isinstance(key, (int, str, slice, list, np.ndarray)) or (len(key) == 1):
-        #         key = self.chans.index(key)
-        #         chans = self.chans.copy()[key]
-        #     elif isinstance(key, tuple) and (isinstance(key[0], (int, str, slice, list, np.ndarray))) and (len(self.chans.shape) > 0):  # channels selected together with time domain
-        #         key = list(key)
-        #         key[0] = self.chans.index(key[0])
-        #         key = tuple(key)
-        #         chans = self.chans.copy()[key[0]]
-        #     else:  # channels not changed
-        #         chans = self.chans.copy()
-        #
-        #     # FIXME: time domain selection not working
-        #     if isinstance(key, tuple) and len(key) > 1 and (isinstance(key[1], (str, list, np.ndarray))):
-        #         # time selected and probably string indexing given
-        #         key = list(key)
-        #         key[1] = gettimeindices(key[1], self.fs)
-        #         key = tuple(key)
-        #     if isinstance(key, tuple) and len(key) > 1 and isinstance(key[1], slice) and key[1].step is not None:
-        #         # time is sliced, sampling rate might be changed
-        #         fs = float(self.fs) / key[1].step
-        #     else:
-        #         fs = self.fs
-        #
-        # # iterate over trials and select from key
-        # x = np.asarray(self)
-        #
-        # sliced_data = [trial[key] for trial in x]
-        # # Transform the sliced_data list to an ndarray object with dtype set to object
-        # sliced_data_array = np.asarray(sliced_data, dtype=object)
-        # sliced_data_array[:] = sliced_data
-        #
-        #
-        # # create new object with sliced data
-        # obj = SRM_Data(sliced_data_array, fs,self.mrk, chans)
-        #
-        # return obj
+
+    def lfilter(self, band, order=5, filttype='*', filtfunc=sp.signal.butter):
+        return bbcpy.functions.temporal.lfilter(self, band, order=order, filttype=filttype, filtfunc=filtfunc)
+
+    def cov(self, **kwargs):
+        return bbcpy.functions.statistics.cov(self, **kwargs)
+
+    def pca(self, **kwargs):
+        pca_fitter = sklearn.decomposition.PCA(**kwargs)
+        pca_fitter = pca_fitter.fit(self)
+        # data = pca_fitter.transform(self)
+        data = SRM_Data(pca_fitter.transform(self), self.fs, self.mrk)
+        data.pcaobj = pca_fitter  # all values like W, A, d are stored in pca object of the EEGdata object
+        # self.flat = data.flatten()
+        return data
 
     def copy(self, order='K'):
         obj = self.__class__(super().copy(order=order), *self.__initargs__())
