@@ -1,270 +1,237 @@
-import os
-import sys
+import copy
+from collections import defaultdict
 
-import matplotlib.pyplot as plt
 import numpy as np
-import pandas as pd
-import plotly.graph_objs as go
-import seaborn as sns
-from bbcpy.utils.data import normalize
-from matplotlib import rc
-from matplotlib.collections import LineCollection
-from plotly.offline import iplot
-
-sns.set_theme(style="darkgrid")
-font = {'family': 'monospace',
-        'weight': 'bold',
-        'size': 10}
-rc('font', **font)
+from bbcpy.load.srm_eeg import *
+from bokeh.io import output_notebook
+from bokeh.models import ColumnDataSource, LabelSet
+from bokeh.models import FactorRange
+from bokeh.palettes import Spectral6
+from bokeh.plotting import figure, show
+from bokeh.transform import factor_cmap
 
 
-def plot_eeg(raw_data, num_trial, ch_names, timepoints, fs=1000., norm_type="std", axis=1):
-    EEG_norm, x_norm_params = normalize(raw_data, norm_type="std", axis=axis)
+def sort_subject_by_key(subject_group_path, key="MBSRsubject"):
+    """ Sort the subject_group_path dictionary by the key."""
+    sorted_subject_group_path = {}
+    if key == "MBSRsubject":
+        sorted_subject_group_path["MBSRsubject"] = {}
+        sorted_subject_group_path["no_MBSRsubject"] = {}
 
-    EEG = EEG_norm[num_trial]
-
-    n_samples, n_rows = EEG.shape[-1], len(ch_names)
-    # t = timepoints / fs
-    t = np.arange(n_samples) / fs
-
-    dmin = EEG.min()
-    dmax = EEG.max()
-    dr = (dmax - dmin) * 0.5  # Crowd them a bit.
-    y0 = dmin
-    y1 = (n_rows - 1) * dr + dmax
-
-    ticklocs = []
-    segs = []
-    for i in range(n_rows):
-        segs.append(np.column_stack((t, EEG[i, :])))
-        ticklocs.append(i * dr)
-
-    offsets = np.zeros((n_rows, 2), dtype=float)
-    offsets[:, 1] = ticklocs
-
-    fig, ax = plt.subplots(figsize=(15, 10))
-
-    lines = LineCollection(segs, offsets=offsets, transOffset=None)
-    ax.add_collection(lines)
-    ax.set_ylim(y0, y1)
-
-    ax.set_yticks(ticklocs)
-    ax.set_yticklabels(ch_names, rotation=30, fontsize=8)
-    ax.xaxis.set_ticklabels(timepoints, fontsize=6, color='black')
-    ax.set_ylabel('Channels')
-    ax.set_xlabel('Time (s)')
-    ax.set_title("S{:}s{:}\ntrial_{:}\n norm:{:}_axis{:}".format(1, 1, num_trial, norm_type, axis))
-
-    # for sig, ch_name in zip(EEG, ch_names):
-    #     ax.plot(time, ch_name)
-
-    fig.tight_layout()
-    plt.show()
-
-
-def plot_cm(engine, class_type, figsize=(15, 6), fontsize=16):
-    cm = engine.state.metrics["cm"].numpy().astype(int)
-    if class_type == "LR":
-        class_names = ["L", "R"]
-        num_classes = len(class_names)
+        for subject_id, subj_dict in subject_group_path.items():
+            for session_id, sess_path in subj_dict.items():
+                tmp = load_session_metadata(sess_path)
+                if tmp[subject_id]["MBSRsubject"] == True:
+                    sorted_subject_group_path["MBSRsubject"][subject_id] = copy.deepcopy(subj_dict)
+                if tmp[subject_id]["MBSRsubject"] == False:
+                    sorted_subject_group_path["no_MBSRsubject"][subject_id] = copy.deepcopy(subj_dict)
     else:
-        raise NotImplemented
+        raise NotImplementedError("The key is not implemented yet.")
 
-    group_counts = []
-    for i in range(len(class_names)):
-        for j in range(len(class_names)):
-            group_counts.append("{}/{}".format(cm[i, j], cm.sum(axis=1)[j]))
-    group_percentages = cm.astype('float') / cm.sum(axis=1)[:, np.newaxis]
-    group_percentages = np.nan_to_num(group_percentages)
-    labels = [f"{v1} \n {v2 * 100: .4}%" for v1, v2 in zip(group_counts, group_percentages.flatten())]
-    labels = np.asarray(labels).reshape(num_classes, num_classes)
-    plt.ioff()
-    fig, ax = plt.subplots(figsize=figsize)
-    sns.heatmap(cm, annot=labels, ax=ax, fmt="", cmap="Blues", cbar=True)
-    # sns.heatmap(cm, annot=True, ax=ax, fmt="", cmap="Blues", cbar=True)
-
-    # labels, title and ticks
-    ax.set_xlabel('Predicted labels', fontsize=fontsize, color='black')
-    ax.set_ylabel('True labels', fontsize=fontsize, color='black')
-    ax.set_title('Confusion Matrix on Validation set')
-    # True_class_name = [str(i) for i in range(len(class_names))]
-    ax.xaxis.set_ticklabels(class_names, fontsize=20, color='black')
-    ax.yaxis.set_ticklabels(class_names, fontsize=20, color='black')
-
-    return fig
+    return sorted_subject_group_path
 
 
-def plot_3dSurface_and_heatmap(eeg_data, clab):
-    temp_df = pd.DataFrame(data=eeg_data, index=clab)
-    channel = np.arange(62)
-    sensor_positions = clab
-    data = [go.Surface(z=temp_df, colorscale='Bluered')]
-    layout = go.Layout(
-        title='<br>3d Surface and Heatmap of Sensor Values ',
-        width=800,
-        height=900,
-        autosize=False,
-        margin=dict(t=0, b=0, l=0, r=0),
-        scene=dict(
-            xaxis=dict(
-                title='Time (sample num)',
-                gridcolor='rgb(255, 255, 255)',
-                #             erolinecolor='rgb(255, 255, 255)',
-                showbackground=True,
-                backgroundcolor='rgb(230, 230,230)'
-            ),
-            yaxis=dict(
-                title='Channel',
-                tickvals=channel,
-                ticktext=sensor_positions,
-                gridcolor='rgb(255, 255, 255)',
-                zerolinecolor='rgb(255, 255, 255)',
-                showbackground=True,
-                backgroundcolor='rgb(230, 230, 230)'
-            ),
-            zaxis=dict(
-                title='Sensor Value',
-                gridcolor='rgb(255, 255, 255)',
-                zerolinecolor='rgb(255, 255, 255)',
-                showbackground=True,
-                backgroundcolor='rgb(230, 230,230)'
-            ),
-            aspectratio=dict(x=1, y=1, z=0.5),
-            aspectmode='manual'
-        )
-    )
-    updatemenus = list([
-        dict(
-            buttons=list([
-                dict(
-                    args=['type', 'surface'],
-                    label='3D Surface',
-                    method='restyle'
-                ),
-                dict(
-                    args=['type', 'heatmap'],
-                    label='Heatmap',
-                    method='restyle'
-                )
-            ]),
-            direction='left',
-            pad={'r': 10, 't': 10},
-            showactive=True,
-            type='buttons',
-            x=0.1,
-            xanchor='left',
-            y=1.1,
-            yanchor='top'
-        ),
-    ])
+def get_trial_stats(subject_group_path, key="subject_result"):
+    """ Get the trial stats from the trial_info_dict."""
+    trial_stat_dict = {}
+    sessions_ids = []
+    subject_ids = []
+    num_subjects = len(subject_group_path.keys())
+    if key == "subject_result":
+        trial_stat_dict["targethitnumber"] = {}
+        trial_stat_dict["targethitnumber"]["L"] = [[] for _ in range(num_subjects)]
+        trial_stat_dict["targethitnumber"]["R"] = [[] for _ in range(num_subjects)]
+        trial_stat_dict["targethitnumber"]["count"] = {"L": [], "R": []}
 
-    annotations = list([
-        dict(text='Trace type:', x=0, y=1.085, yref='paper', align='left', showarrow=False)
-    ])
-    layout['updatemenus'] = updatemenus
-    layout['annotations'] = annotations
+        trial_stat_dict["result"] = {}
+        trial_stat_dict["result"]["failed"] = [[] for _ in range(num_subjects)]
+        trial_stat_dict["result"]["succeed"] = [[] for _ in range(num_subjects)]
+        trial_stat_dict["result"]["NT"] = [[] for _ in range(num_subjects)]
+        trial_stat_dict["result"]["count"] = {"failed": [], "succeed": [], "NT": []}
 
-    fig = dict(data=data, layout=layout)
-    iplot(fig)
+        trial_stat_dict["artifact"] = {}
+        trial_stat_dict["artifact"]["yes"] = [[] for _ in range(num_subjects)]
+        trial_stat_dict["artifact"]["no"] = [[] for _ in range(num_subjects)]
+        trial_stat_dict["artifact"]["count"] = {"yes": [], "no": []}
+
+    sorted_subject_group_path = sorted(subject_group_path.keys(), key=lambda x: int(x[1:]))
+
+    for i, subject_id in enumerate(sorted_subject_group_path):
+        subject_ids.append(subject_id)
+
+        for session_id, sess_path in subject_group_path[subject_id].items():
+            tmp = load_session_metadata(sess_path)
+            sess_id = session_id.split("_")[-1]
+            sessions_ids.append(f"{subject_id}-{sess_id}")
+            if key == "subject_result":
+                trial_stat_dict["targethitnumber"]["L"][i].append(tmp["targethitnumber"]["L"])
+                trial_stat_dict["targethitnumber"]["R"][i].append(tmp["targethitnumber"]["R"])
+
+                trial_stat_dict["result"]["failed"][i].append(tmp["result"]["failed"])
+                trial_stat_dict["result"]["succeed"][i].append(tmp["result"]["succeed"])
+                trial_stat_dict["result"]["NT"][i].append(tmp["result"]["NT"])
+
+                # artifact trials
+                arti_dict = tmp["artifact"]
+                if "yes" in arti_dict:
+                    trial_stat_dict["artifact"]["yes"][i].append(arti_dict["yes"])
+                else:
+                    trial_stat_dict["artifact"]["yes"][i].append(0)
+                trial_stat_dict["artifact"]["no"][i].append(arti_dict["no"])
+
+        trial_stat_dict["targethitnumber"]["count"]["L"].append(
+            np.sum(np.array(trial_stat_dict["targethitnumber"]["L"][i])))
+        trial_stat_dict["targethitnumber"]["count"]["R"].append(
+            np.sum(np.array(trial_stat_dict["targethitnumber"]["R"][i])))
+
+        trial_stat_dict["result"]["count"]["failed"].append(np.sum(np.array(trial_stat_dict["result"]["failed"][i])))
+        trial_stat_dict["result"]["count"]["succeed"].append(np.sum(np.array(trial_stat_dict["result"]["succeed"][i])))
+        trial_stat_dict["result"]["count"]["NT"].append(np.sum(np.array(trial_stat_dict["result"]["NT"][i])))
+
+        trial_stat_dict["artifact"]["count"]["yes"].append(np.sum(np.array(trial_stat_dict["artifact"]["yes"][i])))
+        trial_stat_dict["artifact"]["count"]["no"].append(np.sum(np.array(trial_stat_dict["artifact"]["no"][i])))
+
+    trial_stat_dict["subject_ids"] = subject_ids
+    trial_stat_dict["sessions_ids"] = sessions_ids
+
+    return trial_stat_dict
+
+
+def plot_histogram_subject(trial_stat_dict, subject_group="MBSRsubject", key="targethitnumber"):
+    """ Plot the histogram of the trial stats."""
+
+    subject_ids = trial_stat_dict["subject_ids"]
+    # Set the desired width and height of the figure
+    width = 1800
+    height = 600
+
+    if key == "targethitnumber":
+        left_counts = list(trial_stat_dict["targethitnumber"]["count"]["L"])
+        right_counts = list(trial_stat_dict["targethitnumber"]["count"]["R"])
+        tasks = ["L", "R"]
+
+        plot_title = f"{subject_group} group - Hit Target task count per subject"
+
+        data_dict = {'left': left_counts, 'right': right_counts, 'sessions': subject_ids}
+        x = [(session_id, task) for session_id in subject_ids for task in tasks]
+        counts = sum(zip(data_dict['left'], data_dict['right']), ())
+
+        source = ColumnDataSource(data=dict(x=x, counts=counts))
+
+    if key == "result":
+        failed_counts = list(trial_stat_dict["result"]["count"]["failed"])
+        succeed_counts = list(trial_stat_dict["result"]["count"]["succeed"])
+        NT_counts = list(trial_stat_dict["result"]["count"]["NT"])
+        tasks = ["failed", "succeed", "NT"]
+
+        plot_title = f"{subject_group} group - Trial result count per subject"
+
+        data_dict = {'failed': failed_counts, 'succeed': succeed_counts, 'NT': NT_counts, 'sessions': subject_ids}
+        x = [(session_id, task) for session_id in subject_ids for task in tasks]
+        counts = sum(zip(data_dict['failed'], data_dict['succeed'], data_dict['NT']), ())
+
+        source = ColumnDataSource(data=dict(x=x, counts=counts))
+    if key == "artifact":
+        yes_counts = list(trial_stat_dict["artifact"]["count"]["yes"])
+        no_counts = list(trial_stat_dict["artifact"]["count"]["no"])
+        tasks = ["yes", "no"]
+
+        plot_title = f"{subject_group} group - Artifact count per subject"
+
+        data_dict = {'yes': yes_counts, 'no': no_counts, 'sessions': subject_ids}
+        x = [(session_id, task) for session_id in subject_ids for task in tasks]
+        counts = sum(zip(data_dict['yes'], data_dict['no']), ())
+
+        source = ColumnDataSource(data=dict(x=x, counts=counts))
+
+    # Set up the figure
+    pp = figure(title=plot_title,
+                x_range=FactorRange(*x),
+                width=width, height=height,)
+                # tools="pan,wheel_zoom,box_zoom,reset")
+
+    pp.vbar(x='x', top='counts', width=0.9, source=source, line_color="white",
+            fill_color=factor_cmap('x', palette=Spectral6, factors=tasks, start=1, end=2))
+
+    pp.x_range.range_padding = 0.1
+    pp.xaxis.major_label_orientation = 1
+    pp.xgrid.grid_line_color = None
+    pp.background_fill_color = None
+    pp.border_fill_color = None
+
+    # Show the plot
+    output_notebook()
+    show(pp)
+
+
+def plot_scatter_subject(trial_stat_dict, subject_group="MBSRsubject", key="targethitnumber"):
+    """ Plot the scatter of the trial stats."""
+
+    subject_ids = trial_stat_dict["subject_ids"]
+    # sessions_ids = trial_stat_dict["sessions_ids"]
+
+    # Set the desired width and height of the figure
+    width = 1800
+    height = 800
+
+    if key == "targethitnumber":
+
+        x = list(trial_stat_dict["targethitnumber"]["count"]["L"])
+        y = list(trial_stat_dict["targethitnumber"]["count"]["R"])
+
+        scatter_plot_title = f"{subject_group} group - Hit Target task count per subject"
+        x_axis_label = "Left"
+        y_axis_label = "Right"
+
+        shared_points = defaultdict(list)
+        # Iterate over the sessions and populate the shared points dictionary
+        for i, subject_id in enumerate(subject_ids):
+            point = (x[i], y[i])
+            shared_points[point].append(subject_id)
+
+        # Convert shared_points dictionary to lists for ColumnDataSource
+        x_data = []
+        y_data = []
+        labels = []
+        for point, sessions in shared_points.items():
+            x_data.append(point[0])
+            y_data.append(point[1])
+            label_text = "\n".join(sessions)
+            labels.append(label_text)
+
+        # Create a ColumnDataSource object to store the data
+        source = ColumnDataSource(data=dict(
+            x=x_data,
+            y=y_data,
+            labels=labels
+        ))
+
+    if key == "result":
+        pass
+    if key == "artifact":
+        pass
+
+    # Set up the figure
+    p = figure(title=scatter_plot_title,
+               x_axis_label=x_axis_label,
+               y_axis_label=y_axis_label,
+               width=width, height=height,)
+               # tools='pan,wheel_zoom,box_zoom,reset')
+
+    # Create the scatter plot
+    p.scatter(x='x', y='y', color='blue', source=source)
+
+    labels = LabelSet(x='x', y='y', text='labels', text_color='black',
+                      x_offset=0, y_offset=0, source=source)
+    p.add_layout(labels)
+
+    # Add a legend
+    p.legend.location = "top_right"
+
+    # Show the plot
+    output_notebook()  # If using a Jupyter Notebook, otherwise omit this line
+    show(p)
 
 
 if __name__ == "__main__":
-    root_dir = get_dir_by_indicator(indicator="ROOT")
-    DATA_PATH = Path(root_dir).parent / "data"
-    file_name = os.path.join(DATA_PATH, "S1_Session_1.mat")
-
-    raw_data = load_bbci_data(data_path=DATA_PATH, subjects_list=[1], sessions_list=[[1]], task_type="LR",
-                              time_interval=[-6001, -1], merge_sessions=True, reshape_type="left_pad")
-
-    # raw_data = load_bbci_data(data_path=DATA_PATH, subjects_list=[1], sessions_list=[[1]], task_type="LR",
-    #                           time_interval=[2000, 8000], merge_sessions=True, reshape_type="slice")
-
-    X = np.concatenate([se.bci_recording["data"] for se in raw_data], axis=0)
-    Y = np.expand_dims(np.concatenate([se.bci_recording["label"] for se in raw_data], axis=0), -1)
-    # x_norm, x_norm_params = normalize(X, norm_type="std", axis=1)
-    # times = np.linspace(0, 1, 100, endpoint=False)
-    # sine = np.sin(20 * np.pi * times)
-    # cosine = np.cos(10 * np.pi * times)
-    # # data = np.array([sine, cosine])
-    #
-    # tdata = np.array([[0.2 * sine, 1.0 * cosine],
-    #                  [0.4 * sine, 0.8 * cosine],
-    #                  [0.6 * sine, 0.6 * cosine],
-    #                  [0.8 * sine, 0.4 * cosine],
-    #                  [1.0 * sine, 0.2 * cosine]])
-
-    # mdata = loadmat(file_name, mat_dtype=True)["BCI"]
-    # info = {x: str(y[0]) for x, y in mdata.dtype.fields.items()}
-    # mdata, fs, clab, mnt, mrk_class, mrk_className, task_type, task_typeName, timepoints, trial_artifact = load_matlab_data_fast(
-    #     subjectno=1, sessionno=1, data_path=DATA_PATH)
-
-    # info = mne.create_info(ch_names=ch_names, sfreq=fs, ch_types="eeg")
-    #
-    # simulated_raw = mne.io.RawArray(X[0], info)
-    # simulated_raw.plot(duration=2. , n_channels=1, scalings=None)
-    # simulated_raw.plot(scalings=dict(eeg=100e-6), duration=1, start=14)
-
-    # data_raw = mne.EpochsArray(X, info)
-    # data_raw.plot(picks='eeg', show_scrollbars=False)
-
-    ch_names = list(raw_data[0].clab[0:10])
-    # ch_names = list(raw_data[0].clab)
-    timepoints = raw_data[0].bci_recording["timepoints"]
-    fs = raw_data[0].fs[0]
-    #
-    num_trial = 5
-    plot_eeg(raw_data=X, num_trial=num_trial, timepoints=timepoints, ch_names=ch_names, fs=fs, norm_type=None,
-             axis=None)
-
-    plot_eeg(raw_data=X, num_trial=num_trial, timepoints=timepoints, ch_names=ch_names, fs=fs, norm_type="std", axis=0)
-    plot_eeg(raw_data=X, num_trial=num_trial, timepoints=timepoints, ch_names=ch_names, fs=fs, norm_type="std", axis=1)
-    plot_eeg(raw_data=X, num_trial=num_trial, timepoints=timepoints, ch_names=ch_names, fs=fs, norm_type="std", axis=2)
-
-    plot_eeg(raw_data=X, num_trial=num_trial, timepoints=timepoints, ch_names=ch_names, fs=fs, norm_type="minmax",
-             axis=0)
-    plot_eeg(raw_data=X, num_trial=num_trial, timepoints=timepoints, ch_names=ch_names, fs=fs, norm_type="minmax",
-             axis=1)
-    plot_eeg(raw_data=X, num_trial=num_trial, timepoints=timepoints, ch_names=ch_names, fs=fs, norm_type="minmax",
-             axis=2)
-    module_path = os.path.abspath(os.path.join('..'))
-    if module_path not in sys.path:
-        sys.path.append(module_path)
-
-    DATA_PATH = os.path.join(module_path, "data/SMR/raw")
-
-    data, fs, clab, mnt, mrk_class, mrk_className, task_type, task_typeName, timepoints, trial_artifact = \
-        load_matlab_data_complete(subjectno=1, sessionno=1, data_path=DATA_PATH, outfile=False)
-
-    idx_class_0 = np.squeeze(np.argwhere(task_type == 0))
-    d = data[idx_class_0][0].tolist()
-    index_clab = clab
-
-    df = pd.DataFrame(data=d, index=index_clab)
-    channel = np.arange(62)
-    sensor_positions = clab
-
-    # list_of_pairs = []
-    # j = 0
-    # for column in sample_corr_df.columns:
-    #     j += 1
-    #     for i in range(j, len(sample_corr_df)):
-    #         if column != sample_corr_df.index[i]:
-    #             temp_pair = [column + '-' + sample_corr_df.index[i]]
-    #             list_of_pairs.append(temp_pair)
-    #
-    # corr_pairs_dict = {}
-    # for i in range(len(list_of_pairs)):
-    #     temp_corr_pair = dict(zip(list_of_pairs[i], [0]))
-    #     corr_pairs_dict.update(temp_corr_pair)
-    #
-    # j = 0
-    # for column in correlation_df.columns:
-    #     j += 1
-    #     for i in range(j, len(correlation_df)):
-    #         if ((correlation_df[column][i] >= threshold) & (column != correlation_df.index[i])):
-    #             corr_pairs_dict[column + '-' + correlation_df.index[i]] += 1
-    #
-    # corr_count = pd.DataFrame(corr_pairs_dict, index=['count']).T.reset_index(drop=False).rename(
-    #     columns={'index': 'channel_pair'})
-    # print('Channel pairs that have correlation value >= ' + str(threshold) + ' (' + group + ' group):')
-    # print(corr_count['channel_pair'][corr_count['count'] > 0].tolist())
+    pass
