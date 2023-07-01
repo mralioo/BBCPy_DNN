@@ -138,3 +138,6 @@ data/
  **/*.ipynb_checkpoints/
 # local folder
 local/
+
+# venv folder
+/bbcpy_env/
