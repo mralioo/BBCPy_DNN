@@ -1,0 +1,26 @@
+# Hydra config file for the csp classifier steps
+_target_: src.models.csp.csp_pipeline
+
+#StepName:
+#    _target_: <class to instantiate the step>
+#    param1: <step's first parameter>
+#    param2: <step's second parameter, etc.>
+
+steps_config: # use yaml list syntax to preserve to order
+    - CSP:
+      _target_: bbcpy.functions.spatial.CSP
+      scoring:
+          _target_: bbcpy.functions.helpers.evscoring_medvar()
+
+      select:
+          _target_: bbcpy.functions.helpers.evselect_directorscut
+
+    - var:
+        _target_: bbcpy.functions.base.ImportFunc
+        func: np.var
+        axis: 2
+    - log:
+        _target_: bbcpy.functions.base.ImportFunc
+        func: np.log
+    - LDA:
+      _target_: sklearn.discriminant_analysis.LinearDiscriminantAnalysis
