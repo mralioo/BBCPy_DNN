@@ -1,9 +1,7 @@
-# https://mlflow.org
-
 mlflow:
-  _target_: lightning.pytorch.loggers.mlflow.MLFlowLogger
-  # experiment_name: ""
-  # run_name: ""
+  #  _target_: sklearn.mlflow.MlflowLogger
+  experiment_name: "test"
+  run_name: "debug"
   tracking_uri: ${paths.log_dir}/mlflow/mlruns # run `mlflow ui` command inside the `logs/mlflow/` dir to open the UI
   tags: null
   # save_dir: "./mlruns"

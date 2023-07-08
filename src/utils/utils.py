@@ -86,6 +86,12 @@ def task_wrapper(task_func: Callable) -> Callable:
                 if wandb.run:
                     log.info("Closing wandb!")
                     wandb.finish()
+            if find_spec("mlflow"):
+                import mlflow
+
+                if mlflow.active_run():
+                    log.info("Closing mlflow!")
+                    mlflow.end_run()
 
         return metric_dict, object_dict
 

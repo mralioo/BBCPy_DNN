@@ -2,6 +2,8 @@ from lightning.pytorch.utilities import rank_zero_only
 from omegaconf import OmegaConf
 
 from src.utils import pylogger
+import json
+import mlflow
 
 log = pylogger.get_pylogger(__name__)
 
@@ -49,3 +51,23 @@ def log_hyperparameters(object_dict: dict) -> None:
     # send hparams to all loggers
     for logger in trainer.loggers:
         logger.log_hyperparams(hparams)
+@rank_zero_only
+def log_sklearn_hyperparameters(object_dict: dict):
+
+    hparams = {}
+
+    cfg = OmegaConf.to_container(object_dict["cfg"])
+
+    hparams["model"] = cfg["model"]
+    hparams["data"] = cfg["data"]
+
+    hparams["callbacks"] = cfg.get("callbacks")
+    hparams["extras"] = cfg.get("extras")
+
+    hparams["task_name"] = cfg.get("task_name")
+    hparams["tags"] = cfg.get("tags")
+    hparams["ckpt_path"] = cfg.get("ckpt_path")
+    hparams["seed"] = cfg.get("seed")
+
+
+    return hparams

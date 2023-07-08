@@ -1,0 +1,39 @@
+# Hydra config file for the csp classifier steps
+#StepName:
+#    _target_: <class to instantiate the step>
+#    param1: <step's first parameter>
+#    param2: <step's second parameter, etc.>
+
+_target_: src.models.baseline_models.csp_pipeline
+steps_config: # use yaml list syntax to preserve to order
+    - CSP:
+        excllev: 1.2
+        estimator: 'lwf'
+    - var:
+        axis: 2
+    - LDA:
+        solver: 'svd'
+        shrinkage: 'auto'
+        n_components: 2
+
+
+
+
+
+#  - CSP:
+#      _target_: bbcpy.functions.spatial.CSP
+#      scoring:
+#        _partial_: true
+#        _target_: bbcpy.functions.helpers.evscoring_EV
+#      select:
+#        _partial_: true
+#        _target_: bbcpy.functions.helpers.evselect_best_csp
+#  - var:
+#      _target_: bbcpy.functions.base.ImportFunc
+#      func: numpy.var
+#      axis: 2
+#  - log:
+#      _target_: bbcpy.functions.base.ImportFunc
+#      func: numpy.log
+#  - LDA:
+#      _target_: sklearn.discriminant_analysis.LinearDiscriminantAnalysis
