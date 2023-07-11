@@ -5,15 +5,15 @@
 
 defaults:
   - override /data: srm_eeg.yaml
-  - override /model: baseline_csp.yaml
+  - override /model: baseline_riemann.yaml
   - override /callbacks: default.yaml
   - override /trainer: sklearn.yaml
-  - override /logger: mlflow.yaml
 
 # all parameters below will be merged with parameters from default configurations set above
 # this allows you to overwrite only specified parameters
 
 tags: [ alpha_band ]
+
 seed: 12345
 
 data:
@@ -22,4 +22,4 @@ data:
 logger:
   mlfow:
     tags: ${tags}
-    run_name: csp
+    run_name: riemann

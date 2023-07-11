@@ -5,7 +5,7 @@
 defaults:
   - _self_
   - data: srm_eeg.yaml
-  - model: baseline_riemann.yaml #
+  - model: baseline_riemann.yaml
   - callbacks: none.yaml
   - logger: mlflow.yaml # set logger here or use command line (e.g. `python train.py logger=tensorboard`)
   - trainer: sklearn.yaml
@@ -15,10 +15,11 @@ defaults:
 
   # experiment configs allow for version control of specific hyperparameters
   # e.g. best hyperparameters for given model and datamodule
-  - experiment: baseline_experiement_alpha_band.yaml
+  - experiment: baseline_experiement_alpha_band_riemann.yaml
 
   # config for hyperparameter optimization
   - hparams_search: null
+#  - hparams_search: baseline_experiement_multi_band.yaml
 
   # optional local config for machine/user specific settings
   # it's optional since it doesn't need to exist and is excluded from version control

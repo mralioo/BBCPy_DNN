@@ -1,10 +1,9 @@
 mlflow:
-  _target_: mlflow.sklearn
-  experiment_name: "test"
-  run_name: "debug"
+  experiment_name: "baseline_classifiers"
+  run_name: "csp"
   tracking_uri: ${paths.log_dir}\mlflow\mlruns # run `mlflow ui` command inside the `logs/mlflow/` dir to open the UI
-  tags: null
+  tags: ["alpha_band"]
   # save_dir: "./mlruns"
   prefix: ""
-  artifact_location: null
+  artifact_location: ${paths.log_dir}\mlflow\mlruns
   # run_id: ""
