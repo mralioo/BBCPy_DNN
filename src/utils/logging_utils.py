@@ -60,6 +60,7 @@ def log_sklearn_hyperparameters(object_dict: dict):
 
     hparams["model"] = cfg["model"]
     hparams["data"] = cfg["data"]
+    hparams["trainer"] = cfg["trainer"]
 
     hparams["callbacks"] = cfg.get("callbacks")
     hparams["extras"] = cfg.get("extras")

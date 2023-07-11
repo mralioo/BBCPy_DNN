@@ -1,0 +1,18 @@
+_target_: src.models.baseline_module.classifier_pipeline
+steps_config: # use yaml list syntax to preserve to order
+  FeatureExtraction:
+    AverageVariance:
+      applied: True
+      excllev: 1.2
+      estimator: 'lwf'
+    Covariance:
+      applied: True
+      estimator: 'lwf'
+  Transformation:
+    tangent_space:
+      applied: False
+  Classification:
+    SVC-pyriemann:
+      applied: True
+    SVC-sklearn:
+      applied: False

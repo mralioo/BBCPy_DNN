@@ -4,17 +4,30 @@
 #    param1: <step's first parameter>
 #    param2: <step's second parameter, etc.>
 
-_target_: src.models.baseline_models.csp_pipeline
+_target_: src.models.baseline_module.classifier_pipeline
 steps_config: # use yaml list syntax to preserve to order
-    - CSP:
-        excllev: 1.2
-        estimator: 'lwf'
-    - var:
-        axis: 2
-    - LDA:
-        solver: 'svd'
-        shrinkage: 'auto'
-        n_components: 2
+  FeatureExtraction:
+    CSP:
+      applied: True
+      n_cmps: 8
+      excllev: 1.2
+      estimator: 'scm'
+    MBCSP:
+      applied: False
+      n_cmps: 8
+      excllev: 1.2
+      estimator: 'scm'
+  Transformation:
+    var:
+      applied: True
+      axis: 2
+    log:
+      applied: True
+  Classification:
+    LDA:
+      applied: True
+      solver: 'svd'
+
 
 
 

@@ -1,6 +1,8 @@
+# https://mlflow.org
+
 mlflow:
-  _target_: mlflow.sklearn
-  experiment_name: "test"
+  _target_: lightning.pytorch.loggers.mlflow.MLFlowLogger
+  experiment_name: "lightning-exp"
   run_name: "debug"
   tracking_uri: ${paths.log_dir}\mlflow\mlruns # run `mlflow ui` command inside the `logs/mlflow/` dir to open the UI
   tags: null
