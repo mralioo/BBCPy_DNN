@@ -68,7 +68,8 @@ class EEGNetLitModule(LightningModule):
         self.val_acc_best.reset()
 
     def model_step(self, batch: Any):
-        x, y = batch
+        x = torch.tensor(batch).float()
+        y = batch.y
         logits = self.forward(x)
         loss = self.criterion(logits, y)
         preds = torch.argmax(logits, dim=1)
