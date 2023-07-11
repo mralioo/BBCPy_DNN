@@ -1,0 +1,14 @@
+_target_: src.data.srm_datamodule.SRMDatamodule
+data_dir: ${paths.data_dir} # data_dir is specified in config.yaml
+ival: 2s:8s:1ms
+bands: [ 8, 13 ]
+chans: [ * ]
+classes: [ R, L ]
+#train_subjects_sessions_dict : {S1: [1,2,3,4], S3: [6]}
+train_subjects_sessions_dict: { S1: [ 1 ] }
+test_subjects_sessions_dict: { S4: [ 3 ] }
+concatenate_subjects: true
+cv:
+  _target_: sklearn.model_selection.KFold
+  n_splits: 5
+  shuffle: False

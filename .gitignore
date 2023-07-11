@@ -133,11 +133,11 @@ dmypy.json
 # Log folder
 logs/
 # data folder
-data/
+/data/
 # jupyter checkpoints
  **/*.ipynb_checkpoints/
 # local folder
-local/
+/local/
 
 
 # venv folder
