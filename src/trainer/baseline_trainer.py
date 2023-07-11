@@ -28,7 +28,7 @@ def confusion_matrix_to_png(conf_mat, class_names, title, figure_file_name=None,
         plt.imshow(conf_mat, interpolation='nearest', cmap=plt.cm.Blues)
         plt.colorbar()
         tick_marks = np.arange(len(class_names))
-        plt.xticks(tick_marks, class_names, rotation=45)
+        plt.xticks(tick_marks, class_names)
         plt.yticks(tick_marks, class_names)
         # set title
         plt.title(title)
@@ -95,7 +95,7 @@ def confusion_matrix_to_png(conf_mat, class_names, title, figure_file_name=None,
             fig_file_path = f'{figure_file_name}.png'
 
         plt.savefig(fig_file_path)
-        mlflow.log_artifact(fig_file_path)
+        mlflow.log_artifact(fig_file_path, artifact_path="Validation_cm")
         plt.close(figure)
 
 
@@ -197,9 +197,18 @@ class SklearnTrainer(object):
                     mean_f1_score = np.mean(val_f1_list)
                     mlflow.log_metric("vali_mean_f1_score", mean_f1_score)
                     confusion_matrix_to_png(val_cm_list, classes_names, "mean_cm_val", type="mean")
+                    # log the mean confusion matrix to mlflow parent run
                     with open("Hparams.json", "w") as f:
                         json.dump(hparams, f)
-                    mlflow.log_artifact("Hparams.json")
+                    mlflow.log_artifact("Hparams.json", artifact_path="model")
+                    # log dataset dict to mlflow parent run
+
+                    for key, value in self.train_sessions.items():
+                        self.train_sessions[key] = list(value)
+
+                    with open("train_sessions.json", "w") as f:
+                        json.dump(self.train_sessions, f)
+                    mlflow.log_artifact("train_sessions.json", artifact_path="model")
 
                 # fetch logged data from parent run
                 params, metrics, tags, artifacts = fetch_logged_data(parent_run_id)
