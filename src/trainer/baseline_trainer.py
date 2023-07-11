@@ -9,6 +9,10 @@ from mlflow.tracking import MlflowClient
 from sklearn.metrics import confusion_matrix
 from pprint import pprint
 
+import pyrootutils
+pyrootutils.setup_root(__file__, indicator=".project-root", pythonpath=True)
+
+
 from src import utils
 from src.utils.vis import calculate_cm_stats, compute_percentages_cm
 import matplotlib.pyplot as plt

@@ -5,7 +5,7 @@
 
 defaults:
   - override /data: srm_eeg.yaml
-  - override /model: baseline_csp.yaml
+  - override /model: baseline_mbcsp.yaml
   - override /callbacks: default.yaml
   - override /trainer: sklearn.yaml
   - override /logger: mlflow.yaml
@@ -13,13 +13,14 @@ defaults:
 # all parameters below will be merged with parameters from default configurations set above
 # this allows you to overwrite only specified parameters
 
-tags: [ alpha_band ]
+tags: [ multiband ]
+
 seed: 12345
 
 data:
-  bands: [ 10.5, 13 ]
+  bands: [ [ 10.5, 13 ], [ 21, 26 ], [ 31.5, 39 ] ]
 
 logger:
   mlflow:
     tags: ${tags}
-    run_name: csp
+    run_name: mbcsp

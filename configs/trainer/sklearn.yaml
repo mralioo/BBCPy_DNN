@@ -1,4 +1,8 @@
 _target_: src.trainer.baseline_trainer.SklearnTrainer
+train_subjects_sessions_dict: { S1: [ 1 ] }
+#vali_subjects_sessions_dict: { S1: [ 2 ] }
+test_subjects_sessions_dict: { S2: [ 1 ] }
+concatenate_subjects: True
 cv:
     _target_: sklearn.model_selection.KFold
     n_splits: 5

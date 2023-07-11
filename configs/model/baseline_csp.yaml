@@ -4,7 +4,7 @@
 #    param1: <step's first parameter>
 #    param2: <step's second parameter, etc.>
 
-_target_: src.models.baseline_module.classifier_pipeline
+_target_: src.models.baseline_models.classifier_pipeline
 steps_config: # use yaml list syntax to preserve to order
   FeatureExtraction:
     CSP:

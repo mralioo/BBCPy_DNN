@@ -1,0 +1,18 @@
+_target_: src.models.baseline_models.classifier_pipeline
+steps_config: # use yaml list syntax to preserve to order
+  FeatureExtraction:
+    MBCSP:
+      applied: True
+      n_cmps: 8
+      excllev: 1.2
+      estimator: 'scm'
+  Transformation:
+    var:
+      applied: True
+      axis: 2
+    log:
+      applied: True
+  Classification:
+    LDA:
+      applied: True
+      solver: 'svd'

@@ -35,7 +35,7 @@ def classifier_pipeline(steps_config):
                                                                excllev=algo_config.excllev,
                                                                estimator=algo_config.estimator,
                                                                scoring=bbcpy.functions.helpers.evscoring_medvar,
-                                                               select=bbcpy.functions.helpers.evselect_direct)
+                                                               select=bbcpy.functions.helpers.evselect_directorscut)
                     steps.append(mbcsp_step)
 
                 if algo_name == 'AverageVariance' and algo_config.applied == True:
@@ -67,7 +67,7 @@ def classifier_pipeline(steps_config):
                     lda_step = LDA(solver=algo_config.solver)
                     steps.append(lda_step)
                 elif algo_name == 'SVC-pyriemann' and algo_config.applied == True:
-                    svc_step = pyriemann.classification.SVC()
+                    svc_step = pyriemann.classification.SVC(metric='logeuclid')
                     steps.append(svc_step)
 
                 elif algo_name == 'SVC-sklearn' and algo_config.applied == True:
