@@ -15,10 +15,11 @@ defaults:
 
   # experiment configs allow for version control of specific hyperparameters
   # e.g. best hyperparameters for given model and datamodule
-  - experiment: baseline_experiment_alpha_band.yaml
+  - experiment: baseline_riemann.yaml
 
   # config for hyperparameter optimization
-  - hparams_search: cv_gridsearch_csp.yaml
+#  - hparams_search: cv_gridsearch_csp.yaml
+  - hparams_search: null
 #  - hparams_search: sklearn_optuna.yaml
 
   # optional local config for machine/user specific settings
@@ -39,10 +40,10 @@ task_name: "hparmas_search"
 tags: [ "baseline" ]
 
 # set False to skip model training
-train: False
+train: True
 
 # set False to skip hyperparameter optimization
-tune: True
+tune: False
 
 # evaluate on test set, using best model weights achieved during training
 # lightning chooses best weights based on the metric specified in checkpoint callback

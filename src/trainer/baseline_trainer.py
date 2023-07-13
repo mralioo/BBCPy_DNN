@@ -1,6 +1,7 @@
 import json
 import pprint
 from datetime import datetime
+from pathlib import Path
 from sklearn.model_selection import GridSearchCV
 
 import mlflow
@@ -124,7 +125,7 @@ class SklearnTrainer(object):
             val_recall_list = []
 
             log.info("Logging to mlflow...")
-            mlflow.set_tracking_uri('file://' + self.logger.mlflow.tracking_uri)
+            mlflow.set_tracking_uri(Path(self.logger.mlflow.tracking_uri).as_uri())
 
             experiment_name = self.logger.mlflow.experiment_name
             run_name = "{}_{}".format(self.logger.mlflow.run_name,
@@ -138,9 +139,11 @@ class SklearnTrainer(object):
             except:
                 experiment = mlflow.get_experiment_by_name(experiment_name)
 
+
             mlflow.sklearn.autolog()
 
-            with mlflow.start_run(experiment_id=experiment.experiment_id, run_name=run_name) as parent_run:
+            with mlflow.start_run(experiment_id=experiment.experiment_id,
+                                  run_name=run_name) as parent_run:
 
                 for fold, (train_index, test_index) in enumerate(self.cv.split(train_data, train_data.y)):
                     foldNum = fold + 1
@@ -153,8 +156,11 @@ class SklearnTrainer(object):
                     parent_run_id = parent_run.info.run_id
                     mlflow_job_name = f"Fold-{foldNum}"
 
-                    with mlflow.start_run(experiment_id=experiment.experiment_id, run_name=mlflow_job_name,
+                    with mlflow.start_run(experiment_id=experiment.experiment_id,
+                                          run_name=mlflow_job_name,
                                           nested=True) as child_run:
+
+                        mlflow_artifact_path = mlflow.get_artifact_uri()
 
                         self.clf.fit(X_train, y_train)
                         y_pred = self.clf.predict(X_test)
@@ -171,7 +177,10 @@ class SklearnTrainer(object):
                         cm_vali = confusion_matrix(y_test, y_pred)
                         val_cm_list.append(compute_percentages_cm(cm_vali))
                         val_cm_title = f"vali-foldNum-{foldNum}-f1_score-{f1_score_vali}"
-                        confusion_matrix_to_png(cm_vali, classes_names, val_cm_title, figure_file_name="vali_cm")
+                        confusion_matrix_to_png(cm_vali,
+                                                classes_names,
+                                                val_cm_title,
+                                                figure_file_name="vali_cm")
 
                         # fetch logged data from child run
                         child_run_id = child_run.info.run_id
@@ -181,11 +190,23 @@ class SklearnTrainer(object):
                     # log the mean confusion matrix to mlflow parent run
                     mean_f1_score = np.mean(val_f1_list)
                     mlflow.log_metric("vali_mean_f1_score", mean_f1_score)
-                    confusion_matrix_to_png(val_cm_list, classes_names, "mean_cm_val", type="mean")
+                    confusion_matrix_to_png(val_cm_list,
+                                            classes_names,
+                                            "mean_cm_val",
+                                            type="mean")
                     # log the mean confusion matrix to mlflow parent run
+
+                    # fetch logged data from parent run
+                    parent_run_id = parent_run.info.run_id
+                    params, metrics, tags, artifacts = fetch_logged_data(parent_run_id)
+
+                    hparams.update(params)
+                    hparams.update(tags)
+
+                    hparams["mlflow_uri"] = mlflow_artifact_path
                     with open("Hparams.json", "w") as f:
                         json.dump(hparams, f)
-                    mlflow.log_artifact("Hparams.json", artifact_path="model")
+                    mlflow.log_artifact("Hparams.json", artifact_path="best_model")
                     # log dataset dict to mlflow parent run
 
                     for key, value in self.train_sessions.items():
@@ -193,11 +214,8 @@ class SklearnTrainer(object):
 
                     with open("train_sessions.json", "w") as f:
                         json.dump(self.train_sessions, f)
-                    mlflow.log_artifact("train_sessions.json", artifact_path="model")
+                    mlflow.log_artifact("train_sessions.json", artifact_path="data")
 
-                # fetch logged data from parent run
-                parent_run_id = parent_run.info.run_id
-                params, metrics, tags, artifacts = fetch_logged_data(parent_run_id)
                 log.info(f"Training completed!")
 
         else:

@@ -17,6 +17,21 @@ tags: [ "baseline" ,"alpha_band", "csp" ]
 seed: 12345
 
 data:
+  train_subjects_sessions_dict:
+    S1:
+      - 1
+      - 2
+      - 3
+      - 4
+      - 5
+      - 6
+    S2:
+      - 1
+      - 2
+      - 3
+      - 4
+      - 5
+      - 6
   bands: [ 10.5, 13 ]
 
 logger:

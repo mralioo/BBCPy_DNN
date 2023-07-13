@@ -5,7 +5,7 @@ root_dir: ${oc.env:PROJECT_ROOT}
 
 # path to data directory
 #data_dir: ${paths.root_dir}/data/SMR/raw/
-data_dir: ${paths.root_dir}\data\SMR\raw\
+data_dir: ${paths.root_dir}/../SMR_2021_RAW_DATA
 
 
 # path to logging directory

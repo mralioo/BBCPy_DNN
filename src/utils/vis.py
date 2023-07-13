@@ -82,7 +82,7 @@ def confusion_matrix_to_png(conf_mat, class_names, title, figure_file_name=None,
             fig_file_path = f'{figure_file_name}.png'
 
         plt.savefig(fig_file_path)
-        mlflow.log_artifact(fig_file_path, artifact_path="artifact_plots")
+        mlflow.log_artifact(fig_file_path, artifact_path="plots")
         plt.close(figure)
 
     elif type == 'mean':
@@ -120,5 +120,5 @@ def confusion_matrix_to_png(conf_mat, class_names, title, figure_file_name=None,
             fig_file_path = f'{figure_file_name}.png'
 
         plt.savefig(fig_file_path)
-        mlflow.log_artifact(fig_file_path, artifact_path="artifact_plots")
+        mlflow.log_artifact(fig_file_path, artifact_path="plots")
         plt.close(figure)
