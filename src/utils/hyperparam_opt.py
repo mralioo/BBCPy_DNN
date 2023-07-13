@@ -3,13 +3,13 @@ Methods for performing a search over specified parameter values for an estimator
 """
 import importlib
 import logging
-from omegaconf import OmegaConf
-
-from sklearn.model_selection._search import BaseSearchCV
 from collections.abc import Iterable
 
 import colorama
 import numpy as np
+from omegaconf import OmegaConf
+from sklearn.metrics import make_scorer
+from sklearn.model_selection._search import BaseSearchCV
 
 logger = logging.getLogger(__name__)
 
@@ -66,14 +66,20 @@ def optimize_hyperparams(cfg, pipeline):
                 'params' in cfg["hyperparam_opt"]):
             param_space = dict(param_space, **OmegaConf.to_container(cfg["hyperparam_opt"].params, resolve=True))
 
+    # make scorer
+    if cfg.hyperparam_opt.scoring == 'evscoring_medvar':
+        from bbcpy.functions.helpers import evscoring_medvar
+        scorer = make_scorer(evscoring_medvar)
+    else:
+        scorer = cfg.hyperparam_opt.scoring
+
     logger.info(f"Performing Hyperparameter Optimization for the following parameter space {param_space}")
 
     return class_(estimator=pipeline,
                   param_grid=param_space["param_grid"],
-                  scoring=cfg.hyperparam_opt.scoring,
-                  cv=cfg.hyperparam_opt.cv,
-                  n_job=cfg.hyperparam_opt.n_jobs,
-                  memory=cfg.hyperparam_opt.memory, )
+                  scoring=scorer,
+                  cv=cfg.hyperparam_opt.cv, )
+    # n_jobs=cfg.hyperparam_opt.n_jobs)
 
 
 class BayesianOptCV(BaseSearchCV):

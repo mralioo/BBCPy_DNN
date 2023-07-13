@@ -10,13 +10,14 @@ import pyrootutils
 import sklearn
 from sklearn.metrics import confusion_matrix
 
+pyrootutils.setup_root(__file__, indicator=".project-root", pythonpath=True)
+
 from src import utils
 from src.utils.hyperparam_opt import optimize_hyperparams
 from src.utils.mlflow import fetch_logged_data
 from src.utils.vis import compute_percentages_cm, confusion_matrix_to_png
 
 log = utils.get_pylogger(__name__)
-pyrootutils.setup_root(__file__, indicator=".project-root", pythonpath=True)
 
 
 class SklearnTrainer(object):
@@ -97,9 +98,10 @@ class SklearnTrainer(object):
 
             with open("Hparams.json", "w") as f:
                 json.dump(hparams, f)
-            mlflow.log_artifact("Hparams.json", artifact_path="model")
+            mlflow.log_artifact("Hparams.json", artifact_path="best_model")
 
-            params, metrics, tags, artifacts = fetch_logged_data(parent_run)
+            parent_run_id = parent_run.info.run_id
+            params, metrics, tags, artifacts = fetch_logged_data(parent_run_id)
 
         return metrics
 
@@ -194,6 +196,7 @@ class SklearnTrainer(object):
                     mlflow.log_artifact("train_sessions.json", artifact_path="model")
 
                 # fetch logged data from parent run
+                parent_run_id = parent_run.info.run_id
                 params, metrics, tags, artifacts = fetch_logged_data(parent_run_id)
                 log.info(f"Training completed!")
 

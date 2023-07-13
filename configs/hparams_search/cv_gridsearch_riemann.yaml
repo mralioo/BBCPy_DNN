@@ -1,14 +1,11 @@
 hyperparam_opt:
   class: sklearn.model_selection.GridSearchCV
   params:
-    wishart__excllev: np.concatenate([[None], np.arange(1, 2, 0.1)])
-    wishart__autobias: [True, False]
-    wishart__estimator: [covariance._scm, covariance._lwf, covariance._oas]
-    csp__n_cmps: [4, 6, 8, 10]
-    scoring: accuracy # The scoring should be choose according with https://scikit-learn.org/stable/modules/model_evaluation.html
-
-
-#
-#parameters = {'wishart__excllev': np.concatenate([[None], np.arange(1, 2, 0.1)]), 'wishart__autobias': [True, False],
-#              'wishart__estimator': [covariance._scm, covariance._lwf, covariance._oas], 'csp__n_cmps': [4, 6, 8, 10]}
-#clf = GridSearchCV(pipeline, parameters, cv=cv)
+    param_grid:
+      AverageVariance__excllev: [ 1.2, 1.5, 1.8 ]
+  scoring:
+    f1_weighted
+  cv:
+    _target_: sklearn.model_selection.KFold
+    n_splits: 5
+    shuffle: False
