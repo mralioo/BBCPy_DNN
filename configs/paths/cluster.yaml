@@ -10,7 +10,7 @@ data_dir: ${paths.root_dir}/../SMR_2021_RAW_DATA
 
 # path to logging directory
 #log_dir: ..\logs\ # Fixme os path
-log_dir: ${paths.root_dir}/logs/ # Fixme os path
+log_dir: ${paths.root_dir}/logs/mlflow/mlruns # Fixme os path
 
 
 # path to output directory, created dynamically by hydra
