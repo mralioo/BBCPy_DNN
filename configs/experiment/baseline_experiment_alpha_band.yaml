@@ -6,7 +6,7 @@
 defaults:
   - override /data: srm_eeg.yaml
   - override /model: baseline_csp.yaml
-  - override /callbacks: default.yaml
+  - override /callbacks: none.yaml
   - override /trainer: sklearn.yaml
   - override /logger: mlflow.yaml
 

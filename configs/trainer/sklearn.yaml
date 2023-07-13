@@ -1,32 +1,18 @@
 _target_: src.trainer.baseline_trainer.SklearnTrainer
-train_subjects_sessions_dict:
-    S1:
-        - 1
-        - 2
-#vali_subjects_sessions_dict: { S1: [ 2 ] }
-test_subjects_sessions_dict:
-    S1:
-        - 3
-        - 4
-concatenate_subjects: True
-cv:
-    _target_: sklearn.model_selection.KFold
-    n_splits: 5
-    shuffle: False
-#default_root_dir: ${paths.output_dir}
 
+cv:
+  _target_: sklearn.model_selection.KFold
+  n_splits: 5
+  shuffle: False
+
+#default_root_dir: ${paths.output_dir}
+#
 #min_epochs: 1 # prevents early stopping
 #max_epochs: 10
-
+#
 #accelerator: cpu
 #devices: 1
+#
+##mixed precision for extra speed-up
+#precision: 16
 
-# mixed precision for extra speed-up
-# precision: 16
-
-# perform a validation loop every N training epochs
-#check_val_every_n_epoch: 1
-
-# set True to to ensure deterministic results
-# makes training slower but gives more reproducibility than just setting seeds
-#deterministic: False

@@ -10,10 +10,6 @@ from bbcpy.functions.spatial import CSP, MBCSP
 from bbcpy.functions.statistics import cov
 from bbcpy.pipeline import make_pipeline
 
-
-# from bbcpy import functions
-
-
 def classifier_pipeline(steps_config):
     steps = []
     # for step_dict in steps_config: # if list

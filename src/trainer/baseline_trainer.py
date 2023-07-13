@@ -1,136 +1,126 @@
 import json
+import pprint
 from datetime import datetime
-import numpy as np
-import itertools
+from sklearn.model_selection import GridSearchCV
 
 import mlflow
-import sklearn
-from mlflow.tracking import MlflowClient
-from sklearn.metrics import confusion_matrix
-from pprint import pprint
-
+import numpy as np
+import optuna
 import pyrootutils
+import sklearn
+from sklearn.metrics import confusion_matrix
+
+from src import utils
+from src.utils.hyperparam_opt import optimize_hyperparams
+from src.utils.mlflow import fetch_logged_data
+from src.utils.vis import compute_percentages_cm, confusion_matrix_to_png
+
+log = utils.get_pylogger(__name__)
 pyrootutils.setup_root(__file__, indicator=".project-root", pythonpath=True)
 
 
-from src import utils
-from src.utils.vis import calculate_cm_stats, compute_percentages_cm
-import matplotlib.pyplot as plt
-
-log = utils.get_pylogger(__name__)
-
-
-def confusion_matrix_to_png(conf_mat, class_names, title, figure_file_name=None, type='standard'):
-    if type == 'standard':
-        plt.rcParams["font.family"] = 'DejaVu Sans'
-        figure = plt.figure(figsize=(9, 9))
-
-        plt.imshow(conf_mat, interpolation='nearest', cmap=plt.cm.Blues)
-        plt.colorbar()
-        tick_marks = np.arange(len(class_names))
-        plt.xticks(tick_marks, class_names)
-        plt.yticks(tick_marks, class_names)
-        # set title
-        plt.title(title)
-
-        # render the confusion matrix with percentage and ratio.
-        group_counts = []
-        for i in range(len(class_names)):
-            for j in range(len(class_names)):
-                group_counts.append("{}/{}".format(conf_mat[i, j], conf_mat.sum(axis=1)[i]))
-        group_percentages = np.around(conf_mat.astype('float') / conf_mat.sum(axis=1)[:, np.newaxis], decimals=2)
-        labels = [f"{v1} \n {v2 * 100: .4}%" for v1, v2 in zip(group_counts, group_percentages.flatten())]
-        labels = np.asarray(labels).reshape(len(class_names), len(class_names))
-
-        # set the font size of the text in the confusion matrix
-        for i, j in itertools.product(range(conf_mat.shape[0]), range(conf_mat.shape[1])):
-            color = "red"
-            plt.text(j, i, labels[i, j], horizontalalignment="center", color=color, fontsize=15)
-
-        plt.tight_layout()
-        plt.ylabel('True label', fontsize=10)
-        plt.xlabel('Predicted label', fontsize=10)
-
-        if figure_file_name is None:
-            fig_file_path = f'{title}.png'
-        else:
-            fig_file_path = f'{figure_file_name}.png'
-
-        plt.savefig(fig_file_path)
-        mlflow.log_artifact(fig_file_path)
-        plt.close(figure)
-
-    elif type == 'mean':
-
-        # Fixme here I pass list of cm (better way)
-        plt.rcParams["font.family"] = 'DejaVu Sans'
-        figure = plt.figure(figsize=(9, 9))
-
-        # Add values to the plot
-        mean_cm_val, std_cm_val = calculate_cm_stats(cm_list=conf_mat, num_classes=len(class_names))
-
-        plt.imshow(mean_cm_val, interpolation='nearest', cmap=plt.cm.Blues)
-        plt.colorbar()
-        tick_marks = np.arange(len(class_names))
-        plt.xticks(tick_marks, class_names, rotation=45)
-        plt.yticks(tick_marks, class_names)
-        # set title
-        plt.title(title)
-
-        labels = [f"{v1 * 100:.4}%  ±{v2 * 100: .4}%" for v1, v2 in zip(mean_cm_val.flatten(), std_cm_val.flatten())]
-        labels = np.asarray(labels).reshape(len(class_names), len(class_names))
-
-        # thresh = mean_cm_val.max() / 2.0
-        for i, j in itertools.product(range(mean_cm_val.shape[0]), range(mean_cm_val.shape[1])):
-            color = "red"
-            plt.text(j, i, labels[i, j], horizontalalignment="center", color=color)
-
-        plt.tight_layout()
-        plt.ylabel('True label', fontsize=10)
-        plt.xlabel('Predicted label', fontsize=10)
-
-        if figure_file_name is None:
-            fig_file_path = f'{title}.png'
-        else:
-            fig_file_path = f'{figure_file_name}.png'
-
-        plt.savefig(fig_file_path)
-        mlflow.log_artifact(fig_file_path, artifact_path="Validation_cm")
-        plt.close(figure)
-
-
-def fetch_logged_data(run_id):
-    client = MlflowClient()
-    data = client.get_run(run_id).data
-    tags = {k: v for k, v in data.tags.items() if not k.startswith("mlflow.")}
-    artifacts = [f.path for f in client.list_artifacts(run_id, "model")]
-    return data.params, data.metrics, tags, artifacts
-
-
 class SklearnTrainer(object):
-    def __init__(self, train_subjects_sessions_dict,
-                 test_subjects_sessions_dict,
-                 logger=None, cv=None, concatenate_subjects=True):
+    def __init__(self,
+                 cv,
+                 datamodule,
+                 logger=None,
+                 hyperparameter_search=None):
 
-        self.logger = logger
-        self.train_sessions = dict(train_subjects_sessions_dict)
-        self.test_sessions = dict(test_subjects_sessions_dict)
-        self.concatenate_subjects = concatenate_subjects
         self.cv = cv
 
-    def train(self, model, datamodule, hparams):
-        self.model = model
-        train_data = datamodule.load_data(self.train_sessions, self.concatenate_subjects)
+        self.logger = logger
+        self.datamodule = datamodule
+
+        self.hyperparameter_search = hyperparameter_search
+
+        self.train_sessions = self.datamodule.train_subjects_sessions_dict
+        self.vali_sessions = self.datamodule.vali_subjects_sessions_dict
+        self.test_sessions = self.datamodule.test_subjects_sessions_dict
+        self.concatenate_subjects = self.datamodule.concatenate_subjects
+
+    def search_hyperparams(self, pipeline, hparams):
+
+        log.info("Loading data...")
+        train_data = self.datamodule.load_data(self.train_sessions,
+                                               self.concatenate_subjects)
+
+        vali_data = self.datamodule.load_data(self.vali_sessions,
+                                              self.concatenate_subjects)
+
         classes_names = train_data.className
-        # initialize lists for storing results of confusion matrix to calculate mean std
-        val_cm_list = []
-        val_f1_list = []
-        val_recall_list = []
 
+        # FIXME with multi run does it automatically?
+        # self.optuna_search = optuna.integration.OptunaSearchCV(pipeline, self.hyperparameter_search)
+        # self.optuna_search = pipeline
 
-        num_folds = self.cv.n_splits
+        log.info("Logging to mlflow...")
+        mlflow.set_tracking_uri('file://' + self.logger.mlflow.tracking_uri)
+
+        experiment_name = self.logger.mlflow.experiment_name
+
+        run_name = "{}_{}".format(self.logger.mlflow.run_name,
+                                  datetime.now().strftime("%Y-%m-%d_%H-%M-%S"))
+
+        log.info("Create experiment: {}".format(experiment_name))
+        try:
+            mlflow.create_experiment(experiment_name)
+            mlflow.set_experiment(experiment_name)
+            experiment = mlflow.get_experiment_by_name(experiment_name)
+        except:
+            experiment = mlflow.get_experiment_by_name(experiment_name)
+
+        mlflow.sklearn.autolog()
+
+        with mlflow.start_run(experiment_id=experiment.experiment_id, run_name=run_name) as parent_run:
+
+            self.opt = optimize_hyperparams(self.hyperparameter_search, pipeline)
+
+            self.opt.fit(train_data, train_data.y)
+
+            log.info("Best params: {}".format(self.opt.best_params_))
+            best_model = self.opt.best_estimator_
+            y_pred = best_model.predict(vali_data)
+
+            val_acc = sklearn.metrics.accuracy_score(vali_data.y, y_pred)
+            val_f1 = sklearn.metrics.f1_score(vali_data.y, y_pred, average='weighted')
+            val_recall = sklearn.metrics.recall_score(vali_data.y, y_pred, average='weighted')
+            val_precision = sklearn.metrics.precision_score(vali_data.y, y_pred, average='weighted')
+
+            mlflow.log_metric("val_acc", val_acc)
+            mlflow.log_metric("val_f1", val_f1)
+            mlflow.log_metric("val_recall", val_recall)
+            mlflow.log_metric("val_precision", val_precision)
+
+            cm_vali = confusion_matrix(vali_data.y, y_pred)
+            val_cm_title = f"best_model_val-f1_score-{val_f1}"
+            confusion_matrix_to_png(cm_vali, classes_names, val_cm_title, figure_file_name="best_model_vali_cm")
+
+            with open("Hparams.json", "w") as f:
+                json.dump(hparams, f)
+            mlflow.log_artifact("Hparams.json", artifact_path="model")
+
+            params, metrics, tags, artifacts = fetch_logged_data(parent_run)
+
+        return metrics
+
+    def train(self, pipeline, hparams):
+
+        log.info("Loading data...")
+        train_data = self.datamodule.load_data(self.train_sessions,
+                                               self.concatenate_subjects)
+        classes_names = train_data.className
 
         if "mlflow" in self.logger:
+            self.clf = pipeline
+            num_folds = self.cv.n_splits
+
+            log.info(f"Train with cross-validation with {num_folds} folds...")
+
+            # initialize lists for storing results of confusion matrix to calculate mean std
+            val_cm_list = []
+            val_f1_list = []
+            val_recall_list = []
+
             log.info("Logging to mlflow...")
             mlflow.set_tracking_uri('file://' + self.logger.mlflow.tracking_uri)
 
@@ -163,15 +153,16 @@ class SklearnTrainer(object):
 
                     with mlflow.start_run(experiment_id=experiment.experiment_id, run_name=mlflow_job_name,
                                           nested=True) as child_run:
-                        self.model.fit(X_train, y_train)
-                        y_pred = self.model.predict(X_test)
 
+                        self.clf.fit(X_train, y_train)
+                        y_pred = self.clf.predict(X_test)
 
                         f1_score_vali = sklearn.metrics.f1_score(y_true=y_test, y_pred=y_pred, average="weighted")
                         mlflow.log_metric("vali_f1_score", f1_score_vali)
                         val_f1_list.append(f1_score_vali)
 
-                        recall_score_vali = sklearn.metrics.recall_score(y_true=y_test, y_pred=y_pred, average="weighted")
+                        recall_score_vali = sklearn.metrics.recall_score(y_true=y_test, y_pred=y_pred,
+                                                                         average="weighted")
                         mlflow.log_metric("vali_recall_score", recall_score_vali)
                         val_recall_list.append(recall_score_vali)
 
@@ -180,16 +171,8 @@ class SklearnTrainer(object):
                         val_cm_title = f"vali-foldNum-{foldNum}-f1_score-{f1_score_vali}"
                         confusion_matrix_to_png(cm_vali, classes_names, val_cm_title, figure_file_name="vali_cm")
 
-
-
                         # fetch logged data from child run
                         child_run_id = child_run.info.run_id
-                        # params, metrics, tags, artifacts = fetch_logged_data(child_run_id)
-                        # print("run_id: {}".format(child_run_id))
-                        # pprint(params)
-                        # pprint(metrics)
-                        # pprint(tags)
-                        # pprint(artifacts)
 
                         log.info(f"Train Fold {foldNum} with run-i {child_run_id} is completed!")
 
@@ -212,21 +195,16 @@ class SklearnTrainer(object):
 
                 # fetch logged data from parent run
                 params, metrics, tags, artifacts = fetch_logged_data(parent_run_id)
-                # print("run_id: {}".format(parent_run_id))
-                # pprint(params)
-                # pprint(metrics)
-                # pprint(tags)
-                # pprint(artifacts)
                 log.info(f"Training completed!")
-
-            return metrics
 
         else:
             log.warning("Logger not found! Skipping hyperparameter logging...")
-            score = self.model.fit(train_data, train_data.y)
+            score = self.clf.fit(train_data, train_data.y)
             return score
 
-    def test(self, model, datamodule):
+        return metrics
+
+    def test(self, pipeline, datamodule):
         test_data = datamodule.load_data(self.test_sessions, self.concatenate_subjects)
 
-        return model.predict(test_data)
+        return pipeline.predict(test_data)

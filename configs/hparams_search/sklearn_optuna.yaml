@@ -1,9 +1,14 @@
-#parameters = {'excllev': np.concatenate([[None], np.arange(1, 2, 0.1)]),
-#              'estimator': [covariance._scm, covariance._lwf], 'n_cmps': [2, 3, 4, 6, 8]}
+# @package _global_
 
+# example hyperparameter optimization of some experiment with Optuna:
+# python train.py -m hparams_search=mnist_optuna experiment=example
 
 defaults:
-  - override /hydra/sweeper: sklearn
+  - override /hydra/sweeper: optuna
+
+# choose metric which will be optimized by Optuna
+# make sure this is the correct name of some metric logged in lightning module!
+optimized_metric: "val_acc"
 
 # here we define Optuna hyperparameter search
 # it optimizes for value returned from function with @hydra.main decorator

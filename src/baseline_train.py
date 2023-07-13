@@ -6,8 +6,8 @@ import pyrootutils
 from omegaconf import DictConfig
 
 import bbcpy
-from trainer.baseline_trainer import SklearnTrainer
 from data.srm_datamodule import SRMDatamodule
+from trainer.baseline_trainer import SklearnTrainer
 
 pyrootutils.setup_root(__file__, indicator=".project-root", pythonpath=True)
 # ------------------------------------------------------------------------------------ #
@@ -55,7 +55,7 @@ def train(cfg: DictConfig) -> dict:
     datamodule: SRMDatamodule = hydra.utils.instantiate(cfg.data)
 
     log.info(f"Instantiating model <{cfg.model._target_}>")
-    model: bbcpy.pipeline.Pipeline = hydra.utils.instantiate(cfg.model)
+    pipeline: bbcpy.pipeline.Pipeline = hydra.utils.instantiate(cfg.model)
 
     log.info("Instantiating callbacks...")
     callbacks = utils.instantiate_callbacks(cfg.get("callbacks"))
@@ -63,28 +63,43 @@ def train(cfg: DictConfig) -> dict:
     log.info("Instantiating loggers...")
     logger = hydra.utils.instantiate(cfg.get("logger"))
 
+    log.info("Instantiating hyperparameter search...")
+    hyperparameter_search = hydra.utils.instantiate(cfg.get("hparams_search"))
+
     log.info(f"Instantiating trainer <{cfg.trainer._target_}>")
-    trainer: SklearnTrainer = hydra.utils.instantiate(cfg.trainer, logger=logger)
+    trainer: SklearnTrainer = hydra.utils.instantiate(cfg.trainer,
+                                                      datamodule=datamodule,
+                                                      logger=logger,
+                                                      hyperparameter_search=hyperparameter_search)
 
     object_dict = {
         "cfg": cfg,
         "datamodule": datamodule,
-        "model": model,
+        "pipeline": pipeline,
         "callbacks": callbacks,
         "logger": logger,
         "trainer": trainer,
     }
 
+    hparams = utils.log_sklearn_hyperparameters(object_dict)
+
     if cfg.get("train"):
         log.info("Starting training!")
-        hparams = utils.log_sklearn_hyperparameters(object_dict)
-        metric_dict = trainer.train(model=model, datamodule=datamodule, hparams=hparams)
+        metric_dict = trainer.train(pipeline=pipeline,
+                                    hparams=hparams)
         log.info("Training finished!")
 
-    # if cfg.get("test"):
-    #     log.info("Starting testing!")
-    #     metrics_test = trainer.test(model=model, datamodule=datamodule)
-    #     log.info("Training finished!")
+    if cfg.get("tune"):
+        log.info("Starting hyperparameter search!")
+        metric_dict = trainer.search_hyperparams(pipeline=pipeline,
+                                                 hparams=hparams)
+        log.info("Hyperparameter search finished!")
+
+    if cfg.get("test"):
+        log.info("Starting testing!")
+        metrics_test = trainer.test(pipeline=pipeline,
+                                    datamodule=datamodule)
+        log.info("Training finished!")
 
     return metric_dict, object_dict
 

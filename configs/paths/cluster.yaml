@@ -5,13 +5,13 @@ root_dir: ${oc.env:PROJECT_ROOT}
 
 # path to data directory
 #data_dir: ${paths.root_dir}/data/SMR/raw/
-data_dir: ${paths.root_dir}\data\SMR\raw\ # Fixme os path
-#data_dir: home/mnt/0E0823E30823C893/SRM-data/
+data_dir: ${paths.root_dir}\data\SMR\raw\
+
 
 # path to logging directory
 #log_dir: ..\logs\ # Fixme os path
-#log_dir: ${paths.root_dir}/logs/ # Fixme os path
-log_dir: ${paths.root_dir}\logs\ # Fixme os path
+log_dir: ${paths.root_dir}/logs/ # Fixme os path
+
 
 # path to output directory, created dynamically by hydra
 # path generation pattern is specified in `configs/hydra/default.yaml`

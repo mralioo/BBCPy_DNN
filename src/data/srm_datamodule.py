@@ -2,7 +2,7 @@
 import logging
 
 import numpy as np
-
+import omegaconf
 import bbcpy
 
 logging.getLogger().setLevel(logging.INFO)
@@ -15,7 +15,12 @@ class SRMDatamodule():
                  ival,
                  bands,
                  chans,
-                 classes):
+                 classes,
+                 train_subjects_sessions_dict,
+                 vali_subjects_sessions_dict,
+                 test_subjects_sessions_dict,
+                 concatenate_subjects,
+                 train_val_split, ):
         """ Initialize the SRM datamodule
 
         Parameters
@@ -35,23 +40,23 @@ class SRMDatamodule():
 
         self.srm_data_path = data_dir
 
-        if not isinstance(classes, list):
-            classes = list(classes)
-        if not isinstance(chans, list):
-            chans = list(chans)
-        if not isinstance(bands, list):
-            bands = list(bands)
-
-        self.classes = classes
-        self.select_chans = chans
+        self.classes = list(classes)
+        self.select_chans = list(chans)
         self.select_timepoints = ival
-        self.bands = bands
+        self.bands = list(bands)
+
+        self.train_subjects_sessions_dict = dict(train_subjects_sessions_dict)
+        self.vali_subjects_sessions_dict = dict(vali_subjects_sessions_dict)
+        self.test_subjects_sessions_dict = dict(test_subjects_sessions_dict)
+
+        self.concatenate_subjects = concatenate_subjects
+        self.train_val_split = train_val_split
 
     def collect_subject_sessions(self, subjects_dict):
         """ Collect all the sessions for the subjects in the list """
 
-        if not isinstance(subjects_dict, dict):
-            raise Exception(f"subjects_dict must be a dictionary with S*:[1,2,3,4]")
+        # if not isinstance(subjects_dict, dict) or not isinstance(subjects_dict, omegaconf.dictconfig.DictConfig):
+        #     raise Exception(f"subjects_dict must be a dictionary with S*:[1,2,3,4]")
 
         subjects_sessions_path_dict = {}
         for subject_name, sessions_ids in subjects_dict.items():
@@ -183,9 +188,11 @@ class SRMDatamodule():
 
             subjects_data[init_subject_name] = obj_new.copy()
 
-        # if not concatenate_subjects:
-        #     # remove object from memory FIXME
-        #     del obj_new
-        #     return subjects_data
+        if not concatenate_subjects:
+            # remove object from memory FIXME
+            del obj_new
+            return subjects_data
+
+        del subjects_data
 
         return obj_new

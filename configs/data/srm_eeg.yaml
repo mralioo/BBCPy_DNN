@@ -1,8 +1,23 @@
 _target_: src.data.srm_datamodule.SRMDatamodule
 data_dir: ${paths.data_dir}
 ival: 2s:8s:1ms
-bands: [ 8, 13 ]
+bands:
+  - 8
+  - 13
 chans: [ "*" ]
 classes:
   - "R"
   - "L"
+train_subjects_sessions_dict:
+  S1:
+    - 1
+vali_subjects_sessions_dict:
+  S1:
+    - 3
+test_subjects_sessions_dict:
+  S1:
+    - 3
+concatenate_subjects: True
+train_val_split:
+  - 0.7
+  - 0.3

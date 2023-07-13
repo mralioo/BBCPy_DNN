@@ -15,11 +15,11 @@ defaults:
 
   # experiment configs allow for version control of specific hyperparameters
   # e.g. best hyperparameters for given model and datamodule
-  - experiment: baseline_experiement_alpha_band.yaml
+  - experiment: baseline_experiment_alpha_band.yaml
 
   # config for hyperparameter optimization
-  - hparams_search: null
-#  - hparams_search: baseline_experiement_multi_band.yaml
+  - hparams_search: cv_gridsearch_csp.yaml
+#  - hparams_search: sklearn_optuna.yaml
 
   # optional local config for machine/user specific settings
   # it's optional since it doesn't need to exist and is excluded from version control
@@ -29,15 +29,20 @@ defaults:
   - debug: null
 
 # task name, determines output directory path
-task_name: "train"
+# list of tasks [train, test, hparams_search]
+
+task_name: "hparmas_search"
 
 # tags to help you identify your experiments
 # you can overwrite this in experiment configs
 # overwrite from command line with `python train.py tags="[first_tag, second_tag]"`
-tags: ["baseline"]
+tags: [ "baseline" ]
 
 # set False to skip model training
-train: True
+train: False
+
+# set False to skip hyperparameter optimization
+tune: True
 
 # evaluate on test set, using best model weights achieved during training
 # lightning chooses best weights based on the metric specified in checkpoint callback

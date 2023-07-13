@@ -6,7 +6,8 @@ chans: [ "*" ]
 classes:
   - "R"
   - "L"
-#train_subjects_sessions_dict : {S1: [1,2,3,4], S3: [6]}
+
+
 train_subjects_sessions_dict: { S1: [ 1 ] }
 vali_subjects_sessions_dict: { S1: [ 2 ] }
 test_subjects_sessions_dict: { S4: [ 3 ] }

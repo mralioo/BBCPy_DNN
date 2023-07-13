@@ -81,13 +81,13 @@ class SRM_DataModule(LightningDataModule):
         self.data_dir = data_dir
 
         self.ival = ival
-        self.bands = list(bands)  # FIXME
-        self.chans = list(chans)  # FIXME
+        self.bands = bands  # FIXME
+        self.chans = chans  # FIXME
         self.classes = classes
 
-        self.train_subjects_sessions_dict = dict(train_subjects_sessions_dict)
-        self.vali_subjects_sessions_dict = dict(vali_subjects_sessions_dict)
-        self.test_subjects_sessions_dict = dict(test_subjects_sessions_dict)
+        self.train_subjects_sessions_dict = train_subjects_sessions_dict
+        self.vali_subjects_sessions_dict = vali_subjects_sessions_dict
+        self.test_subjects_sessions_dict = test_subjects_sessions_dict
 
         self.concatenate_subjects = concatenate_subjects
         self.train_val_split = train_val_split
