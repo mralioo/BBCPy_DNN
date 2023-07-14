@@ -1,9 +1,14 @@
 from typing import Any
 
+import pyrootutils
 import torch
 from lightning import LightningModule
+from sklearn.metrics import confusion_matrix
 from torchmetrics import MaxMetric, MeanMetric
 from torchmetrics.classification.accuracy import Accuracy
+
+pyrootutils.setup_root(__file__, indicator=".project-root", pythonpath=True)
+from src.utils.vis import confusion_matrix_to_png
 
 
 class EEGNetLitModule(LightningModule):
@@ -68,11 +73,16 @@ class EEGNetLitModule(LightningModule):
         self.val_acc_best.reset()
 
     def model_step(self, batch: Any):
-        x = torch.tensor(batch).float()
-        y = batch.y
-        logits = self.forward(x)
-        loss = self.criterion(logits, y)
-        preds = torch.argmax(logits, dim=1)
+        # FIXME : not transform the data here as tensor but in the dataloader
+        # x = torch.tensor(batch).float()
+        # y_ie = torch.tensor(batch.y).long()
+        # y_oe = torch.nn.functional.one_hot(y_ie, num_classes=2)
+        x, y = batch
+        logits = self.forward(x).double()
+        loss = self.criterion()(logits[0], y)
+        preds_ie = torch.argmax(logits, dim=1)
+        preds = torch.nn.functional.one_hot(preds_ie, num_classes=2)[0]
+
         return loss, preds, y
 
     def training_step(self, batch: Any, batch_idx: int):
@@ -108,6 +118,12 @@ class EEGNetLitModule(LightningModule):
 
     def test_step(self, batch: Any, batch_idx: int):
         loss, preds, targets = self.model_step(batch)
+
+        cm_vali = confusion_matrix(preds, targets)
+        val_cm_title = "vali_cm"
+        confusion_matrix_to_png(cm_vali, classes_names, val_cm_title, figure_file_name="best_model_vali_cm")
+
+        cm = confusion_matrix_to_png(preds, targets)
 
         # update and log metrics
         self.test_loss(loss)

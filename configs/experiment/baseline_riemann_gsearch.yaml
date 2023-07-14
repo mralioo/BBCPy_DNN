@@ -21,4 +21,4 @@ logger:
   mlflow:
     tags: ${tags}
     experiment_name: riemann
-    run_name: MBSRsubject
+    run_name: tune

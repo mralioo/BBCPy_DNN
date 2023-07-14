@@ -56,7 +56,7 @@ class SklearnTrainer(object):
         # self.optuna_search = pipeline
 
         log.info("Logging to mlflow...")
-        mlflow.set_tracking_uri('file://' + self.logger.mlflow.tracking_uri)
+        mlflow.set_tracking_uri(self.logger.mlflow.tracking_uri.as_uri())
 
         experiment_name = self.logger.mlflow.experiment_name
 
@@ -154,7 +154,7 @@ class SklearnTrainer(object):
                     y_train, y_test = train_data.y[train_index], train_data.y[test_index]
 
                     parent_run_id = parent_run.info.run_id
-                    mlflow_job_name = f"Fold-{foldNum}"
+                    mlflow_job_name = f"CV_{foldNum}_{experiment_name}_{run_name}"
 
                     with mlflow.start_run(experiment_id=experiment.experiment_id,
                                           run_name=mlflow_job_name,

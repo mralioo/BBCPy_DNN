@@ -8,9 +8,16 @@ classes:
   - "L"
 
 
-train_subjects_sessions_dict: { S1: [ 1 ] }
-vali_subjects_sessions_dict: { S1: [ 2 ] }
-test_subjects_sessions_dict: { S4: [ 3 ] }
+train_subjects_sessions_dict:
+  S1:
+    - 1
+vali_subjects_sessions_dict:
+  S1:
+    - 2
+test_subjects_sessions_dict:
+  S2:
+    - 1
+
 concatenate_subjects: True
 batch_size: 32
 train_val_split:

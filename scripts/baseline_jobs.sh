@@ -23,7 +23,7 @@ echo  "I am a job task with ID $JOB_ID" STARTED on $(date)
 
 python src/baseline_train.py paths=cluster experiment=baseline_riemann logger.mlflow.run_name=subject1
 
-# display resource consumption 
+# display resource consumption
 qstat -j $JOB_ID | awk 'NR==1,/^scheduling info:/'
 
 echo FINISHED on $(date)

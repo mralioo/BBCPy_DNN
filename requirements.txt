@@ -1,18 +1,19 @@
+numpy>=1.22.1
+scipy>=1.7.3
+matplotlib>=3.5.1
 scikit-learn>=1.0.2
 pyriemann>=0.2.7
 
-
 joblib>=1.1.0
-mne>=1.0.2
 pandas>=1.4.0
 setuptools>=60.7.0
 
 h5py
 
+# --------- optuna --------- #
 optuna>=2.10.0
 
 # --------- pytorch --------- #
-torch>=2.0.0
 lightning>=2.0.0
 torchmetrics>=0.11.4
 

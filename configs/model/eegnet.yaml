@@ -22,8 +22,12 @@ net:
   in_chans: 62
   n_classes: 2
   input_window_samples: 6000
-  second_kernel_size: [ 2, 32 ]
-  third_kernel_size: [ 8, 4 ]
+  second_kernel_size:
+    - 2
+    - 32
+  third_kernel_size:
+    - 8
+    - 4
   final_conv_length: auto
   pool_mode: max
   drop_prob: 0.25

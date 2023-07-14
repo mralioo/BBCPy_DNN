@@ -7,8 +7,8 @@
 
 #$ -o jobs_outputs/$JOB_NAME/$JOB_ID.o
 #$ -e jobs_outputs/$JOB_NAME/$JOB_ID.e
-
-##$ -l mem_free=500M
+#-l h_vmem=16G
+##$ -l mem_free=20G
 #echo "Only runs on nodes which have more than 500 megabytes of free memory"
 
 # if you also want to request a GPU, add the following line to the above block:

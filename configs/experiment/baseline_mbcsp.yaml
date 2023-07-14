@@ -18,6 +18,10 @@ tags: [ "baseline" , "multiband", "mbcsp" ]
 seed: 12345
 
 data:
+  train_subjects_sessions_dict:
+    S1:
+      - 1
+      - 2
   bands: [ [ 10.5, 13 ], [ 21, 26 ], [ 31.5, 39 ] ]
 
 logger:

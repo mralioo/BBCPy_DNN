@@ -4,11 +4,34 @@ from typing import Any, Dict, Optional
 import torch
 from lightning import LightningDataModule
 from torch.utils.data import Dataset
+from sklearn.preprocessing import LabelBinarizer, OneHotEncoder
+
 
 from src.data.srm_datamodule import SRMDatamodule
 
 logging.getLogger().setLevel(logging.INFO)
 
+class Data(Dataset):
+    def __init__(self, inputs, targets, transform=None):
+        if not isinstance(inputs, torch.Tensor):
+            inputs = torch.Tensor(inputs)
+        if not isinstance(targets, torch.Tensor):
+            targets = torch.Tensor(targets)
+
+        assert inputs.shape[0] == targets.shape[0]
+
+        self.inputs = inputs
+        self.targets = targets
+        self.transform = transform
+
+    def __len__(self):
+        return self.inputs.shape[0]
+
+    def __getitem__(self, idx):
+        sample = [self.inputs[idx, :], self.targets[idx, :]]
+        if self.transform:
+            sample = self.transform(sample)
+        return sample[0], sample[1]
 
 class CustomDataset(Dataset):
     def __init__(self,
@@ -18,19 +41,29 @@ class CustomDataset(Dataset):
                  pin_memory,
                  shuffle
                  ):
-        self.data = data
+
         self.batch_size = batch_size
         self.num_workers = num_workers
         self.pin_memory = pin_memory
         self.shuffle = shuffle
 
+
+        # Perform one-hot encoding on labels
+        y = data.y
+        onehot_encoder = OneHotEncoder(sparse=False)
+        integer_encoded = y.reshape(-1, 1)
+        onehot_encoded = onehot_encoder.fit_transform(integer_encoded)
+
+
+        self.data = torch.tensor(data).float()
+        self.y_oe = torch.tensor(onehot_encoded)
+
     def __getitem__(self, index):
-        return self.data[index]
-        # sample = self.data[index]
-        #
-        # # perform some transforms here
-        # transformed_sample = torch.tensor(sample)
-        # return transformed_sample , sample.y
+
+        x = self.data[index].unsqueeze(dim=0)
+        y = self.y_oe[index]
+
+        return x, y
 
     def __len__(self):
         return len(self.data)
@@ -115,7 +148,16 @@ class SRM_DataModule(LightningDataModule):
 
     def prepare_data(self):
         """ instantiate srm object. This method is called only from a single GPU."""
-        self.srm_datamodule = SRMDatamodule(self.data_dir, self.ival, self.bands, self.chans, self.classes)
+        self.srm_datamodule = SRMDatamodule(data_dir=self.data_dir,
+                                            ival=self.ival,
+                                            bands=self.bands,
+                                            chans=self.chans,
+                                            classes=self.classes,
+                                            test_subjects_sessions_dict=self.test_subjects_sessions_dict,
+                                            train_subjects_sessions_dict=self.train_subjects_sessions_dict,
+                                            vali_subjects_sessions_dict=self.vali_subjects_sessions_dict,
+                                            concatenate_subjects=self.concatenate_subjects,
+                                            train_val_split=self.train_val_split)
 
     def setup(self, stage: Optional[str] = None):
         """Load data. Set variables: num_classes."""

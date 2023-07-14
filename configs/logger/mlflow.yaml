@@ -1,8 +1,7 @@
 mlflow:
   experiment_name: Test
   run_name: Debug
-  #  tracking_uri: ${paths.log_dir}\mlflow\mlruns # run `mlflow ui` command inside the `logs/mlflow/` dir to open the UI
-  tracking_uri: ${paths.log_dir} # run `mlflow ui` command inside the `logs/mlflow/` dir to open the UI
+  tracking_uri: ${paths.log_dir}/mlflow/mlruns
   tags: null
   # save_dir: "./mlruns"
   prefix: ""

@@ -32,7 +32,7 @@ defaults:
 # task name, determines output directory path
 # list of tasks [train, test, hparams_search]
 
-task_name: "hparmas_search"
+task_name: "train"
 
 # tags to help you identify your experiments
 # you can overwrite this in experiment configs

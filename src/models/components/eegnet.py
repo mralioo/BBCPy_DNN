@@ -6,6 +6,7 @@ from src.models.components.modules import Expression, Ensure4d
 from src.models.components.functions import squeeze_final_output
 import optuna
 
+
 class Conv2dWithConstraint(nn.Conv2d):
     def __init__(self, *args, max_norm=1, **kwargs):
         self.max_norm = max_norm
@@ -60,7 +61,7 @@ class EEGNetv4(nn.Sequential):
             self.third_kernel_size = (trial.suggest_int("third_kernel_size_1", low=6, high=10, step=2),
                                       trial.suggest_int("third_kernel_size_2", low=2, high=6, step=2))
             self.drop_prob = trial.suggest_float("dropout_rate", 0, 1)
-        else :
+        else:
             self.F1 = F1
             self.D = D
             self.F2 = F2
@@ -187,6 +188,7 @@ class EEGNetv4(nn.Sequential):
 
         _glorot_weight_zero_bias(self)
 
+
 def _transpose_to_b_1_c_0(x):
     return x.permute(0, 3, 1, 2)
 
@@ -230,11 +232,11 @@ class EEGNetv1(nn.Module):
 
         if isinstance(trial, optuna.Trial):
             self.second_kernel_size = (trial.suggest_int("second_kernel_size_1", low=6, high=10, step=2),
-                                      trial.suggest_int("second_kernel_size_2", low=2, high=6, step=2))
+                                       trial.suggest_int("second_kernel_size_2", low=2, high=6, step=2))
             self.third_kernel_size = (trial.suggest_int("third_kernel_size_1", low=6, high=10, step=2),
                                       trial.suggest_int("third_kernel_size_2", low=2, high=6, step=2))
             self.drop_prob = trial.suggest_float("dropout_rate", 0, 1)
-        else :
+        else:
             self.second_kernel_size = second_kernel_size
             self.third_kernel_size = third_kernel_size
             self.drop_prob = drop_prob
@@ -250,7 +252,6 @@ class EEGNetv1(nn.Module):
         pool_class = dict(max=nn.MaxPool2d, mean=nn.AvgPool2d)[self.pool_mode]
 
         self.model = nn.Sequential()
-
 
         self.model.add_module("ensuredims", Ensure4d())
         n_filters_1 = 16
@@ -337,19 +338,21 @@ class EEGNetv1(nn.Module):
             ),
         )
         self.model.add_module("softmax", nn.LogSoftmax(dim=1))
-        # Transpose back to the the logic of braindecode,
-        # so time in third dimension (axis=2)
+        # Transpose back to the the logic of braindecode, so time in third dimension (axis=2)
         self.model.add_module(
             "permute_2", Expression(lambda x: x.permute(0, 1, 3, 2))
         )
         self.model.add_module("squeeze", Expression(squeeze_final_output))
+
+        # initialize all weights and biases with glorot
         _glorot_weight_zero_bias(self)
 
     def forward(self, x):
         return self.model(x)
+
+
 def _glorot_weight_zero_bias(model):
-    """Initalize parameters of all modules by initializing weights with
-    glorot
+    """Initalize parameters of all modules by initializing weights with glorot
      uniform/xavier initialization, and setting biases to zero. Weights from
      batch norm layers are set to 1.
 
@@ -368,20 +371,38 @@ def _glorot_weight_zero_bias(model):
                 nn.init.constant_(module.bias, 0)
 
 
-# if __name__ == "__main__":
-#     from torch.autograd import Variable
-#     import numpy as np
-#
-#     input = Variable(torch.from_numpy(np.random.rand(100, 62, 6000))).double()
-#     model = EEGNetv1(
-#         in_chans=62,
-#         n_classes=1,
-#         input_window_samples=6000,
-#         final_conv_length="auto",
-#         pool_mode="max",
-#         second_kernel_size=(2, 32),
-#         third_kernel_size=(8, 4),
-#         drop_prob=0.25,
-#     )
-#     model.double()
-#     y_pred = model(input)
+if __name__ == "__main__":
+    from torch.autograd import Variable
+    import numpy as np
+
+    num_samples = 100
+    num_classes = 2
+
+    input = Variable(torch.from_numpy(np.random.rand(num_samples, 62, 6000))).double()
+
+    # Generate random indices for each sample
+    indices = torch.randint(low=0, high=num_classes, size=(num_samples,))
+
+    # Create an empty tensor with the desired shape
+    one_hot_tensor = torch.zeros((num_samples, num_classes))
+    # Fill the tensor with one-hot encoded values
+    one_hot_tensor.scatter_(1, indices.unsqueeze(1), 1)
+
+    loss = nn.CrossEntropyLoss()
+
+    model = EEGNetv1(
+        in_chans=62,
+        n_classes=2,
+        input_window_samples=6000,
+        final_conv_length="auto",
+        pool_mode="max",
+        second_kernel_size=(2, 32),
+        third_kernel_size=(8, 4),
+        drop_prob=0.25,
+    )
+    model.double()
+    y_pred = model(input)
+
+    loss = loss(y_pred, one_hot_tensor)
+
+    print(loss)
