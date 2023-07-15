@@ -119,6 +119,9 @@ class EEGNetLitModule(LightningModule):
     def test_step(self, batch: Any, batch_idx: int):
         loss, preds, targets = self.model_step(batch)
 
+        y_pred = preds.cpu().detach().numpy()
+        y_true = targets.cpu().detach().numpy()
+
         cm_vali = confusion_matrix(preds, targets)
         val_cm_title = "vali_cm"
         confusion_matrix_to_png(cm_vali, classes_names, val_cm_title, figure_file_name="best_model_vali_cm")
