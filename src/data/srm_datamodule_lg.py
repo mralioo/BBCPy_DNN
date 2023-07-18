@@ -3,13 +3,13 @@ from typing import Any, Dict, Optional
 
 import torch
 from lightning import LightningDataModule
-from torch.utils.data import Dataset
-from sklearn.preprocessing import LabelBinarizer, OneHotEncoder
-
-
+from sklearn.preprocessing import OneHotEncoder
 from src.data.srm_datamodule import SRMDatamodule
+from torch.utils.data import DataLoader
+from torch.utils.data import Dataset
 
 logging.getLogger().setLevel(logging.INFO)
+
 
 class Data(Dataset):
     def __init__(self, inputs, targets, transform=None):
@@ -33,20 +33,9 @@ class Data(Dataset):
             sample = self.transform(sample)
         return sample[0], sample[1]
 
+
 class CustomDataset(Dataset):
-    def __init__(self,
-                 data,
-                 batch_size,
-                 num_workers,
-                 pin_memory,
-                 shuffle
-                 ):
-
-        self.batch_size = batch_size
-        self.num_workers = num_workers
-        self.pin_memory = pin_memory
-        self.shuffle = shuffle
-
+    def __init__(self, data):
 
         # Perform one-hot encoding on labels
         y = data.y
@@ -54,12 +43,11 @@ class CustomDataset(Dataset):
         integer_encoded = y.reshape(-1, 1)
         onehot_encoded = onehot_encoder.fit_transform(integer_encoded)
 
-
         self.data = torch.tensor(data).float()
         self.y_oe = torch.tensor(onehot_encoded)
 
     def __getitem__(self, index):
-
+        #fixme
         x = self.data[index].unsqueeze(dim=0)
         y = self.y_oe[index]
 
@@ -142,6 +130,9 @@ class SRM_DataModule(LightningDataModule):
         self.num_workers = num_workers
         self.pin_memory = pin_memory
 
+        # self.prepare_data()
+        # self.setup()
+
     @property
     def num_classes(self):
         return len(self.classes)
@@ -162,50 +153,47 @@ class SRM_DataModule(LightningDataModule):
     def setup(self, stage: Optional[str] = None):
         """Load data. Set variables: num_classes."""
         # if stage == "train" or stage is None:
-        if not self.data_train:
-            # train/val datasets & loaders
+        # load and split datasets only if not loaded already
+        if not self.data_train and not self.data_vali and not self.data_test:
+            # if stage == "train":
             logging.info("Loading train data...")
-            self.train_data = self.srm_datamodule.load_data(self.train_subjects_sessions_dict,
-                                                            self.concatenate_subjects)
+            data_train = self.srm_datamodule.load_data(self.train_subjects_sessions_dict,
+                                                       self.concatenate_subjects)
 
-        if not self.data_vali:
+            self.training_set = CustomDataset(data=data_train)
+
+            # if stage == "vali":
             logging.info("Loading vali data...")
-            self.vali_data = self.srm_datamodule.load_data(self.vali_subjects_sessions_dict,
-                                                           self.concatenate_subjects)
-        # if not self.data_test:
-        #     logging.info("Loading test data...")
-        #     self.test_data = self.srm_datamodule.load_data(self.test_subjects_sessions_dict,
-        #                                                       self.concatenate_subjects)
+            data_vali = self.srm_datamodule.load_data(self.vali_subjects_sessions_dict,
+                                                      self.concatenate_subjects)
 
-        # self.train_data, self.val_data = random_split(dataset=data,
-        #                                               lengths=[int(len(data) * self.train_val_split[0]),
-        #                                                        int(len(data) * self.train_val_split[1])],
-        #                                               generator=torch.Generator().manual_seed(42))
+            self.validation_set = CustomDataset(data=data_vali)
 
-        # if stage == "test" or stage is None:
-        #     # test dataset & loader
-        #     self.test_data = self.srm_datamodule.load_data(self.test_subjects_sessions_dict, self.concatenate_subjects)
+            # if stage == "test":
+            logging.info("Loading test data...")
+            data_test = self.srm_datamodule.load_data(self.test_subjects_sessions_dict,
+                                                      self.concatenate_subjects)
+
+            self.test_set = CustomDataset(data=data_test)
 
     def train_dataloader(self):
-        return CustomDataset(data=self.train_data,
-                             batch_size=self.hparams.batch_size,
-                             num_workers=self.hparams.num_workers,
-                             pin_memory=self.hparams.pin_memory,
-                             shuffle=False)
+        return DataLoader(self.training_set,
+                          batch_size=self.hparams.batch_size,
+                          num_workers=self.hparams.num_workers,
+                          pin_memory=self.hparams.pin_memory)
 
-    def val_dataloader(self):
-        return CustomDataset(data=self.vali_data,
-                             batch_size=self.hparams.batch_size,
-                             num_workers=self.hparams.num_workers,
-                             pin_memory=self.hparams.pin_memory,
-                             shuffle=False)
+    def vali_dataloader(self):
+        return DataLoader(self.validation_set,
+                          batch_size=self.hparams.batch_size,
+                          num_workers=self.hparams.num_workers,
+                          pin_memory=self.hparams.pin_memory)
 
-    # def test_dataloader(self):
-    #     return DataLoader(dataset=self.data_test,
-    #                       batch_size=self.hparams.batch_size,
-    #                       num_workers=self.hparams.num_workers,
-    #                       pin_memory=self.hparams.pin_memory,
-    #                       shuffle=False)
+    def test_dataloader(self):
+        return DataLoader(self.test_set,
+                          batch_size=self.hparams.batch_size,
+                          num_workers=self.hparams.num_workers,
+                          pin_memory=self.hparams.pin_memory,
+                          shuffle=False)
 
     def teardown(self, stage: Optional[str] = None):
         """Clean up after fit or test."""

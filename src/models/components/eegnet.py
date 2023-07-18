@@ -390,19 +390,43 @@ if __name__ == "__main__":
 
     loss = nn.CrossEntropyLoss()
 
-    model = EEGNetv1(
+    # model = EEGNetv1(
+    #     in_chans=62,
+    #     n_classes=2,
+    #     input_window_samples=6000,
+    #     final_conv_length="auto",
+    #     pool_mode="max",
+    #     second_kernel_size=(2, 32),
+    #     third_kernel_size=(8, 4),
+    #     drop_prob=0.25,
+    # )
+    # model.double()
+    # y_pred = model(input)
+
+    # loss = loss(y_pred, one_hot_tensor)
+    #
+    # print(loss)
+    #
+    # import os
+    #
+    # model_name = 'eegnet-v1.onnx'
+    # model_path_onnx = os.path.join("C:\\Users\\alioo\\Desktop\\MA\\bbcpy_AutoML\\local", model_name)
+    # torch.onnx.export(model, input, model_path_onnx, input_names=["features"], output_names=["logits"])
+
+    model_2 = EEGNetv4(
         in_chans=62,
         n_classes=2,
         input_window_samples=6000,
         final_conv_length="auto",
-        pool_mode="max",
-        second_kernel_size=(2, 32),
+        pool_mode="mean",
+        F1=8,
+        D=2,
+        F2=16,  # usually set to F1*D (?)
+        kernel_length=64,
         third_kernel_size=(8, 4),
-        drop_prob=0.25,
-    )
-    model.double()
-    y_pred = model(input)
+        drop_prob=0.25,)
 
-    loss = loss(y_pred, one_hot_tensor)
 
-    print(loss)
+    model_name = 'eegnet-v4.onnx'
+    model_path_onnx = os.path.join("C:\\Users\\alioo\\Desktop\\MA\\bbcpy_AutoML\\local", model_name)
+    torch.onnx.export(model_2, input, model_path_onnx, input_names=["features"], output_names=["logits"])

@@ -9,6 +9,7 @@ Couple CNN and Transformer in a concise manner with amazing results
 
 import argparse
 import os
+
 gpus = [0]
 os.environ['CUDA_DEVICE_ORDER'] = 'PCI_BUS_ID'
 os.environ["CUDA_VISIBLE_DEVICES"] = ','.join(map(str, gpus))
@@ -29,7 +30,6 @@ from torchvision.utils import save_image, make_grid
 from torch.utils.data import DataLoader
 from torch.autograd import Variable
 from torchsummary import summary
-
 import torch.autograd as autograd
 from torchvision.models import vgg19
 
@@ -58,6 +58,7 @@ from einops.layers.torch import Rearrange, Reduce
 import matplotlib.pyplot as plt
 # from torch.utils.tensorboard import SummaryWriter
 from torch.backends import cudnn
+
 cudnn.benchmark = False
 cudnn.deterministic = True
 
@@ -226,26 +227,21 @@ class ExP():
         self.nSub = nsub
 
         self.start_epoch = 0
-        self.root = 'C:/Users/alioo/Desktop/MA/bbcpy_AutoML/data/BCICIV'
+        self.root = '/Data/strict_TE/'
 
-        self.log_write = open("C:/Users/alioo/Desktop/MA/bbcpy_AutoML/local/results/log_subject%d.txt" % self.nSub, "w")
+        self.log_write = open("./results/log_subject%d.txt" % self.nSub, "w")
 
-        # self.Tensor = torch.cuda.FloatTensor
-        self.Tensor = torch.FloatTensor
-        # self.LongTensor = torch.cuda.LongTensor
-        self.LongTensor = torch.LongTensor
+        self.Tensor = torch.cuda.FloatTensor
+        self.LongTensor = torch.cuda.LongTensor
 
         self.criterion_l1 = torch.nn.L1Loss().cuda()
         self.criterion_l2 = torch.nn.MSELoss().cuda()
         self.criterion_cls = torch.nn.CrossEntropyLoss().cuda()
 
-        # self.model = Conformer().cuda()
-        self.model = Conformer()
-        # self.model = nn.DataParallel(self.model, device_ids=[i for i in range(len(gpus))])
-        # self.model = self.model.cuda()
-        self.model = self.model
-        input = Variable(torch.from_numpy(np.random.rand(1,1, 22, 1000))).float()
-        summary(self.model, input)
+        self.model = Conformer().cuda()
+        self.model = nn.DataParallel(self.model, device_ids=[i for i in range(len(gpus))])
+        self.model = self.model.cuda()
+        # summary(self.model, (1, 22, 1000))
 
     # Segmentation and Reconstruction (S&R) data augmentation
     def interaug(self, timg, label):
@@ -281,7 +277,6 @@ class ExP():
 
         # train data
         self.total_data = scipy.io.loadmat(self.root + 'A0%dT.mat' % self.nSub)
-        self.total_data = scipy.io.loadmat("C:/Users/alioo/Desktop/MA/bbcpy_AutoML/data/BCICIV/BCICIV_eval_ds1g.mat")
         self.train_data = self.total_data['data']
         self.train_label = self.total_data['label']
 
@@ -410,7 +405,7 @@ class ExP():
 def main():
     best = 0
     aver = 0
-    result_write = open("C:/Users/alioo/Desktop/MA/bbcpy_AutoML/local/results/sub_result.txt", "w")
+    result_write = open("./results/sub_result.txt", "w")
 
     for i in range(9):
         starttime = datetime.datetime.now()
@@ -455,5 +450,3 @@ if __name__ == "__main__":
     print(time.asctime(time.localtime(time.time())))
     main()
     print(time.asctime(time.localtime(time.time())))
-
-    # model = Conformer().cuda()

@@ -545,7 +545,7 @@ Example pipeline managing the instantiation logic: [src/train.py](src/nn_train.p
 
 ## Main Config
 
-Location: [configs/train.yaml](configs/nn_train.yaml) <br>
+Location: [configs/train.yaml](configs/eegnet_train.yaml) <br>
 Main project config contains default training configuration.<br>
 It determines how config is composed when simply executing command `python train.py`.<br>
 

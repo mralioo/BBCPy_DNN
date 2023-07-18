@@ -5,12 +5,9 @@ import numpy as np
 import pyrootutils
 import torch
 from lightning import LightningModule
-# from pytorch_lightning import LightningModule, Trainer, LightningDataModule
-from torch.utils.data import DataLoader, Dataset
 from sklearn.metrics import confusion_matrix
 from torchmetrics import MaxMetric, MeanMetric
 from torchmetrics.classification.accuracy import Accuracy
-from sklearn.metrics import f1_score
 
 pyrootutils.setup_root(__file__, indicator=".project-root", pythonpath=True)
 from src.utils.vis import calculate_cm_stats
@@ -35,7 +32,7 @@ class EEGNetLitModule(LightningModule):
 
     def __init__(
             self,
-            net,
+            net: torch.nn.Module,
             optimizer: torch.optim.Optimizer,
             criterion: torch.nn,
             scheduler: torch.optim.lr_scheduler,
@@ -45,11 +42,13 @@ class EEGNetLitModule(LightningModule):
         # also ensures init params will be stored in ckpt
         self.save_hyperparameters(logger=True)
 
-        # set net
         self.net = net
 
         # loss function
         self.criterion = self.hparams.criterion
+        #
+        # # scheduler
+        # self.scheduler = scheduler
 
         # metric objects for calculating and averaging accuracy across batches
         self.train_acc = Accuracy(task="multiclass", num_classes=2)
@@ -64,13 +63,8 @@ class EEGNetLitModule(LightningModule):
         # for tracking best so far validation accuracy
         self.val_acc_best = MaxMetric()
 
-        # --> HERE STEP 1 <--
-        # ATTRIBUTES TO SAVE BATCH OUTPUTS
-        self.training_step_outputs = []  # save outputs in each batch to compute metric overall epoch
-        self.training_step_targets = []  # save targets in each batch to compute metric overall epoch
-        self.val_step_outputs = []  # save outputs in each batch to compute metric overall epoch
-        self.val_step_targets = []  # save targets in each batch to compute metric overall epoch
-
+        self.training_step_outputs = {"preds": [], "targets": []}
+        self.validation_step_outputs = {"preds": [], "targets": []}
 
     def forward(self, x: torch.Tensor):
         return self.net(x)
@@ -78,8 +72,9 @@ class EEGNetLitModule(LightningModule):
     def on_train_start(self):
         # by default lightning executes validation step sanity checks before training starts,
         # so it's worth to make sure validation metrics don't store results from these checks
+
         self.class_names = self.trainer.datamodule.classes
-        self.num_classes = self.trainer.datamodule.num_classes
+        self.num_classes = len(self.class_names)
 
         self.mlflow_client = self.logger.experiment
         self.run_id = self.logger.run_id
@@ -90,26 +85,16 @@ class EEGNetLitModule(LightningModule):
 
     def model_step(self, batch: Any):
         x, y = batch
-
-        # fixme
-        # x = torch.squeeze(x)
-
         logits = self.forward(x).double()
-        loss = self.criterion()(logits, y)
+        loss = self.criterion()(logits[0], y)
         preds_ie = torch.argmax(logits, dim=1)
-        preds = torch.nn.functional.one_hot(preds_ie, num_classes=self.num_classes)
+        preds = torch.nn.functional.one_hot(preds_ie, num_classes=2)[0]
         return loss, preds, y
 
-    def training_step(self, batch: Any):
+    def training_step(self, batch: Any, batch_idx: int):
         loss, preds, targets = self.model_step(batch)
-
-        # GET AND SAVE OUTPUTS AND TARGETS PER BATCH
-        y_pred = preds.argmax(axis=1).cpu().numpy()
-        y_true = targets.argmax(axis=1).cpu().numpy()
-
-        # --> HERE STEP 2 <--
-        self.training_step_outputs.extend(y_pred)
-        self.training_step_targets.extend(y_true)
+        self.training_step_outputs["preds"].append(preds)
+        self.training_step_outputs["targets"].append(targets)
 
         # update and log metrics
         self.train_loss(loss)
@@ -121,33 +106,23 @@ class EEGNetLitModule(LightningModule):
         return loss
 
     def on_train_epoch_end(self):
-        ## F1 Macro all epoch saving outputs and target per batch
-        train_all_outputs = self.training_step_outputs
-        train_all_targets = self.training_step_targets
-        f1_macro_epoch = f1_score(train_all_outputs, train_all_targets, average='macro')
-        self.log("train_f1_epoch", f1_macro_epoch, on_step=False, on_epoch=True, prog_bar=True)
-
-        if self.current_epoch % 2 == 0:
-            # Calculate the confusion matrix and log it to mlflow
-            cm = confusion_matrix(train_all_targets, train_all_outputs)
-            title = f"Training Confusion matrix, epoch {self.current_epoch}"
-            file_name = f"Training_confusion_matrix_epoch_{self.current_epoch}.png"
-            self.confusion_matrix_to_png(cm, title, file_name)
-
-        # free up the memory
-        # --> HERE STEP 3 <--
-        self.training_step_outputs.clear()
-        self.training_step_targets.clear()
+        pass
+        # outputs = self.training_step_outputs
+        #
+        # if self.current_epoch % 2 == 0:
+        #     y_true = torch.stack(outputs["targets"]).cpu().numpy()  # True labels
+        #     y_pred = torch.stack(outputs["preds"]).cpu().numpy()  # Predicted labels
+        #
+        #     # Calculate the confusion matrix and log it to mlflow
+        #     cm = confusion_matrix(np.argmax(y_true, axis=1), np.argmax(y_pred, axis=1))
+        #     title = f"Training Confusion matrix, epoch {self.current_epoch}"
+        #     file_name = f"Training_confusion_matrix_epoch_{self.current_epoch}.png"
+        #     self.confusion_matrix_to_png(cm, title, file_name)
 
     def validation_step(self, batch: Any, batch_idx: int):
         loss, preds, targets = self.model_step(batch)
-        # GET AND SAVE OUTPUTS AND TARGETS PER BATCH
-        y_pred = preds.argmax().cpu().numpy()
-        y_true = targets.argmax().cpu().numpy()
-
-        # --> HERE STEP 2 <--
-        self.val_step_outputs.extend(y_pred)
-        self.val_step_targets.extend(y_true)
+        self.validation_step_outputs["preds"].append(preds)
+        self.validation_step_outputs["targets"].append(targets)
 
         # update and log metrics
         self.val_loss(loss)
@@ -155,34 +130,24 @@ class EEGNetLitModule(LightningModule):
         self.log("val/loss", self.val_loss, on_step=False, on_epoch=True, prog_bar=True)
         self.log("val/acc", self.val_acc, on_step=False, on_epoch=True, prog_bar=True)
 
-        return loss
-
     def on_validation_epoch_end(self):
-
-        ## F1 Macro all epoch saving outputs and target per batch
-        val_all_outputs = self.val_step_outputs
-        val_all_targets = self.val_step_targets
-        val_f1_macro_epoch = f1_score(val_all_outputs, val_all_targets, average='macro')
-        self.log("val_f1_epoch", val_f1_macro_epoch, on_step=False, on_epoch=True, prog_bar=True)
-
-        if self.current_epoch % 2 == 0:
-            # Calculate the confusion matrix and log it to mlflow
-            cm = confusion_matrix(val_all_targets, val_all_outputs)
-            title = f"Validation Confusion matrix, epoch {self.current_epoch}"
-            file_name = f"Vali_confusion_matrix_epoch_{self.current_epoch}.png"
-            self.confusion_matrix_to_png(cm, title, file_name)
-
         acc = self.val_acc.compute()  # get current val acc
         self.val_acc_best(acc)  # update best so far val acc
         # log `val_acc_best` as a value through `.compute()` method, instead of as a metric object
         # otherwise metric would be reset by lightning after each epoch
 
-        self.log("val/acc_best", self.val_acc_best.compute(), sync_dist=True, prog_bar=True)
+        outputs = self.validation_step_outputs
+        if self.current_epoch % 2 == 0:
+            y_true = torch.stack(outputs["targets"]).cpu().numpy()  # True labels
+            y_pred = torch.stack(outputs["preds"]).cpu().numpy()  # Predicted labels
 
-        # free up the memory
-        # --> HERE STEP 3 <--
-        self.val_step_outputs.clear()
-        self.val_step_targets.clear()
+            # Calculate the confusion matrix and log it to mlflow
+            cm = confusion_matrix(y_true, y_pred)
+            title = f"Validation Confusion matrix, epoch {self.current_epoch}"
+            file_name = f"Vali_confusion_matrix_epoch_{self.current_epoch}.png"
+            self.confusion_matrix_to_png(cm, title, file_name)
+
+        self.log("val/acc_best", self.val_acc_best.compute(), sync_dist=True, prog_bar=True)
 
     def test_step(self, batch: Any, batch_idx: int):
         loss, preds, targets = self.model_step(batch)
@@ -210,7 +175,7 @@ class EEGNetLitModule(LightningModule):
                 "optimizer": optimizer,
                 "lr_scheduler": {
                     "scheduler": scheduler,
-                    "monitor": "train/loss",
+                    "monitor": "val/loss",
                     "interval": "epoch",
                     "frequency": 1,
                 },
@@ -256,7 +221,7 @@ class EEGNetLitModule(LightningModule):
             plt.savefig(fig_file_path)
             self.mlflow_client.log_artifact(self.run_id,
                                             local_path=fig_file_path,
-                                            artifact_path="plots")
+                                            artifact_path=os.path.join(self.mlflow_client.tracking_uri,"plots"))
             plt.close(figure)
 
         elif type == 'mean':

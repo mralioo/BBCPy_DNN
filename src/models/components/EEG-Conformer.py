@@ -1,25 +1,35 @@
+import os
+
+gpus = [0]
+os.environ['CUDA_DEVICE_ORDER'] = 'PCI_BUS_ID'
+os.environ["CUDA_VISIBLE_DEVICES"] = ','.join(map(str, gpus))
+
 import torch
 import torch.nn.functional as F
-import matplotlib.pyplot as plt
-import numpy as np
-import math
+
 from torch import nn
 from torch import Tensor
-from einops import rearrange, reduce, repeat
+from einops import rearrange
 from einops.layers.torch import Rearrange, Reduce
-from torchsummary import summary
+
+from torch.backends import cudnn
+
+cudnn.benchmark = False
+cudnn.deterministic = True
 
 
 # Convolution module
 # use conv to capture local features, instead of postion embedding.
 class PatchEmbedding(nn.Module):
-    def __init__(self, emb_size=40):
+    def __init__(self, emb_kernel_size_1,
+                 emb_kernel_size_2,
+                 emb_size):
         # self.patch_size = patch_size
         super().__init__()
 
         self.shallownet = nn.Sequential(
-            nn.Conv2d(1, 40, (1, 25), (1, 1)),
-            nn.Conv2d(40, 40, (22, 1), (1, 1)),
+            nn.Conv2d(1, 40, emb_kernel_size_1, (1, 1)),
+            nn.Conv2d(40, 40, emb_kernel_size_2, (1, 1)),
             nn.BatchNorm2d(40),
             nn.ELU(),
             nn.AvgPool2d((1, 75), (1, 15)),
@@ -149,19 +159,35 @@ class ClassificationHead(nn.Sequential):
 
 
 class Conformer(nn.Sequential):
-    def __init__(self, emb_size=40, depth=6, n_classes=4, **kwargs):
+    def __init__(self, emb_kernel_size_1, emb_kernel_size_2, emb_size=40, depth=1, n_classes=2, **kwargs):
         super().__init__(
 
-            PatchEmbedding(emb_size),
+            PatchEmbedding(emb_kernel_size_1, emb_kernel_size_2, emb_size),
             TransformerEncoder(depth, emb_size),
             ClassificationHead(emb_size, n_classes)
         )
 
 
 if __name__ == '__main__':
-    model = Conformer()
+    gpus = [0]
+    os.environ['CUDA_DEVICE_ORDER'] = 'PCI_BUS_ID'
+    os.environ["CUDA_VISIBLE_DEVICES"] = ','.join(map(str, gpus))
+    import math
+
+    from torchsummary import summary
+
+    model = Conformer(emb_kernel_size_1=[1, 25], emb_kernel_size_2=[22, 1]).cuda()
+
+    # model = nn.DataParallel(model, device_ids=[i for i in range(len(gpus))])
+    # model = model.cuda()
+
     print(model)
-    x = torch.randn(1, 1, 64,6000)
-    summary(model,(1, 1, 64,6000))
+    x = torch.randn(200, 1, 22, 1000).cuda()
+
+    summary(model, (1, 22, 1000))
+
     out = model(x)
+    model_name = 'eegconformer-d1.onnx'
+    model_path_onnx = os.path.join("C:\\Users\\alioo\\Desktop\\MA\\bbcpy_AutoML\\local", model_name)
+    torch.onnx.export(model, x, model_path_onnx, input_names=["features"], output_names=["logits"])
     print(out.shape)
