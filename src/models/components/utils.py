@@ -1,7 +1,48 @@
 import torch
 import numpy as np
 
+def get_trainable_parameter_num(model):
+    total_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
+    return total_params
 
+def L1Loss(model, Lambda):
+    w = torch.cat([x.view(-1) for x in model.parameters()])
+    err = Lambda * torch.sum(torch.abs(w))
+    return err
+
+
+def generate_TS_channel_order(original_order: list):
+    """https://github.com/yi-ding-cs/TSception/blob/main/code/utils.py
+
+    This function will generate the channel order for TSception
+    Parameters
+    ----------
+    original_order: list of the channel names
+
+    Returns
+    -------
+    TS: list of channel names which is for TSception
+    """
+    chan_name, chan_num, chan_final = [], [], []
+    for channel in original_order:
+        chan_name_len = len(channel)
+        k = 0
+        for s in [*channel[:]]:
+            if s.isdigit():
+               k += 1
+        if k != 0:
+            chan_name.append(channel[:chan_name_len-k])
+            chan_num.append(int(channel[chan_name_len-k:]))
+            chan_final.append(channel)
+    chan_pair = []
+    for ch, id in enumerate(chan_num):
+        if id % 2 == 0:
+            chan_pair.append(chan_name[ch] + str(id-1))
+        else:
+            chan_pair.append(chan_name[ch] + str(id+1))
+    chan_no_duplicate = []
+    [chan_no_duplicate.extend([f, chan_pair[i]]) for i, f in enumerate(chan_final) if f not in chan_no_duplicate]
+    return chan_no_duplicate[0::2] + chan_no_duplicate[1::2]
 def to_dense_prediction_model(model, axis=(2, 3)):
     """
     Transform a sequential model with strides to a model that outputs

@@ -407,7 +407,7 @@ if __name__ == "__main__":
     #
     # print(loss)
     #
-    # import os
+    import os
     #
     # model_name = 'eegnet-v1.onnx'
     # model_path_onnx = os.path.join("C:\\Users\\alioo\\Desktop\\MA\\bbcpy_AutoML\\local", model_name)
@@ -424,7 +424,7 @@ if __name__ == "__main__":
         F2=16,  # usually set to F1*D (?)
         kernel_length=64,
         third_kernel_size=(8, 4),
-        drop_prob=0.25,)
+        drop_prob=0.25,).double()
 
 
     model_name = 'eegnet-v4.onnx'
