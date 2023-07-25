@@ -1,60 +1,15 @@
 import logging
 from typing import Any, Dict, Optional
 
-import torch
 from lightning import LightningDataModule
-from sklearn.preprocessing import OneHotEncoder
-from src.data.srm_datamodule import SRMDatamodule
 from torch.utils.data import DataLoader
 from torch.utils.data import Dataset
 
+from src.data.srm_datamodule import SRMDatamodule
+from src.data.srm_dataset import SRMDataset
+
+
 logging.getLogger().setLevel(logging.INFO)
-
-
-class Data(Dataset):
-    def __init__(self, inputs, targets, transform=None):
-        if not isinstance(inputs, torch.Tensor):
-            inputs = torch.Tensor(inputs)
-        if not isinstance(targets, torch.Tensor):
-            targets = torch.Tensor(targets)
-
-        assert inputs.shape[0] == targets.shape[0]
-
-        self.inputs = inputs
-        self.targets = targets
-        self.transform = transform
-
-    def __len__(self):
-        return self.inputs.shape[0]
-
-    def __getitem__(self, idx):
-        sample = [self.inputs[idx, :], self.targets[idx, :]]
-        if self.transform:
-            sample = self.transform(sample)
-        return sample[0], sample[1]
-
-
-class CustomDataset(Dataset):
-    def __init__(self, data):
-
-        # Perform one-hot encoding on labels
-        y = data.y
-        onehot_encoder = OneHotEncoder(sparse=False)
-        integer_encoded = y.reshape(-1, 1)
-        onehot_encoded = onehot_encoder.fit_transform(integer_encoded)
-
-        self.data = torch.tensor(data).float()
-        self.y_oe = torch.tensor(onehot_encoded)
-
-    def __getitem__(self, index):
-        #fixme
-        x = self.data[index].unsqueeze(dim=0)
-        y = self.y_oe[index]
-
-        return x, y
-
-    def __len__(self):
-        return len(self.data)
 
 
 class SRM_DataModule(LightningDataModule):
@@ -113,6 +68,15 @@ class SRM_DataModule(LightningDataModule):
         self.concatenate_subjects = concatenate_subjects
         self.train_val_split = train_val_split
 
+
+        self.srm_datamodule = SRMDatamodule(data_dir=data_dir,
+                                            ival=ival,
+                                            bands=bands,
+                                            chans=chans,
+                                            classes=classes,
+                                            concatenate_subjects=concatenate_subjects)
+
+
         self.data_train: Optional[Dataset] = None
         self.data_vali: Optional[Dataset] = None
         self.data_test: Optional[Dataset] = None
@@ -139,16 +103,7 @@ class SRM_DataModule(LightningDataModule):
 
     def prepare_data(self):
         """ instantiate srm object. This method is called only from a single GPU."""
-        self.srm_datamodule = SRMDatamodule(data_dir=self.data_dir,
-                                            ival=self.ival,
-                                            bands=self.bands,
-                                            chans=self.chans,
-                                            classes=self.classes,
-                                            test_subjects_sessions_dict=self.test_subjects_sessions_dict,
-                                            train_subjects_sessions_dict=self.train_subjects_sessions_dict,
-                                            vali_subjects_sessions_dict=self.vali_subjects_sessions_dict,
-                                            concatenate_subjects=self.concatenate_subjects,
-                                            train_val_split=self.train_val_split)
+        pass
 
     def setup(self, stage: Optional[str] = None):
         """Load data. Set variables: num_classes."""
@@ -160,21 +115,21 @@ class SRM_DataModule(LightningDataModule):
             data_train = self.srm_datamodule.load_data(self.train_subjects_sessions_dict,
                                                        self.concatenate_subjects)
 
-            self.training_set = CustomDataset(data=data_train)
+            self.training_set = SRMDataset(data=data_train)
 
             # if stage == "vali":
             logging.info("Loading vali data...")
             data_vali = self.srm_datamodule.load_data(self.vali_subjects_sessions_dict,
                                                       self.concatenate_subjects)
 
-            self.validation_set = CustomDataset(data=data_vali)
+            self.validation_set = SRMDataset(data=data_vali)
 
             # if stage == "test":
             logging.info("Loading test data...")
             data_test = self.srm_datamodule.load_data(self.test_subjects_sessions_dict,
                                                       self.concatenate_subjects)
 
-            self.test_set = CustomDataset(data=data_test)
+            self.test_set = SRMDataset(data=data_test)
 
     def train_dataloader(self):
         return DataLoader(self.training_set,

@@ -1,12 +1,16 @@
 numpy>=1.22.1
 scipy>=1.7.3
 matplotlib>=3.5.1
-scikit-learn==1.0.2
+scikit-learn==1.2.0
 pyriemann>=0.2.7
 mne>=1.0.2
 joblib>=1.1.0
 pandas>=1.4.0
 setuptools>=60.7.0
+
+# --------- dask --------- #
+dask
+dask-ml
 
 h5py
 
@@ -15,6 +19,7 @@ optuna>=2.10.0
 # torch==2.0.1+cu117
 # --------- pytorch --------- #
 lightning>=2.0.0
+torchsummary
 einops
 
 # --------- hydra --------- #

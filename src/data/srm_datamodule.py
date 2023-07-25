@@ -2,7 +2,7 @@
 import logging
 
 import numpy as np
-import omegaconf
+
 import bbcpy
 
 logging.getLogger().setLevel(logging.INFO)
@@ -16,11 +16,7 @@ class SRMDatamodule():
                  bands,
                  chans,
                  classes,
-                 train_subjects_sessions_dict,
-                 vali_subjects_sessions_dict,
-                 test_subjects_sessions_dict,
-                 concatenate_subjects,
-                 train_val_split, ):
+                 concatenate_subjects):
         """ Initialize the SRM datamodule
 
         Parameters
@@ -40,17 +36,12 @@ class SRMDatamodule():
 
         self.srm_data_path = data_dir
 
-        self.classes = list(classes)
-        self.select_chans = list(chans)
+        self.classes = classes
+        self.select_chans = chans
         self.select_timepoints = ival
-        self.bands = list(bands)
-
-        self.train_subjects_sessions_dict = dict(train_subjects_sessions_dict)
-        self.vali_subjects_sessions_dict = dict(vali_subjects_sessions_dict)
-        self.test_subjects_sessions_dict = dict(test_subjects_sessions_dict)
+        self.bands = bands
 
         self.concatenate_subjects = concatenate_subjects
-        self.train_val_split = train_val_split
 
     def collect_subject_sessions(self, subjects_dict):
         """ Collect all the sessions for the subjects in the list """
@@ -164,6 +155,9 @@ class SRMDatamodule():
     def load_data(self, subjects_dict, concatenate_subjects=True):
         """ Prepare the data for the classification """
 
+        if not isinstance(subjects_dict, dict):
+            subjects_dict = subjects_dict.to_container()
+
         subjects_data = {}
         subjects_sessions_path_dict = self.collect_subject_sessions(subjects_dict)
         subjects_key = list(subjects_sessions_path_dict.keys())
@@ -196,3 +190,16 @@ class SRMDatamodule():
         del subjects_data
 
         return obj_new
+
+
+if __name__ == "__main__":
+    srm_raw_path = "../../data/SMR/raw/"
+    srm_data = SRMDatamodule(srm_raw_path,
+                             bands=[8, 13],
+                             classes=["R", "L"],
+                             chans=['C*', 'FC*'],
+                             ival="2s:8s:10ms",
+                             concatenate_subjects=True)
+
+    srm_data, timepoints, srm_fs, clab, mnt, trial_info, subject_info = srm_data.load_session_raw_data(
+        session_path="../../data/SMR/raw/S1_Session_1.mat")
