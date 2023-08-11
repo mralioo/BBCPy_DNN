@@ -4,7 +4,7 @@ from typing import Any, Dict, Optional
 import torch
 from lightning import LightningDataModule
 from sklearn.preprocessing import OneHotEncoder
-from src.data.srm_datamodule import SRMDatamodule
+from src.data.srm_datamodule import SMR_Data
 from torch.utils.data import DataLoader
 from torch.utils.data import Dataset
 

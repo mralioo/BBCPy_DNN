@@ -6,7 +6,7 @@ import pyrootutils
 from omegaconf import DictConfig
 
 import bbcpy
-from data.srm_datamodule import SRMDatamodule
+from data.srm_datamodule import SMR_Data
 from trainer.baseline_trainer import SklearnTrainer
 
 pyrootutils.setup_root(__file__, indicator=".project-root", pythonpath=True)
@@ -52,7 +52,7 @@ def train(cfg: DictConfig) -> dict:
         np.random.seed(cfg.seed)
 
     log.info(f"Instantiating datamodule <{cfg.data._target_}>")
-    datamodule: SRMDatamodule = hydra.utils.instantiate(cfg.data)
+    datamodule: SMR_Data = hydra.utils.instantiate(cfg.data)
 
     log.info(f"Instantiating model <{cfg.model._target_}>")
     pipeline: bbcpy.pipeline.Pipeline = hydra.utils.instantiate(cfg.model)

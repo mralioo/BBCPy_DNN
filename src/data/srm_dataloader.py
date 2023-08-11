@@ -5,7 +5,7 @@ from lightning import LightningDataModule
 from torch.utils.data import DataLoader
 from torch.utils.data import Dataset
 
-from src.data.srm_datamodule import SRMDatamodule
+from src.data.srm_datamodule import SMR_Data
 from src.data.srm_dataset import SRMDataset
 
 
@@ -46,7 +46,6 @@ class SRM_DataModule(LightningDataModule):
                  chans,
                  classes,
                  train_subjects_sessions_dict,
-                 vali_subjects_sessions_dict,
                  test_subjects_sessions_dict,
                  concatenate_subjects,
                  train_val_split,
@@ -62,19 +61,10 @@ class SRM_DataModule(LightningDataModule):
         self.classes = classes
 
         self.train_subjects_sessions_dict = train_subjects_sessions_dict
-        self.vali_subjects_sessions_dict = vali_subjects_sessions_dict
         self.test_subjects_sessions_dict = test_subjects_sessions_dict
 
         self.concatenate_subjects = concatenate_subjects
         self.train_val_split = train_val_split
-
-
-        self.srm_datamodule = SRMDatamodule(data_dir=data_dir,
-                                            ival=ival,
-                                            bands=bands,
-                                            chans=chans,
-                                            classes=classes,
-                                            concatenate_subjects=concatenate_subjects)
 
 
         self.data_train: Optional[Dataset] = None
@@ -109,20 +99,13 @@ class SRM_DataModule(LightningDataModule):
         """Load data. Set variables: num_classes."""
         # if stage == "train" or stage is None:
         # load and split datasets only if not loaded already
-        if not self.data_train and not self.data_vali and not self.data_test:
+        if not self.data_train and not self.data_test:
             # if stage == "train":
             logging.info("Loading train data...")
             data_train = self.srm_datamodule.load_data(self.train_subjects_sessions_dict,
                                                        self.concatenate_subjects)
 
             self.training_set = SRMDataset(data=data_train)
-
-            # if stage == "vali":
-            logging.info("Loading vali data...")
-            data_vali = self.srm_datamodule.load_data(self.vali_subjects_sessions_dict,
-                                                      self.concatenate_subjects)
-
-            self.validation_set = SRMDataset(data=data_vali)
 
             # if stage == "test":
             logging.info("Loading test data...")

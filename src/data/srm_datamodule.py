@@ -1,6 +1,6 @@
 # from bbcpy.datatypes.srm_eeg import *
 import logging
-
+from sklearn.model_selection import KFold
 import numpy as np
 
 import bbcpy
@@ -8,15 +8,32 @@ import bbcpy
 logging.getLogger().setLevel(logging.INFO)
 
 
-class SRMDatamodule():
+def prepare_subject_data(data_dir,
+                         ival,
+                         bands,
+                         chans,
+                         classes,
+                         subjects_dict):
+    """ Prepare the data for the classification """
+    srm_data = SMR_Data(data_dir=data_dir,
+                        bands=bands,
+                        classes=classes,
+                        chans=chans,
+                        ival=ival)
+
+    obj = srm_data.load_data(subjects_dict=subjects_dict)
+
+    return obj
+
+
+class SMR_Data():
 
     def __init__(self,
                  data_dir,
                  ival,
                  bands,
                  chans,
-                 classes,
-                 concatenate_subjects):
+                 classes):
         """ Initialize the SRM datamodule
 
         Parameters
@@ -40,8 +57,6 @@ class SRMDatamodule():
         self.select_chans = chans
         self.select_timepoints = ival
         self.bands = bands
-
-        self.concatenate_subjects = concatenate_subjects
 
     def collect_subject_sessions(self, subjects_dict):
         """ Collect all the sessions for the subjects in the list """
@@ -93,7 +108,80 @@ class SRMDatamodule():
 
         return obj
 
-    def load_session_data(self, session_name, sessions_group_path):
+    def load_forced_valid_trials_data(self, session_name, sessions_group_path):
+        session_path = sessions_group_path[session_name]
+
+        srm_data, timepoints, srm_fs, clab, mnt, trial_info, subject_info = \
+            self.load_session_raw_data(session_path)
+
+        # init channels object
+        chans = bbcpy.datatypes.eeg.Chans(clab, mnt)
+
+        # true labels
+        target_map_dict = {1: "R", 2: "L", 3: "U", 4: "D"}
+        mrk_class = np.array(trial_info["targetnumber"])
+        mrk_class = mrk_class.astype(int) - 1  # to start from 0
+        # mrk_class_ie = np.array(trial_info["targetnumber"])
+        #
+        # # Function to map integer values to labels
+        # def _map_labels(value):
+        #     return target_map_dict.get(value, value)
+        #
+        # # Use np.vectorize to apply the mapping to the entire array
+        # mrk_class = np.vectorize(_map_labels)(mrk_class_ie)
+
+        # Split data into train and test , where test contained forced trails
+        trialresult = trial_info["result"]
+        valid_trials_idx = np.where(trialresult)[0]
+
+        # select all valid trials to train
+        valid_data = srm_data[valid_trials_idx]
+        valid_mrk_class = mrk_class[valid_trials_idx]
+        valid_timepoints = timepoints[valid_trials_idx]
+        class_names = np.array(["R", "L", "U", "D"])
+
+        valid_mrk = bbcpy.datatypes.eeg.Marker(mrk_pos=valid_trials_idx,
+                                               mrk_class=valid_mrk_class,
+                                               mrk_class_name=class_names,
+                                               mrk_fs=1,
+                                               parent_fs=srm_fs)
+
+        # create SRM_Data object for the session
+        valid_trials = bbcpy.datatypes.srm_eeg.SRM_Data(valid_data,
+                                                        valid_timepoints.reshape(-1, 1),
+                                                        srm_fs,
+                                                        mrk=valid_mrk,
+                                                        chans=chans)
+
+        # select all forced trials to test
+        forced_trials = trial_info["forcedresult"]
+        forced_trials_idx = np.setdiff1d(valid_trials_idx, np.where(forced_trials)[0])
+        forced_data = srm_data[forced_trials_idx, :, :]
+        forced_mrk_class = mrk_class[forced_trials_idx]
+        forced_timepoints = timepoints[forced_trials_idx]
+        forced_mrk = bbcpy.datatypes.eeg.Marker(mrk_pos=forced_trials_idx,
+                                                mrk_class=forced_mrk_class,
+                                                mrk_class_name=None,
+                                                mrk_fs=1,
+                                                parent_fs=srm_fs)
+        # # create SRM_Data object for the session
+        forced_trials = bbcpy.datatypes.srm_eeg.SRM_Data(forced_data,
+                                                         forced_timepoints.reshape(-1, 1),
+                                                         srm_fs,
+                                                         mrk=forced_mrk,
+                                                         chans=chans)
+
+        # preprocess the data
+        logging.info(f"Preprocessing data..")
+        valid_trials = self.preprocess_data(valid_trials)
+        forced_trials = self.preprocess_data(forced_trials)
+
+        logging.info(
+            f"{session_name} loaded;  valid trails shape: {valid_trials.shape},"
+            f" forced trials shape: {forced_trials.shape}")
+        return [valid_trials, forced_trials]
+
+    def load_valid_trials_data(self, session_name, sessions_group_path):
         """ Create a session object from the SRM data sessions """
 
         session_path = sessions_group_path[session_name]
@@ -101,22 +189,35 @@ class SRMDatamodule():
         srm_data, timepoints, srm_fs, clab, mnt, trial_info, subject_info = \
             self.load_session_raw_data(session_path)
 
+        # init channels object
+        chans = bbcpy.datatypes.eeg.Chans(clab, mnt)
+
+        # true labels
+        target_map_dict = {1: "R", 2: "L", 3: "U", 4: "D"}
         mrk_class = np.array(trial_info["targetnumber"])
         mrk_class = mrk_class.astype(int) - 1  # to start from 0
 
-        mrk_class_name = ["R", "L", "U", "D"]
-
+        # Split data into train and test , where test contained forced trails
         trialresult = trial_info["result"]
-        # initialize SRM_Marker object
-        mrk = bbcpy.datatypes.srm_eeg.SRM_Marker(mrk_class, mrk_class_name, trialresult, srm_fs)
-        # initialize SRM_Chans object
-        chans = bbcpy.datatypes.eeg.Chans(clab, mnt)
+        valid_trials_idx = np.where(trialresult)[0]
+
+        # select all valid trials to train
+        valid_data = srm_data[valid_trials_idx]
+        valid_mrk_class = mrk_class[valid_trials_idx]
+        valid_timepoints = timepoints[valid_trials_idx]
+        class_names = np.array(["R", "L", "U", "D"])
+
+        valid_mrk = bbcpy.datatypes.eeg.Marker(mrk_pos=valid_trials_idx,
+                                               mrk_class=valid_mrk_class,
+                                               mrk_class_name=class_names,
+                                               mrk_fs=1,
+                                               parent_fs=srm_fs)
 
         # create SRM_Data object for the session
-        obj = bbcpy.datatypes.srm_eeg.SRM_Data(srm_data,
-                                               timepoints.reshape(-1, 1),
+        obj = bbcpy.datatypes.srm_eeg.SRM_Data(valid_data,
+                                               valid_timepoints.reshape(-1, 1),
                                                srm_fs,
-                                               mrk=mrk,
+                                               mrk=valid_mrk,
                                                chans=chans)
 
         # preprocess the data
@@ -125,7 +226,7 @@ class SRMDatamodule():
         logging.info(f"{session_name} loaded; has the shape: {obj.shape}")
         return obj
 
-    def load_subject_data(self, sessions_group_path):
+    def load_subject_data(self, sessions_group_path, distributed_mode=False):
         """ Create a subject object from the SRM data sessions , concatenating the sessions over trails"""
 
         sessions_key = list(sessions_group_path.keys())
@@ -134,20 +235,20 @@ class SRMDatamodule():
             init_session_name = sessions_key[0]
             logging.info(
                 f"Loading {init_session_name} finalized (1 from {str(len(sessions_key))})")
-            obj_new = self.load_session_data(session_name=init_session_name,
-                                             sessions_group_path=sessions_group_path)
+            obj_new = self.load_valid_trials_data(session_name=init_session_name,
+                                                  sessions_group_path=sessions_group_path)
 
             for i, session_name in enumerate(sessions_key[1:]):
                 logging.info(
                     f"Loading {session_name} finalized ({str(i + 2)} from {str(len(sessions_key))})")
-                obj = self.load_session_data(session_name=session_name,
-                                             sessions_group_path=sessions_group_path)
+                obj = self.load_valid_trials_data(session_name=session_name,
+                                                  sessions_group_path=sessions_group_path)
                 obj_new = obj_new.append(obj, axis=0)
 
         else:
             init_session_name = sessions_key[0]
-            obj_new = self.load_session_data(session_name=init_session_name,
-                                             sessions_group_path=sessions_group_path)
+            obj_new = self.load_valid_trials_data(session_name=init_session_name,
+                                                  sessions_group_path=sessions_group_path)
             logging.info(f"Loading sessions: {init_session_name} finalized (1 from 1)")
 
         return obj_new
@@ -191,15 +292,51 @@ class SRMDatamodule():
 
         return obj_new
 
+    def kfolding_within_subject(self, subject_dict, cv_mode, prepare_test=False):
+
+        subject_id = subject_dict.keys()[0]
+        sessions_ids = subject_dict[subject_id]
+
+        if len(sessions_ids) < 2:
+            raise Exception(f"Subject {subject_id} has only one session, take at least two sessions for k-folding")
+
+        sessions_group_path = self.collect_subject_sessions(subject_dict)
+
+        sessions_data = {}
+
+        kfold = KFold(n_splits=len(sessions_ids), shuffle=True, random_state=42)
+
+        for session_name in sessions_ids:
+            logging.info(f"Loading session: {session_name} finalized")
+            sessions_data[session_name] = self.load_valid_trials_data(session_name=session_name,
+                                              sessions_group_path=sessions_group_path[subject_id])
+
+        channels_kfolded = []
+
+        for fold, (train_index, test_index) in enumerate(kfold.split(sessions_ids)):
+            foldNum = fold + 1
+
+
+        pass
+
+    def calculate_class_weights(self, data):
+        """ Calculate the class weights for the data """
+        pass
+
+    def kfolding_cross_subjects(self, subjects_dict, cv_mode, prepare_test=False):
+        pass
+
 
 if __name__ == "__main__":
     srm_raw_path = "../../data/SMR/raw/"
-    srm_data = SRMDatamodule(srm_raw_path,
-                             bands=[8, 13],
-                             classes=["R", "L"],
-                             chans=['C*', 'FC*'],
-                             ival="2s:8s:10ms",
-                             concatenate_subjects=True)
+    srm_data = SMR_Data(data_dir=srm_raw_path,
+                        bands=[8, 13],
+                        classes=["R", "L", "U"],
+                        chans=['C*', 'FC*'],
+                        ival="2s:8s:10ms")
 
-    srm_data, timepoints, srm_fs, clab, mnt, trial_info, subject_info = srm_data.load_session_raw_data(
-        session_path="../../data/SMR/raw/S1_Session_1.mat")
+    obj = srm_data.load_data(subjects_dict={"S1": [1]})
+    print(obj.shape)
+
+    # data, timepoints, srm_fs, clab, mnt, trial_info, subject_info = srm_data.load_session_raw_data(
+    #     session_path="../../data/SMR/raw/S1_Session_1.mat")
