@@ -6,7 +6,7 @@ import pyrootutils
 from omegaconf import DictConfig
 
 import bbcpy
-from data.srm_datamodule import SMR_Data
+from data.smr_datamodule import SMR_Data
 from trainer.baseline_trainer import SklearnTrainer
 
 pyrootutils.setup_root(__file__, indicator=".project-root", pythonpath=True)

@@ -1,14 +1,9 @@
-_target_: src.data.srm_datamodule.SRMDatamodule
+_target_: src.data.smr_datamodule.SMR_Data
 data_dir: ${paths.data_dir}
 ival: 2s:8s:1ms
-bands:
-  - 8
-  - 13
+bands: [8,13]
 chans: ['C?,~*3,~*4', 'FC*,~*3,~*4']
-classes:
-  - "R"
-  - "L"
-
+classes: ["R", "L"]
 train_subjects_sessions_dict:
   S1:
     - 1
@@ -21,35 +16,8 @@ train_subjects_sessions_dict:
     - 9
     - 10
     - 11
-  S3:
-    - 1
-    - 2
-    - 3
-    - 4
-    - 5
-    - 6
-  S4:
-    - 1
-    - 2
-    - 3
-    - 4
-    - 5
-    - 6
 test_subjects_sessions_dict:
   S2:
     - 1
-  S3:
-    - 1
-    - 2
-  S4:
-    - 1
-    - 2
-    - 3
-    - 4
-    - 5
-    - 6
-
 concatenate_subjects: True
-train_val_split:
-  - 0.7
-  - 0.3
+train_val_split: [0.8, 0.2]

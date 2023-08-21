@@ -1,7 +1,7 @@
 mlflow:
-  experiment_name: Test
-  run_name: Debug
-  tracking_uri: ${paths.log_dir}/mlflow/mlruns
+  experiment_name: Debug
+  run_name: RUN-00
+  tracking_uri: ${paths.log_dir}
   tags: null
   # save_dir: "./mlruns"
   prefix: ""

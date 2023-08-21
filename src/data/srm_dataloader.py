@@ -5,7 +5,7 @@ from lightning import LightningDataModule
 from torch.utils.data import DataLoader
 from torch.utils.data import Dataset
 
-from src.data.srm_datamodule import SMR_Data
+from src.data.smr_datamodule import SMR_Data
 from src.data.srm_dataset import SRMDataset
 
 

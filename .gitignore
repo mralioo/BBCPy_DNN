@@ -139,6 +139,8 @@ logs/
 # local folder
 /local/
 
+# vscode ide
+
 
 # venv folder
 /bbcpy_env/

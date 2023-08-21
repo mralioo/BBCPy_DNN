@@ -1,4 +1,5 @@
 import itertools
+import os
 
 import mlflow
 import numpy as np
@@ -79,10 +80,12 @@ def confusion_matrix_to_png(conf_mat, class_names, title, figure_file_name=None,
         if figure_file_name is None:
             fig_file_path = f'{title}.png'
         else:
-            fig_file_path = f'{figure_file_name}.png'
 
-        plt.savefig(fig_file_path)
-        mlflow.log_artifact(fig_file_path, artifact_path="plots")
+            fig_file_path = f'{figure_file_name}.png'
+        mlflow_artifact_path = mlflow.get_artifact_uri().replace("file:///", "")
+        plt_cm_file_path = os.path.join(mlflow_artifact_path, fig_file_path)
+        plt.savefig(plt_cm_file_path)
+        mlflow.log_artifact(plt_cm_file_path)
         plt.close(figure)
 
     elif type == 'mean':
@@ -119,6 +122,10 @@ def confusion_matrix_to_png(conf_mat, class_names, title, figure_file_name=None,
         else:
             fig_file_path = f'{figure_file_name}.png'
 
-        plt.savefig(fig_file_path)
-        mlflow.log_artifact(fig_file_path, artifact_path="plots")
+        mlflow_artifact_path = mlflow.get_artifact_uri().replace("file:///", "")
+        plt_cm_mean_file_path = os.path.join(mlflow_artifact_path, fig_file_path)
+
+        plt.savefig(plt_cm_mean_file_path)
+
+        mlflow.log_artifact(plt_cm_mean_file_path)
         plt.close(figure)

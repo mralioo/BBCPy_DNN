@@ -1,7 +1,9 @@
 # from bbcpy.datatypes.srm_eeg import *
 import logging
-from sklearn.model_selection import KFold
+from omegaconf import OmegaConf, DictConfig, ListConfig
+
 import numpy as np
+from sklearn.model_selection import KFold
 
 import bbcpy
 
@@ -13,7 +15,7 @@ def prepare_subject_data(data_dir,
                          bands,
                          chans,
                          classes,
-                         subjects_dict):
+                         subject_dict):
     """ Prepare the data for the classification """
     srm_data = SMR_Data(data_dir=data_dir,
                         bands=bands,
@@ -21,7 +23,7 @@ def prepare_subject_data(data_dir,
                         chans=chans,
                         ival=ival)
 
-    obj = srm_data.load_data(subjects_dict=subjects_dict)
+    obj = srm_data.load_data(subject_dict=subject_dict)
 
     return obj
 
@@ -30,11 +32,17 @@ class SMR_Data():
 
     def __init__(self,
                  data_dir,
+                 train_subjects_sessions_dict,
+                 test_subjects_sessions_dict,
+                 concatenate_subjects,
+                 train_val_split,
                  ival,
                  bands,
                  chans,
-                 classes):
-        """ Initialize the SRM datamodule
+                 classes,
+                 ):
+
+        """ Initialize the SMR datamodule
 
         Parameters
         ----------
@@ -53,10 +61,20 @@ class SMR_Data():
 
         self.srm_data_path = data_dir
 
-        self.classes = classes
-        self.select_chans = chans
+        self.train_subjects_sessions_dict = train_subjects_sessions_dict
+        self.test_subjects_sessions_dict = test_subjects_sessions_dict
+
+        self.concatenate_subjects = concatenate_subjects
+        self.train_val_split = OmegaConf.to_container(train_val_split)
+
+        self.classes = OmegaConf.to_container(classes)
+        self.select_chans = OmegaConf.to_container(chans)
         self.select_timepoints = ival
-        self.bands = bands
+        self.bands = OmegaConf.to_container(bands)
+
+    @property
+    def num_classes(self):
+        return len(self.classes)
 
     def collect_subject_sessions(self, subjects_dict):
         """ Collect all the sessions for the subjects in the list """
@@ -253,14 +271,11 @@ class SMR_Data():
 
         return obj_new
 
-    def load_data(self, subjects_dict, concatenate_subjects=True):
+    def load_data(self, subject_dict, concatenate_subjects=True):
         """ Prepare the data for the classification """
 
-        if not isinstance(subjects_dict, dict):
-            subjects_dict = subjects_dict.to_container()
-
         subjects_data = {}
-        subjects_sessions_path_dict = self.collect_subject_sessions(subjects_dict)
+        subjects_sessions_path_dict = self.collect_subject_sessions(subject_dict)
         subjects_key = list(subjects_sessions_path_dict.keys())
 
         if len(subjects_key) > 1:
@@ -292,6 +307,12 @@ class SMR_Data():
 
         return obj_new
 
+    def train_dataloader(self):
+        return self.load_data(self.train_subjects_sessions_dict, self.concatenate_subjects)
+
+    def test_dataloader(self):
+        return self.load_data(self.test_subjects_sessions_dict, self.concatenate_subjects)
+
     def kfolding_within_subject(self, subject_dict, cv_mode, prepare_test=False):
 
         subject_id = subject_dict.keys()[0]
@@ -309,13 +330,13 @@ class SMR_Data():
         for session_name in sessions_ids:
             logging.info(f"Loading session: {session_name} finalized")
             sessions_data[session_name] = self.load_valid_trials_data(session_name=session_name,
-                                              sessions_group_path=sessions_group_path[subject_id])
+                                                                      sessions_group_path=sessions_group_path[
+                                                                          subject_id])
 
         channels_kfolded = []
 
         for fold, (train_index, test_index) in enumerate(kfold.split(sessions_ids)):
             foldNum = fold + 1
-
 
         pass
 
@@ -326,17 +347,18 @@ class SMR_Data():
     def kfolding_cross_subjects(self, subjects_dict, cv_mode, prepare_test=False):
         pass
 
+    def split_data(self, data):
+        pass
+
 
 if __name__ == "__main__":
     srm_raw_path = "../../data/SMR/raw/"
-    srm_data = SMR_Data(data_dir=srm_raw_path,
-                        bands=[8, 13],
-                        classes=["R", "L", "U"],
-                        chans=['C*', 'FC*'],
-                        ival="2s:8s:10ms")
 
-    obj = srm_data.load_data(subjects_dict={"S1": [1]})
-    print(obj.shape)
+    obj = prepare_subject_data(data_dir=srm_raw_path,
+                               ival="2s:8s:10ms",
+                               bands=[8, 13],
+                               chans=['C*', 'FC*'],
+                               classes=["R", "L", "U"],
+                               subject_dict={"S1": [1, 2, 3, 4]})
 
-    # data, timepoints, srm_fs, clab, mnt, trial_info, subject_info = srm_data.load_session_raw_data(
-    #     session_path="../../data/SMR/raw/S1_Session_1.mat")
+    print(obj)

@@ -1,12 +1,10 @@
 import json
-import pprint
 from datetime import datetime
 from pathlib import Path
-from sklearn.model_selection import GridSearchCV
+import os
 
 import mlflow
 import numpy as np
-import optuna
 import pyrootutils
 import sklearn
 from sklearn.metrics import confusion_matrix
@@ -35,19 +33,19 @@ class SklearnTrainer(object):
 
         self.hyperparameter_search = hyperparameter_search
 
-        self.train_sessions = self.datamodule.train_subjects_sessions_dict
-        self.vali_sessions = self.datamodule.vali_subjects_sessions_dict
-        self.test_sessions = self.datamodule.test_subjects_sessions_dict
-        self.concatenate_subjects = self.datamodule.concatenate_subjects
+        # self.train_sessions = self.datamodule.train_subjects_sessions_dict
+        # if self.datamodule.test_subjects_sessions_dict is not None:
+        #     self.test_sessions = self.datamodule.test_subjects_sessions_dict
+        # self.concatenate_subjects = self.datamodule.concatenate_subjects
 
     def search_hyperparams(self, pipeline, hparams):
 
         log.info("Loading data...")
-        train_data = self.datamodule.load_data(self.train_sessions,
-                                               self.concatenate_subjects)
 
-        vali_data = self.datamodule.load_data(self.vali_sessions,
-                                              self.concatenate_subjects)
+        train_sessions_dict = self.datamodule.train_subjects_sessions_dict
+        train_data = self.datamodule.train_dataloader()
+
+        vali_data = self.datamodule.train_dataloader()
 
         classes_names = train_data.className
 
@@ -109,9 +107,10 @@ class SklearnTrainer(object):
     def train(self, pipeline, hparams):
 
         log.info("Loading data...")
-        train_data = self.datamodule.load_data(self.train_sessions,
-                                               self.concatenate_subjects)
+        train_data = self.datamodule.train_dataloader()
         classes_names = train_data.className
+
+        metrics = None
 
         if "mlflow" in self.logger:
             self.clf = pipeline
@@ -139,13 +138,13 @@ class SklearnTrainer(object):
             except:
                 experiment = mlflow.get_experiment_by_name(experiment_name)
 
-
             mlflow.sklearn.autolog()
 
             with mlflow.start_run(experiment_id=experiment.experiment_id,
                                   run_name=run_name) as parent_run:
 
                 for fold, (train_index, test_index) in enumerate(self.cv.split(train_data, train_data.y)):
+
                     foldNum = fold + 1
 
                     log.info("Starting fold {} of {}".format(foldNum, num_folds))
@@ -160,7 +159,6 @@ class SklearnTrainer(object):
                                           run_name=mlflow_job_name,
                                           nested=True) as child_run:
 
-                        mlflow_artifact_path = mlflow.get_artifact_uri()
 
                         self.clf.fit(X_train, y_train)
                         y_pred = self.clf.predict(X_test)
@@ -185,7 +183,7 @@ class SklearnTrainer(object):
                         # fetch logged data from child run
                         child_run_id = child_run.info.run_id
 
-                        log.info(f"Train Fold {foldNum} with run-i {child_run_id} is completed!")
+                        log.info(f"Train Fold {foldNum} with run {child_run_id} is completed!")
 
                     # log the mean confusion matrix to mlflow parent run
                     mean_f1_score = np.mean(val_f1_list)
@@ -203,18 +201,26 @@ class SklearnTrainer(object):
                     hparams.update(params)
                     hparams.update(tags)
 
+                    mlflow_artifact_path = mlflow.get_artifact_uri().replace("file:///", "")
+                    hparams_file_path = os.path.join(mlflow_artifact_path, "Hparams.json")
                     hparams["mlflow_uri"] = mlflow_artifact_path
-                    with open("Hparams.json", "w") as f:
+                    with open(hparams_file_path, "w") as f:
                         json.dump(hparams, f)
-                    mlflow.log_artifact("Hparams.json", artifact_path="best_model")
+                    mlflow.log_artifact(hparams_file_path, artifact_path="best_model")
+
                     # log dataset dict to mlflow parent run
+                    train_sessions_dict = self.datamodule.train_subjects_sessions_dict
+                    tmp_dict = {}
+                    for key, value in train_sessions_dict.items():
+                        tmp_dict[key] = list(value)
 
-                    for key, value in self.train_sessions.items():
-                        self.train_sessions[key] = list(value)
+                    mlflow_artifact_path = mlflow.get_artifact_uri().replace("file:///", "")
+                    data_description_file_path = os.path.join(mlflow_artifact_path, "data_description.json")
 
-                    with open("train_sessions.json", "w") as f:
-                        json.dump(self.train_sessions, f)
-                    mlflow.log_artifact("train_sessions.json", artifact_path="data")
+                    with open(data_description_file_path, "w") as f:
+                        json.dump(tmp_dict, f)
+
+                    mlflow.log_artifact(data_description_file_path)
 
                 log.info(f"Training completed!")
 
@@ -226,6 +232,8 @@ class SklearnTrainer(object):
         return metrics
 
     def test(self, pipeline, datamodule):
-        test_data = datamodule.load_data(self.test_sessions, self.concatenate_subjects)
+        return NotImplementedError
 
-        return pipeline.predict(test_data)
+        # test_data = datamodule.load_data(self.test_sessions, self.concatenate_subjects)
+        #
+        # return pipeline.predict(test_data)

@@ -1,5 +1,4 @@
 # @package _global_
-
 hydra:
   run:
     dir: logs/debugs/runs/${name}/${now:%Y-%m-%d}_${now:%H-%M-%S}

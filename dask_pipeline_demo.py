@@ -7,7 +7,7 @@ import bbcpy.functions.helpers as helpers
 from bbcpy.datatypes.eeg import Data
 from bbcpy.datatypes.srm_eeg import SRM_Data
 from bbcpy.functions.artireject import averagevariance
-from src.data.srm_datamodule import SMR_Data
+from src.data.smr_datamodule import SMR_Data
 
 
 class _GEVDsf(sk.base.BaseEstimator, sk.base.TransformerMixin):
@@ -138,7 +138,7 @@ if __name__ == "__main__":
                         classes=["R", "L"],
                         chans=['C*', 'FC*'],
                         ival="2s:8s:10ms")
-    obj = srm_data.load_data(subjects_dict={"S1": [1]})
+    obj = srm_data.load_data(subject_dict={"S1": [1]})
 
     import dask.array as da
 

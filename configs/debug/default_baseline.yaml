@@ -8,7 +8,9 @@ task_name: "debug"
 
 # disable callbacks and loggers during debugging
 callbacks: null
-logger: null
+logger:
+  mlflow:
+    run_name: BASELINE-DEBUG-00
 
 extras:
   ignore_warnings: False
@@ -22,14 +24,20 @@ hydra:
       level: DEBUG
 
   # use this to also set hydra loggers to 'DEBUG'
-  # verbose: True
+  verbose: True
 
 trainer:
-  max_epochs: 1
-  accelerator: cpu # debuggers don't like gpus
-  devices: 1 # debuggers don't like multiprocessing
-  detect_anomaly: true # raise exception if NaN or +/-inf is detected in any tensor
+  cv:
+    n_splits: 2 # debuggers don't like cross-validation
+    shuffle: False # debuggers don't like cross-validation
+
+#  accelerator: cpu # debuggers don't like gpus
+#  devices: 1 # debuggers don't like multiprocessing
+#  detect_anomaly: true # raise exception if NaN or +/-inf is detected in any tensor
 
 data:
-  num_workers: 0 # debuggers don't like multiprocessing
-  pin_memory: False # disable gpu memory pin
+  train_subjects_sessions_dict:
+    S1:
+      - 1
+#  num_workers: 0 # debuggers don't like multiprocessing
+#  pin_memory: False # disable gpu memory pin
