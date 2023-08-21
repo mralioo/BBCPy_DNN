@@ -10,6 +10,7 @@ task_name: "debug"
 callbacks: null
 logger:
   mlflow:
+    experiment_name: riemann
     run_name: BASELINE-DEBUG-00
 
 extras:
