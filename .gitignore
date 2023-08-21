@@ -144,3 +144,6 @@ logs/
 
 # venv folder
 /bbcpy_env/
+
+# apptainer containers
+*.sif
