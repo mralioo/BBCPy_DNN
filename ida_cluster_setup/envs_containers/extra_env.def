@@ -1,0 +1,5 @@
+Bootstrap: localimage
+From: ./bbcpy_lightning.sif
+
+%post
+    pip install --root-user-action=ignore  -f ./bbcpy-0.1.1-py3-none-any.whl
