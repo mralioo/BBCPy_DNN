@@ -7,4 +7,4 @@
 
 
 
-apptainer run --nv bbcpy_lightning.sif python src/baseline_train.py experiment=baseline_riemann
+apptainer run --nv ./hydra_ida/bbcpy_lightning.sif python src/baseline_train.py experiment=baseline_riemann

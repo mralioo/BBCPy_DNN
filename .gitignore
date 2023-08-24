@@ -147,3 +147,4 @@ logs/
 
 # apptainer containers
 *.sif
+*.sqfs
