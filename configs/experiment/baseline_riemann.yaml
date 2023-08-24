@@ -9,6 +9,7 @@ defaults:
   - override /callbacks: default.yaml
   - override /trainer: sklearn.yaml
   - override /logger: mlflow.yaml
+  - override /paths: default.yaml
 
 # all parameters below will be merged with parameters from default configurations set above
 # this allows you to overwrite only specified parameters
@@ -16,6 +17,14 @@ defaults:
 tags: [ "baseline" , "alpha_band" , "riemann" ]
 
 seed: 12345
+
+paths:
+  root_dir: ${oc.env:PROJECT_ROOT}
+  data_dir: ./input-data
+  log_dir: ~/home/ali_alouane/MA_BCI/logs/
+  output_dir: ${hydra:runtime.output_dir}
+  work_dir: ${hydra:runtime.cwd}
+
 
 logger:
   mlflow:

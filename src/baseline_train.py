@@ -1,3 +1,4 @@
+import os
 from typing import Optional, Tuple
 
 import hydra
@@ -106,6 +107,10 @@ def train(cfg: DictConfig) -> dict:
 
 @hydra.main(version_base="1.3", config_path="../configs", config_name="baseline_train.yaml")
 def main(cfg: DictConfig) -> Optional[float]:
+    print("hello hydra")
+    print(f"job ID: {os.getenv('SLURM_JOB_ID')}")
+    print(f"array job ID: {os.getenv('SLURM_ARRAY_JOB_ID')}")
+    print(f"array task ID: {os.getenv('SLURM_ARRAY_TASK_ID')}")
     # apply extra utilities
     # (e.g. ask for tags if none are provided in cfg, print cfg tree, etc.)
     utils.extras(cfg)
