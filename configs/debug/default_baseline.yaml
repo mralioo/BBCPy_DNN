@@ -39,6 +39,6 @@ trainer:
 data:
   train_subjects_sessions_dict:
     S1:
-      - 1
+      - 2
 #  num_workers: 0 # debuggers don't like multiprocessing
 #  pin_memory: False # disable gpu memory pin
