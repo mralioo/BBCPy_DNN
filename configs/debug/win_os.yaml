@@ -1,0 +1,14 @@
+# @package _global_
+task_name: "debug-win"
+
+data:
+  train_subjects_sessions_dict:
+    S1:
+      - 2
+
+paths:
+  root_dir: ${oc.env:PROJECT_ROOT}
+  data_dir: ${paths.root_dir}\data\SMR\raw\
+  log_dir:  ${oc.env:PROJECT_ROOT}\logs
+  output_dir: ${hydra:runtime.output_dir}
+  work_dir: ${hydra:runtime.cwd}

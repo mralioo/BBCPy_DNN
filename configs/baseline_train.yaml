@@ -15,19 +15,19 @@ defaults:
 
   # experiment configs allow for version control of specific hyperparameters
   # e.g. best hyperparameters for given model and datamodule
-  - experiment: baseline_riemann.yaml
+  - experiment: riemann_config_1.yaml
 
   # config for hyperparameter optimization
-#  - hparams_search: cv_gridsearch_csp.yaml
+  #  - hparams_search: cv_gridsearch_csp.yaml
   - hparams_search: null
-#  - hparams_search: sklearn_optuna.yaml
+  #  - hparams_search: sklearn_optuna.yaml
 
   # optional local config for machine/user specific settings
   # it's optional since it doesn't need to exist and is excluded from version control
-#  - optional local: default.yaml
+#  - local: win_os.yaml
 
   # debugging config (enable through command line, e.g. `python train.py debug=default)
-#  - debug: default_baseline.yaml
+  - debug: win_os.yaml
 
 # task name, determines output directory path
 # list of tasks [train, test, hparams_search]

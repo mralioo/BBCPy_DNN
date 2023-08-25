@@ -3,7 +3,5 @@ mlflow:
   run_name: RUN-00
   tracking_uri: ${paths.log_dir}/mlflow/mlruns # run `mlflow ui` command inside the `logs/mlflow/` dir to open the UI
   tags: null
-  # save_dir: "./mlruns"
   prefix: ""
-  artifact_location: ${mlflow.tracking_uri}/${mlflow.experiment_name}
-  # run_id: ""
+#  artifact_location: ${mlflow.tracking_uri}/${mlflow.experiment_name}

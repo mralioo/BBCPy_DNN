@@ -37,6 +37,10 @@ trainer:
 #  detect_anomaly: true # raise exception if NaN or +/-inf is detected in any tensor
 
 data:
+  chans: [ 'C?,~*3,~*4', 'FC*,~*3,~*4' ]
+  class_names:
+    - "R"
+    - "L"
   train_subjects_sessions_dict:
     S1:
       - 2
