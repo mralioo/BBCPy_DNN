@@ -5,5 +5,5 @@ mlflow:
   tags: null
   # save_dir: "./mlruns"
   prefix: ""
-  artifact_location: ${paths.log_dir}
+  artifact_location: ${mlflow.tracking_uri}/${mlflow.experiment_name}
   # run_id: ""

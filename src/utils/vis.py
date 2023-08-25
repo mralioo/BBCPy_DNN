@@ -3,7 +3,14 @@ import os
 
 import mlflow
 import numpy as np
+import pyrootutils
 from matplotlib import pyplot as plt
+
+pyrootutils.setup_root(__file__, indicator=".project-root", pythonpath=True)
+
+from src import utils
+
+log = utils.get_pylogger(__name__)
 
 
 def compute_percentages_cm(cm):
@@ -83,6 +90,9 @@ def confusion_matrix_to_png(conf_mat, class_names, title, figure_file_name=None,
 
             fig_file_path = f'{figure_file_name}.png'
         mlflow_artifact_path = mlflow.get_artifact_uri().replace("file:///", "")
+
+        log.info(f"Saving confusion matrix to {mlflow_artifact_path}")
+
         plt_cm_file_path = os.path.join(mlflow_artifact_path, fig_file_path)
         plt.savefig(plt_cm_file_path)
         mlflow.log_artifact(plt_cm_file_path)
@@ -125,6 +135,7 @@ def confusion_matrix_to_png(conf_mat, class_names, title, figure_file_name=None,
         mlflow_artifact_path = mlflow.get_artifact_uri().replace("file:///", "")
         plt_cm_mean_file_path = os.path.join(mlflow_artifact_path, fig_file_path)
 
+        log.info(f"Saving mean confusion matrix to {plt_cm_mean_file_path}")
         plt.savefig(plt_cm_mean_file_path)
 
         mlflow.log_artifact(plt_cm_mean_file_path)
