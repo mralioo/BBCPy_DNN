@@ -112,11 +112,6 @@ class SMR_Data():
     def preprocess_data(self, srm_obj):
         """ Reshape the SRM data object to the desired shape """
 
-        logging.info(f"type of the classes: {type(self.classes)}")
-        logging.info(f"type of the select_chans: {type(self.select_chans)}")
-        logging.info(f"type of the select_timepoints: {type(self.select_timepoints)}")
-        logging.info(f"type of the bands: {type(self.bands)}")
-
         if (self.classes is not None) and (self.select_chans is not None) and (self.select_timepoints is not None):
             if isinstance(self.classes, str):
                 self.classes = [self.classes]
@@ -238,9 +233,9 @@ class SMR_Data():
                                                parent_fs=srm_fs)
 
         # create SRM_Data object for the session
-        obj = bbcpy.datatypes.srm_eeg.SRM_Data(valid_data,
-                                               valid_timepoints.reshape(-1, 1),
-                                               srm_fs,
+        obj = bbcpy.datatypes.srm_eeg.SRM_Data(srm_data=valid_data,
+                                               timepoints=valid_timepoints.reshape(-1, 1),
+                                               fs=srm_fs,
                                                mrk=valid_mrk,
                                                chans=chans)
 

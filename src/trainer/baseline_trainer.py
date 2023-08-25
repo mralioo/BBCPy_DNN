@@ -1,12 +1,15 @@
+import itertools
 import json
+import os
+import tempfile
 from datetime import datetime
 from pathlib import Path
-import os
 
 import mlflow
 import numpy as np
 import pyrootutils
 import sklearn
+from matplotlib import pyplot as plt
 from sklearn.metrics import confusion_matrix
 
 pyrootutils.setup_root(__file__, indicator=".project-root", pythonpath=True)
@@ -14,7 +17,7 @@ pyrootutils.setup_root(__file__, indicator=".project-root", pythonpath=True)
 from src import utils
 from src.utils.hyperparam_opt import optimize_hyperparams
 from src.utils.mlflow import fetch_logged_data
-from src.utils.vis import compute_percentages_cm, confusion_matrix_to_png
+from src.utils.vis import compute_percentages_cm, calculate_cm_stats
 
 log = utils.get_pylogger(__name__)
 
@@ -47,7 +50,7 @@ class SklearnTrainer(object):
 
         vali_data = self.datamodule.train_dataloader()
 
-        classes_names = train_data.className
+        self.classes_names = train_data.className
 
         # FIXME with multi run does it automatically?
         # self.optuna_search = optuna.integration.OptunaSearchCV(pipeline, self.hyperparameter_search)
@@ -93,7 +96,8 @@ class SklearnTrainer(object):
 
             cm_vali = confusion_matrix(vali_data.y, y_pred)
             val_cm_title = f"best_model_val-f1_score-{val_f1}"
-            confusion_matrix_to_png(cm_vali, classes_names, val_cm_title, figure_file_name="best_model_vali_cm")
+
+            self.compute_confusion_matrix(cm_vali, val_cm_title, figure_file_name="best_model_vali_cm")
 
             with open("Hparams.json", "w") as f:
                 json.dump(hparams, f)
@@ -108,7 +112,8 @@ class SklearnTrainer(object):
 
         log.info("Loading data...")
         train_data = self.datamodule.train_dataloader()
-        classes_names = train_data.className
+
+        self.classes_names = train_data.className
 
         metrics = None
 
@@ -124,9 +129,11 @@ class SklearnTrainer(object):
             val_recall_list = []
 
             log.info("Logging to mlflow...")
+
             mlflow.set_tracking_uri(Path(self.logger.mlflow.tracking_uri).as_uri())
 
             experiment_name = self.logger.mlflow.experiment_name
+
             run_name = "{}_{}".format(self.logger.mlflow.run_name,
                                       datetime.now().strftime("%Y-%m-%d_%H-%M-%S"))
 
@@ -142,6 +149,9 @@ class SklearnTrainer(object):
 
             with mlflow.start_run(experiment_id=experiment.experiment_id,
                                   run_name=run_name) as parent_run:
+                # fetch logged data from parent run
+                # self.parent_mlflow_client = mlflow.tracking.MlflowClient()
+                # self.parent_run_id = parent_run.info.run_id
 
                 for fold, (train_index, test_index) in enumerate(self.cv.split(train_data, train_data.y)):
 
@@ -152,13 +162,14 @@ class SklearnTrainer(object):
                     X_train, X_test = train_data[train_index], train_data[test_index]
                     y_train, y_test = train_data.y[train_index], train_data.y[test_index]
 
-                    parent_run_id = parent_run.info.run_id
                     mlflow_job_name = f"CV_{foldNum}_{experiment_name}_{run_name}"
 
                     with mlflow.start_run(experiment_id=experiment.experiment_id,
                                           run_name=mlflow_job_name,
                                           nested=True) as child_run:
 
+                        # self.child_mlflow_client = mlflow.tracking.MlflowClient()
+                        # self.child_run_id = child_run.info.run_id
 
                         self.clf.fit(X_train, y_train)
                         y_pred = self.clf.predict(X_test)
@@ -175,10 +186,8 @@ class SklearnTrainer(object):
                         cm_vali = confusion_matrix(y_test, y_pred)
                         val_cm_list.append(compute_percentages_cm(cm_vali))
                         val_cm_title = f"vali-foldNum-{foldNum}-f1_score-{f1_score_vali}"
-                        confusion_matrix_to_png(cm_vali,
-                                                classes_names,
-                                                val_cm_title,
-                                                figure_file_name="vali_cm")
+                        self.compute_confusion_matrix(cm_vali,
+                                                      title=val_cm_title)
 
                         # fetch logged data from child run
                         child_run_id = child_run.info.run_id
@@ -188,10 +197,10 @@ class SklearnTrainer(object):
                     # log the mean confusion matrix to mlflow parent run
                     mean_f1_score = np.mean(val_f1_list)
                     mlflow.log_metric("vali_mean_f1_score", mean_f1_score)
-                    confusion_matrix_to_png(val_cm_list,
-                                            classes_names,
-                                            "mean_cm_val",
-                                            type="mean")
+
+                    self.compute_confusion_matrix(val_cm_list,
+                                                  title="mean_cm_val",
+                                                  type="mean")
                     # log the mean confusion matrix to mlflow parent run
 
                     # fetch logged data from parent run
@@ -201,26 +210,23 @@ class SklearnTrainer(object):
                     hparams.update(params)
                     hparams.update(tags)
 
-                    mlflow_artifact_path = mlflow.get_artifact_uri().replace("file:///", "")
-                    hparams_file_path = os.path.join(mlflow_artifact_path, "Hparams.json")
-                    hparams["mlflow_uri"] = mlflow_artifact_path
-                    with open(hparams_file_path, "w") as f:
-                        json.dump(hparams, f)
-                    mlflow.log_artifact(hparams_file_path, artifact_path="best_model")
-
                     # log dataset dict to mlflow parent run
                     train_sessions_dict = self.datamodule.train_subjects_sessions_dict
                     tmp_dict = {}
                     for key, value in train_sessions_dict.items():
                         tmp_dict[key] = list(value)
 
-                    mlflow_artifact_path = mlflow.get_artifact_uri().replace("file:///", "")
-                    data_description_file_path = os.path.join(mlflow_artifact_path, "data_description.json")
+                    # Use a temporary directory to save
+                    with tempfile.TemporaryDirectory() as tmpdirname:
+                        description_path = os.path.join(tmpdirname, "data_description.json")
+                        with open(description_path, "w") as f:
+                            json.dump(tmp_dict, f)
 
-                    with open(data_description_file_path, "w") as f:
-                        json.dump(tmp_dict, f)
+                        hparam_path = os.path.join(tmpdirname, "Hparams.json")
+                        with open(hparam_path, "w") as f:
+                            json.dump(hparams, f)
 
-                    mlflow.log_artifact(data_description_file_path)
+                        mlflow.log_artifacts(tmpdirname)
 
                 log.info(f"Training completed!")
 
@@ -232,8 +238,106 @@ class SklearnTrainer(object):
         return metrics
 
     def test(self, pipeline, datamodule):
+        # test_data = datamodule.load_data(self.test_sessions, self.concatenate_subjects)
+        # return pipeline.predict(test_data)
         return NotImplementedError
 
-        # test_data = datamodule.load_data(self.test_sessions, self.concatenate_subjects)
-        #
-        # return pipeline.predict(test_data)
+    def compute_confusion_matrix(self, conf_mat, title, type='standard'):
+        if type == 'standard':
+            plt.rcParams["font.family"] = 'DejaVu Sans'
+            figure = plt.figure(figsize=(9, 9))
+
+            plt.imshow(conf_mat, interpolation='nearest', cmap=plt.cm.Blues)
+            plt.colorbar()
+            tick_marks = np.arange(len(self.classes_names))
+            plt.xticks(tick_marks, self.classes_names)
+            plt.yticks(tick_marks, self.classes_names)
+            # set title
+            plt.title(title)
+
+            # render the confusion matrix with percentage and ratio.
+            group_counts = []
+            for i in range(len(self.classes_names)):
+                for j in range(len(self.classes_names)):
+                    group_counts.append("{}/{}".format(conf_mat[i, j], conf_mat.sum(axis=1)[i]))
+            group_percentages = np.around(conf_mat.astype('float') / conf_mat.sum(axis=1)[:, np.newaxis], decimals=2)
+            labels = [f"{v1} \n {v2 * 100: .4}%" for v1, v2 in zip(group_counts, group_percentages.flatten())]
+            labels = np.asarray(labels).reshape(len(self.classes_names), len(self.classes_names))
+
+            # set the font size of the text in the confusion matrix
+            for i, j in itertools.product(range(conf_mat.shape[0]), range(conf_mat.shape[1])):
+                color = "red"
+                plt.text(j, i, labels[i, j], horizontalalignment="center", color=color, fontsize=15)
+
+            plt.tight_layout()
+            plt.ylabel('True label', fontsize=10)
+            plt.xlabel('Predicted label', fontsize=10)
+
+            # # Save the plot to a BytesIO object
+            # buf = io.BytesIO()
+            # plt.savefig(buf, format="png")
+            # buf.seek(0)  # Move the cursor to the beginning of the buffer
+            # self.child_mlflow_client.log_artifact(self.child_run_id,
+            #                                       buf,
+            #                                       artifact_path=f"plots/{title}.png")
+            #
+            # plt.close(figure)
+            # buf.close()
+
+            # Use a temporary directory to save the plot
+            with tempfile.TemporaryDirectory() as tmpdirname:
+                plot_path = os.path.join(tmpdirname, f"{title}.png")
+
+                plt.savefig(plot_path)  # Save the plot to the temporary directory
+                mlflow.log_artifacts(tmpdirname)
+
+
+
+        elif type == 'mean':
+
+            # Fixme here I pass list of cm (better way)
+            plt.rcParams["font.family"] = 'DejaVu Sans'
+            figure = plt.figure(figsize=(9, 9))
+
+            # Add values to the plot
+            mean_cm_val, std_cm_val = calculate_cm_stats(cm_list=conf_mat, num_classes=len(self.classes_names))
+
+            plt.imshow(mean_cm_val, interpolation='nearest', cmap=plt.cm.Blues)
+            plt.colorbar()
+            tick_marks = np.arange(len(self.classes_names))
+            plt.xticks(tick_marks, self.classes_names, rotation=45)
+            plt.yticks(tick_marks, self.classes_names)
+            # set title
+            plt.title(title)
+
+            labels = [f"{v1 * 100:.4}%  ±{v2 * 100: .4}%" for v1, v2 in
+                      zip(mean_cm_val.flatten(), std_cm_val.flatten())]
+            labels = np.asarray(labels).reshape(len(self.classes_names), len(self.classes_names))
+
+            # thresh = mean_cm_val.max() / 2.0
+            for i, j in itertools.product(range(mean_cm_val.shape[0]), range(mean_cm_val.shape[1])):
+                color = "red"
+                plt.text(j, i, labels[i, j], horizontalalignment="center", color=color)
+
+            plt.tight_layout()
+            plt.ylabel('True label', fontsize=10)
+            plt.xlabel('Predicted label', fontsize=10)
+
+            # Save the plot to a BytesIO object
+            # buf = io.BytesIO()
+            # plt.savefig(buf, format="png")
+            # buf.seek(0)  # Move the cursor to the beginning of the buffer
+            #
+            # self.parent_mlflow_client.log_artifact(self.parent_run_id,
+            #                                        buf,
+            #                                        artifact_path=f"plots/{title}.png")
+            #
+            # plt.close(figure)
+            # buf.close()
+
+            # Use a temporary directory to save the plot
+            with tempfile.TemporaryDirectory() as tmpdirname:
+                plot_path = os.path.join(tmpdirname, f"{title}.png")
+
+                plt.savefig(plot_path)  # Save the plot to the temporary directory
+                mlflow.log_artifacts(tmpdirname)
