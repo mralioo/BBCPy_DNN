@@ -1,8 +1,9 @@
 # from bbcpy.datatypes.srm_eeg import *
 import logging
-from omegaconf import OmegaConf, DictConfig, ListConfig
+import os
 
 import numpy as np
+from omegaconf import OmegaConf
 from sklearn.model_selection import KFold
 
 import bbcpy
@@ -60,7 +61,10 @@ class SMR_Data():
         # FIXME : parameter are in type  omegaconf
 
         self.srm_data_path = data_dir
-
+        for file in os.listdir(data_dir):
+            if file.endswith('.txt'):
+                file_path = os.path.join(data_dir, file)
+                print(file_path)
         self.train_subjects_sessions_dict = train_subjects_sessions_dict
         self.test_subjects_sessions_dict = test_subjects_sessions_dict
 

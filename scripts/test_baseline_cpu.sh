@@ -11,7 +11,7 @@ echo "I am a job with ID $SLURM_JOB_ID"
 echo "current working directory is $(pwd)"
 
 # 1. copy the squashed dataset to the nodes /tmp
-cp ./../squashfs_smr_data/S1.sqfs /tmp/
+cp ./../squashfs_smr_data/Subj_1_test.sqfs /tmp/
 
 # 3. bind the squashed dataset to your apptainer environment and run your script with apptainer
-apptainer run -B /tmp/S1.sqfs:/input-data:image-src=/ ./../env_images/bbcpy_lightning.sif python ./src/baseline_train.py experiment=baseline_riemann debug=default_baseline
+apptainer run -B /tmp/Subj_1_test.sqfs:/input-data:image-src=/ ./../env_images/bbcpy_lightning.sif python ./src/baseline_train.py +de>
