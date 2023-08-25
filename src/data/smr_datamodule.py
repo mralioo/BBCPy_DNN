@@ -1,6 +1,5 @@
 # from bbcpy.datatypes.srm_eeg import *
 import logging
-import os
 
 import numpy as np
 from omegaconf import OmegaConf
@@ -61,10 +60,6 @@ class SMR_Data():
         # FIXME : parameter are in type  omegaconf
 
         self.srm_data_path = data_dir
-        for file in os.listdir(data_dir):
-            if file.endswith('.txt'):
-                file_path = os.path.join(data_dir, file)
-                print(file_path)
         self.train_subjects_sessions_dict = train_subjects_sessions_dict
         self.test_subjects_sessions_dict = test_subjects_sessions_dict
 
@@ -92,6 +87,8 @@ class SMR_Data():
             sessions_group_path = bbcpy.load.srm_eeg.list_all_files(self.srm_data_path,
                                                                     pattern=f"{subject_name}_*.mat")[subject_name]
 
+            logging.info(f"Found sessions: {list(sessions_group_path.keys())}")
+
             if isinstance(sessions_ids, int):
                 sessions_names = ["Session_" + str(sessions_ids)]
             else:
@@ -114,6 +111,11 @@ class SMR_Data():
 
     def preprocess_data(self, srm_obj):
         """ Reshape the SRM data object to the desired shape """
+
+        logging.info(f"type of the classes: {type(self.classes)}")
+        logging.info(f"type of the select_chans: {type(self.select_chans)}")
+        logging.info(f"type of the select_timepoints: {type(self.select_timepoints)}")
+        logging.info(f"type of the bands: {type(self.bands)}")
 
         if (self.classes is not None) and (self.select_chans is not None) and (self.select_timepoints is not None):
             if isinstance(self.classes, str):
@@ -242,6 +244,7 @@ class SMR_Data():
                                                mrk=valid_mrk,
                                                chans=chans)
 
+        logging.info(f"Data original shape: {obj.shape}")
         # preprocess the data
         logging.info(f"Preprocessing data..")
         obj = self.preprocess_data(obj)
@@ -255,10 +258,12 @@ class SMR_Data():
         logging.info(f"Prepare to Load : {sessions_key} sessions")
         if len(sessions_key) > 1:
             init_session_name = sessions_key[0]
-            logging.info(
-                f"Loading {init_session_name} finalized (1 from {str(len(sessions_key))})")
+
             obj_new = self.load_valid_trials_data(session_name=init_session_name,
                                                   sessions_group_path=sessions_group_path)
+
+            logging.info(
+                f"Loading {init_session_name} finalized (1 from {str(len(sessions_key))})")
 
             for i, session_name in enumerate(sessions_key[1:]):
                 logging.info(
