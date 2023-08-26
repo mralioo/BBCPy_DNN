@@ -24,7 +24,7 @@ data:
     - 8
     - 13
   chans: [ "*" ]
-  class_names:
+  classes:
     - "R"
     - "L"
   train_subjects_sessions_dict:

@@ -38,7 +38,7 @@ trainer:
 
 data:
   chans: [ 'C?,~*3,~*4', 'FC*,~*3,~*4' ]
-  class_names:
+  classes:
     - "R"
     - "L"
   train_subjects_sessions_dict:
