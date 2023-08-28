@@ -10,6 +10,7 @@ from bbcpy.functions.spatial import CSP, MBCSP
 from bbcpy.functions.statistics import cov
 from bbcpy.pipeline import make_pipeline
 
+
 def classifier_pipeline(steps_config):
     steps = []
     # for step_dict in steps_config: # if list
@@ -66,11 +67,24 @@ def classifier_pipeline(steps_config):
                     steps.append(lda_step)
 
                 elif algo_name == 'SVC-pyriemann' and algo_config.applied == True:
-                    svc_step = pyriemann.classification.SVC(metric='logeuclid', class_weight=algo_config.class_weight)
+
+                    if algo_config.class_weight == "None":
+                        class_weight = None
+                    else:
+                        class_weight = algo_config.class_weight
+
+                    svc_step = pyriemann.classification.SVC(metric='logeuclid',
+                                                            class_weight=class_weight)
                     steps.append(svc_step)
 
                 elif algo_name == 'SVC-sklearn' and algo_config.applied == True:
-                    svc_step = sklearn.svm.SVC(class_weight=algo_config.class_weight)
+
+                    if algo_config.class_weight == "None":
+                        class_weight = None
+                    else:
+                        class_weight = algo_config.class_weight
+
+                    svc_step = sklearn.svm.SVC(class_weight=class_weight)
                     steps.append(svc_step)
 
                 elif algo_name == 'MDM' and algo_config.applied == True:
