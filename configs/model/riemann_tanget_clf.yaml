@@ -14,4 +14,4 @@ steps_config: # use yaml list syntax to preserve to order
   Classification:
     SVC-sklearn:
       applied: True
-      class_weight: balanced
+      class_weight: None

@@ -13,7 +13,7 @@ defaults:
 # all parameters below will be merged with parameters from default configurations set above
 # this allows you to overwrite only specified parameters
 
-tags: [ "baseline" , "multiband", "mbcsp", "Within-Subject" ]
+tags: [ "baseline" , "alpha_band" , "Within-Subject" , "RL"]
 
 seed: 12345
 
@@ -38,5 +38,5 @@ data:
 logger:
   mlflow:
     tags: ${tags}
-    experiment_name: mbcsp
-    run_name: tune
+    experiment_name: A-RL-S9-all
+    run_name: mbcsp

@@ -15,7 +15,7 @@ defaults:
 
   # experiment configs allow for version control of specific hyperparameters
   # e.g. best hyperparameters for given model and datamodule
-#  - experiment: 0_csp.yaml
+  - experiment: 0_csp.yaml
 
   # config for hyperparameter optimization
   - hparams_search: null
@@ -27,7 +27,7 @@ defaults:
   #  - local: win_os.yaml
 
   # debugging config (enable through command line, e.g. `python train.py debug=default)
-  - debug: win_os
+#  - debug: win_os
 
 # task name, determines output directory path
 # list of tasks [train, test, hparams_search]

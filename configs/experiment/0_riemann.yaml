@@ -14,7 +14,7 @@ defaults:
 # all parameters below will be merged with parameters from default configurations set above
 # this allows you to overwrite only specified parameters
 
-tags: [ "baseline" , "alpha_band" , "riemann", "Within-Subject" ]
+tags: [ "baseline" , "alpha_band" , "Within-Subject" , "RL"]
 
 seed: 12345
 
@@ -48,5 +48,5 @@ paths:
 logger:
   mlflow:
     tags: ${tags}
-    experiment_name: riemann
-    run_name: A-S9-all
+    experiment_name: A-RL-S9-all
+    run_name: riemann
