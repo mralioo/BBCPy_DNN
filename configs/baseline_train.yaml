@@ -5,7 +5,7 @@
 defaults:
   - _self_
   - data: srm_eeg.yaml
-  - model: baseline_riemann.yaml
+  - model: riemann_clf.yaml
   - callbacks: none.yaml
   - logger: mlflow.yaml # set logger here or use command line (e.g. `python train.py logger=tensorboard`)
   - trainer: sklearn.yaml
@@ -15,19 +15,19 @@ defaults:
 
   # experiment configs allow for version control of specific hyperparameters
   # e.g. best hyperparameters for given model and datamodule
-  - experiment: riemann_config_1.yaml
+#  - experiment: 0_csp.yaml
 
   # config for hyperparameter optimization
-  #  - hparams_search: cv_gridsearch_csp.yaml
   - hparams_search: null
+  #  - hparams_search: cv_gridsearch_csp.yaml
   #  - hparams_search: sklearn_optuna.yaml
 
   # optional local config for machine/user specific settings
   # it's optional since it doesn't need to exist and is excluded from version control
-#  - local: win_os.yaml
+  #  - local: win_os.yaml
 
   # debugging config (enable through command line, e.g. `python train.py debug=default)
-#  - debug: win_os.yaml
+  - debug: win_os
 
 # task name, determines output directory path
 # list of tasks [train, test, hparams_search]
@@ -37,7 +37,7 @@ task_name: "train"
 # tags to help you identify your experiments
 # you can overwrite this in experiment configs
 # overwrite from command line with `python train.py tags="[first_tag, second_tag]"`
-tags: [ "baseline" ]
+tags: [ "baseline"]
 
 # set False to skip model training
 train: True

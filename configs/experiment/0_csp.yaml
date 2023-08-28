@@ -1,0 +1,54 @@
+# @package _global_
+
+# to execute this experiment run:
+# python train.py experiment=example
+
+defaults:
+  - override /data: srm_eeg.yaml
+  - override /model: csp_clf.yaml
+  - override /callbacks: default.yaml
+  - override /trainer: sklearn.yaml
+  - override /logger: mlflow.yaml
+  - override /paths: default.yaml
+
+# all parameters below will be merged with parameters from default configurations set above
+# this allows you to overwrite only specified parameters
+
+tags: [ "baseline" , "alpha_band" , "csp", "Within-Subject" ]
+
+seed: 12345
+
+data:
+  ival: 2s:11s:1ms
+  bands:
+    - 8
+    - 13
+  chans: [ "*" ]
+  classes:
+    - "R"
+    - "L"
+  train_subjects_sessions_dict:
+    S9:
+      - 1
+      - 2
+      - 3
+      - 4
+      - 6
+      - 7
+      - 9
+      - 10
+      - 11
+  loading_data_mode: "within_subject"
+
+paths:
+  root_dir: ${oc.env:PROJECT_ROOT}
+  data_dir: /input-data
+  log_dir: ${oc.env:PROJECT_ROOT}/logs
+  output_dir: ${hydra:runtime.output_dir}
+  work_dir: ${hydra:runtime.cwd}
+
+logger:
+  mlflow:
+    tags: ${tags}
+    experiment_name: csp
+    run_name: A-S9-all

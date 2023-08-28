@@ -10,10 +10,8 @@ steps_config: # use yaml list syntax to preserve to order
       estimator: 'lwf'
   Transformation:
     tangent_space:
-      applied: False
-  Classification:
-    SVC-pyriemann:
       applied: True
-      metric : riemann
+  Classification:
     SVC-sklearn:
-      applied: False
+      applied: True
+      class_weight: balanced

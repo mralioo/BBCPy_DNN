@@ -5,30 +5,28 @@
 
 defaults:
   - override /data: srm_eeg.yaml
-  - override /model: baseline_riemann.yaml
+  - override /model: mbcsp_clf.yaml
   - override /callbacks: default.yaml
   - override /trainer: sklearn.yaml
   - override /logger: mlflow.yaml
-  - override /paths: default.yaml
 
 # all parameters below will be merged with parameters from default configurations set above
 # this allows you to overwrite only specified parameters
 
-tags: [ "baseline" , "alpha_band" , "riemann" ]
+tags: [ "baseline" , "multiband", "mbcsp", "Within-Subject" ]
 
 seed: 12345
 
 data:
   ival: 2s:11s:1ms
-  bands:
-    - 8
-    - 13
+  bands: [ [ 8, 13 ], [ 21, 26 ], [ 31.5, 39 ] ]
   chans: [ "*" ]
   classes:
     - "R"
     - "L"
   train_subjects_sessions_dict:
-    S1:
+    S9:
+      - 1
       - 2
       - 3
       - 4
@@ -36,15 +34,9 @@ data:
       - 7
       - 9
       - 10
-paths:
-  root_dir: ${oc.env:PROJECT_ROOT}
-  data_dir: /input-data
-  log_dir: ${oc.env:PROJECT_ROOT}/logs
-  output_dir: ${hydra:runtime.output_dir}
-  work_dir: ${hydra:runtime.cwd}
-
+      - 11
 logger:
   mlflow:
     tags: ${tags}
-    experiment_name: riemann
-    run_name: A-S1-9s
+    experiment_name: mbcsp
+    run_name: tune

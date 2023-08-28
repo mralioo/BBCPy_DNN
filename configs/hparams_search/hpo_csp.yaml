@@ -4,12 +4,12 @@ hyperparam_opt:
     param_grid:
       csp__n_cmps: [ 4, 6, 8 ]
       csp__excllev: [ 1.2, 1.5, 1.8 ]
-  scoring:
-    f1_weighted
+      csp__estimator: [ "scm", "lwf"]
+  scoring: accuracy
   cv:
     _target_: sklearn.model_selection.KFold
-    n_splits: 5
-    shuffle: False
+    n_splits: 10
+    shuffle: True
     #  n_jobs: -1 # FIXME -1 is not working parallel jobs causes error in  SRM_Data module line 486
     #_target_: sklearn.model_selection.GridSearchCV
     #_partial_: true

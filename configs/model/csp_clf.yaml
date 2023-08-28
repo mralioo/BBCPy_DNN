@@ -12,11 +12,6 @@ steps_config: # use yaml list syntax to preserve to order
       n_cmps: 8
       excllev: 1.2
       estimator: 'scm'
-    MBCSP:
-      applied: False
-      n_cmps: 8
-      excllev: 1.2
-      estimator: 'scm'
   Transformation:
     var:
       applied: True
@@ -27,11 +22,6 @@ steps_config: # use yaml list syntax to preserve to order
     LDA:
       applied: True
       solver: 'svd'
-
-
-
-
-
 
 #  - CSP:
 #      _target_: bbcpy.functions.spatial.CSP

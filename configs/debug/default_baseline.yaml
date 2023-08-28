@@ -1,17 +1,21 @@
 # @package _global_
 
+# specify here default configuration
+# order of defaults determines the order in which configs override each other
+defaults:
+  - override /model: riemann_clf.yaml
+  - override /hparams_search: cv_gridsearch_riemann.yaml
+
+
 # default debugging setup, runs 1 full epoch
 # other debugging configs can inherit from this one
 
-# overwrite task name so debugging logs are stored in separate folder
-task_name: "debug"
 
 # disable callbacks and loggers during debugging
 callbacks: null
 logger:
   mlflow:
-    experiment_name: riemann
-    run_name: BASELINE-DEBUG-00
+    experiment_name: DEBUG
 
 extras:
   ignore_warnings: False
