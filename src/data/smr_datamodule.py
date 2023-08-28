@@ -267,12 +267,19 @@ class SMR_Data():
             for i, session_name in enumerate(sessions_list[1:]):
                 logging.info(
                     f"Loading {session_name} finalized ({str(i + 2)} from {str(len(sessions_list))})")
-                valid_obj, forced_obj = self.load_forced_valid_trials_data(session_name=session_name,
-                                                                           sessions_group_path=sessions_path_dict[
-                                                                               subject_name])
 
-                valid_obj_new = valid_obj_new.append(valid_obj, axis=0)
-                forced_obj_new = forced_obj_new.append(forced_obj, axis=0)
+                try:
+                    valid_obj, forced_obj = self.load_forced_valid_trials_data(session_name=session_name,
+                                                                               sessions_group_path=sessions_path_dict[
+                                                                                   subject_name])
+
+                    valid_obj_new = valid_obj_new.append(valid_obj, axis=0)
+                    forced_obj_new = forced_obj_new.append(forced_obj, axis=0)
+
+                except Exception as e:
+                    logging.info(f"Session {session_name} not loaded")
+                    logging.warning(f"Exception occurred: {e}")
+                    continue
 
         else:
 
