@@ -10,6 +10,8 @@ import numpy as np
 from omegaconf import OmegaConf
 from sklearn.metrics import make_scorer
 from sklearn.model_selection._search import BaseSearchCV
+from sklearn.model_selection._search import GridSearchCV
+
 
 logger = logging.getLogger(__name__)
 
@@ -387,6 +389,6 @@ def sklearn_gridsearch(hparam_config, cv, param_space, estimator):
     for step_name, step_config in hparam_config.items():
         param_space = OmegaConf.to_container(param_space, resolve=True)
 
-        return GridSearchCV(estimator=estimator, param_grid=parameter_space, cv=cv, n_jobs=-1, verbose=2)
+        return GridSearchCV(estimator=estimator, param_grid=param_space, cv=cv, n_jobs=-1, verbose=2)
 
     pass

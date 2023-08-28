@@ -35,6 +35,7 @@ class SMR_Data():
                  train_subjects_sessions_dict,
                  test_subjects_sessions_dict,
                  concatenate_subjects,
+                 loading_data_mode,
                  train_val_split,
                  ival,
                  bands,
@@ -64,6 +65,7 @@ class SMR_Data():
         self.test_subjects_sessions_dict = test_subjects_sessions_dict
 
         self.concatenate_subjects = concatenate_subjects
+        self.loading_data_mode = loading_data_mode
         self.train_val_split = OmegaConf.to_container(train_val_split)
 
         self.classes = OmegaConf.to_container(classes)
@@ -120,14 +122,15 @@ class SMR_Data():
             else:
                 obj = srm_obj[self.classes][:, self.select_chans, self.select_timepoints].copy()
         else:
-            obj = srm_obj.copy()
+            obj = srm_obj
 
         if self.bands is not None:
-            obj = obj.lfilter(self.bands).copy()
+            obj = obj.lfilter(self.bands)
 
         return obj
 
     def load_forced_valid_trials_data(self, session_name, sessions_group_path):
+
         session_path = sessions_group_path[session_name]
 
         srm_data, timepoints, srm_fs, clab, mnt, trial_info, subject_info = \
@@ -140,18 +143,10 @@ class SMR_Data():
         target_map_dict = {1: "R", 2: "L", 3: "U", 4: "D"}
         mrk_class = np.array(trial_info["targetnumber"])
         mrk_class = mrk_class.astype(int) - 1  # to start from 0
-        # mrk_class_ie = np.array(trial_info["targetnumber"])
-        #
-        # # Function to map integer values to labels
-        # def _map_labels(value):
-        #     return target_map_dict.get(value, value)
-        #
-        # # Use np.vectorize to apply the mapping to the entire array
-        # mrk_class = np.vectorize(_map_labels)(mrk_class_ie)
 
         # Split data into train and test , where test contained forced trails
         trialresult = trial_info["result"]
-        valid_trials_idx = np.where(trialresult)[0]
+        valid_trials_idx = np.where(trialresult == np.bool_(True))[0]
 
         # select all valid trials to train
         valid_data = srm_data[valid_trials_idx]
@@ -166,39 +161,40 @@ class SMR_Data():
                                                parent_fs=srm_fs)
 
         # create SRM_Data object for the session
-        valid_trials = bbcpy.datatypes.srm_eeg.SRM_Data(valid_data,
-                                                        valid_timepoints.reshape(-1, 1),
-                                                        srm_fs,
+        valid_trials = bbcpy.datatypes.srm_eeg.SRM_Data(srm_data=valid_data,
+                                                        timepoints=valid_timepoints.reshape(-1, 1),
+                                                        fs=srm_fs,
                                                         mrk=valid_mrk,
                                                         chans=chans)
 
+        valid_trials = self.preprocess_data(valid_trials)
+
         # select all forced trials to test
         forced_trials = trial_info["forcedresult"]
-        forced_trials_idx = np.setdiff1d(valid_trials_idx, np.where(forced_trials)[0])
-        forced_data = srm_data[forced_trials_idx, :, :]
+        forced_trials_idx = np.setdiff1d(np.where(forced_trials == np.bool_(True))[0], valid_trials_idx)
+        forced_data = srm_data[forced_trials_idx]
         forced_mrk_class = mrk_class[forced_trials_idx]
         forced_timepoints = timepoints[forced_trials_idx]
         forced_mrk = bbcpy.datatypes.eeg.Marker(mrk_pos=forced_trials_idx,
                                                 mrk_class=forced_mrk_class,
-                                                mrk_class_name=None,
+                                                mrk_class_name=class_names,
                                                 mrk_fs=1,
                                                 parent_fs=srm_fs)
         # # create SRM_Data object for the session
-        forced_trials = bbcpy.datatypes.srm_eeg.SRM_Data(forced_data,
-                                                         forced_timepoints.reshape(-1, 1),
-                                                         srm_fs,
+        forced_trials = bbcpy.datatypes.srm_eeg.SRM_Data(srm_data=forced_data,
+                                                         timepoints=forced_timepoints.reshape(-1, 1),
+                                                         fs=srm_fs,
                                                          mrk=forced_mrk,
                                                          chans=chans)
 
-        # preprocess the data
-        logging.info(f"Preprocessing data..")
-        valid_trials = self.preprocess_data(valid_trials)
+
+
         forced_trials = self.preprocess_data(forced_trials)
 
         logging.info(
             f"{session_name} loaded;  valid trails shape: {valid_trials.shape},"
             f" forced trials shape: {forced_trials.shape}")
-        return [valid_trials, forced_trials]
+        return valid_trials, forced_trials
 
     def load_valid_trials_data(self, session_name, sessions_group_path):
         """ Create a session object from the SRM data sessions """
@@ -244,78 +240,123 @@ class SMR_Data():
         logging.info(f"Preprocessing data..")
         obj = self.preprocess_data(obj)
         logging.info(f"{session_name} loaded; has the shape: {obj.shape}")
+
         return obj
 
-    def load_subject_data(self, sessions_group_path, distributed_mode=False):
+    def load_subject_sessions(self, subject_name, subject_dict, distributed_mode=False):
+
         """ Create a subject object from the SRM data sessions , concatenating the sessions over trails"""
+        # FIXME : not completed
 
-        sessions_key = list(sessions_group_path.keys())
-        logging.info(f"Prepare to Load : {sessions_key} sessions")
-        if len(sessions_key) > 1:
-            init_session_name = sessions_key[0]
+        sessions_path_dict = self.collect_subject_sessions(subject_dict)
 
-            obj_new = self.load_valid_trials_data(session_name=init_session_name,
-                                                  sessions_group_path=sessions_group_path)
+        # sessions_list = sessions_path_dict[subject_name]
+        sessions_list = list(sessions_path_dict[subject_name].keys())
 
-            logging.info(
-                f"Loading {init_session_name} finalized (1 from {str(len(sessions_key))})")
+        logging.info(f"Prepare to Load : {sessions_list} sessions")
 
-            for i, session_name in enumerate(sessions_key[1:]):
+        if len(sessions_list) > 1:
+            init_session_name = sessions_list[0]
+
+            valid_obj_new, forced_obj_new = self.load_forced_valid_trials_data(session_name=init_session_name,
+                                                                               sessions_group_path=sessions_path_dict[
+                                                                                   subject_name])
+
+            logging.info(f"Loading {init_session_name} finalized (1 from {str(len(sessions_list))})")
+
+            for i, session_name in enumerate(sessions_list[1:]):
                 logging.info(
-                    f"Loading {session_name} finalized ({str(i + 2)} from {str(len(sessions_key))})")
-                obj = self.load_valid_trials_data(session_name=session_name,
-                                                  sessions_group_path=sessions_group_path)
-                obj_new = obj_new.append(obj, axis=0)
+                    f"Loading {session_name} finalized ({str(i + 2)} from {str(len(sessions_list))})")
+                valid_obj, forced_obj = self.load_forced_valid_trials_data(session_name=session_name,
+                                                                           sessions_group_path=sessions_path_dict[
+                                                                               subject_name])
+
+                valid_obj_new = valid_obj_new.append(valid_obj, axis=0)
+                forced_obj_new = forced_obj_new.append(forced_obj, axis=0)
 
         else:
-            init_session_name = sessions_key[0]
-            obj_new = self.load_valid_trials_data(session_name=init_session_name,
-                                                  sessions_group_path=sessions_group_path)
+
+            init_session_name = sessions_list[0]
+            valid_obj_new, forced_obj_new = self.load_forced_valid_trials_data(session_name=init_session_name,
+                                                                               sessions_group_path=sessions_path_dict[
+                                                                                   subject_name])
             logging.info(f"Loading sessions: {init_session_name} finalized (1 from 1)")
 
-        return obj_new
+        return valid_obj_new, forced_obj_new
 
-    def load_data(self, subject_dict, concatenate_subjects=True):
+    def load_subjects(self, subject_dict, concatenate_subjects=True):
         """ Prepare the data for the classification """
 
-        subjects_data = {}
+        subjects_data = {"valid": {}, "forced": {}}
         subjects_sessions_path_dict = self.collect_subject_sessions(subject_dict)
         subjects_key = list(subjects_sessions_path_dict.keys())
 
         if len(subjects_key) > 1:
             init_subject_name = subjects_key[0]
             logging.info(f"Loading subject: {init_subject_name} finalized (1 from  {str(len(subjects_key))})")
-            obj_new = self.load_subject_data(sessions_group_path=subjects_sessions_path_dict[init_subject_name])
-            subjects_data[init_subject_name] = obj_new.copy()
+            valid_Sobj_new, forced_Sobj_new = self.load_subject_sessions(subject_name=init_subject_name,
+                                                                         sessions_group_path=subjects_sessions_path_dict)
+
+            subjects_data["valid"][init_subject_name] = valid_Sobj_new.copy()
+            subjects_data["forced"][init_subject_name] = forced_Sobj_new.copy()
 
             for i, subject_name in enumerate(subjects_key[1:]):
-                logging.info(
-                    f"Loading subject: {subject_name} finalized ({str(i + 2)} from {str(len(subjects_key))})")
-                obj = self.load_subject_data(sessions_group_path=subjects_sessions_path_dict[subject_name])
-                obj_new = obj_new.append(obj, axis=0)
+                logging.info(f"Loading subject: {subject_name} finalized ({str(i + 2)} from {str(len(subjects_key))})")
 
-                subjects_data[subject_name] = obj_new.copy()
+                valid_Sobj, forced_Sobj = self.load_subject_sessions(subject_name=subject_name,
+                                                                     sessions_group_path=subjects_sessions_path_dict)
+
+                valid_Sobj_new = valid_Sobj_new.append(valid_Sobj, axis=0)
+                forced_Sobj_new = forced_Sobj_new.append(forced_Sobj, axis=0)
+
+                subjects_data["valid"][subject_name] = valid_Sobj_new.copy()
+                subjects_data["forced"][subject_name] = forced_Sobj_new.copy()
         else:
             init_subject_name = subjects_key[0]
             logging.info(f"Loading subject: {init_subject_name} finalized (1 from 1)")
-            obj_new = self.load_subject_data(sessions_group_path=subjects_sessions_path_dict[init_subject_name])
 
-            subjects_data[init_subject_name] = obj_new.copy()
+            valid_Sobj_new, forced_Sobj_new = self.load_subject_sessions(subject_name=init_subject_name,
+                                                                         sessions_group_path=subjects_sessions_path_dict)
+
+            subjects_data["valid"][init_subject_name] = valid_Sobj_new.copy()
+            subjects_data["forced"][init_subject_name] = forced_Sobj_new.copy()
 
         if not concatenate_subjects:
             # remove object from memory FIXME
-            del obj_new
+            del valid_Sobj_new
+            del forced_Sobj_new
+
             return subjects_data
 
         del subjects_data
 
-        return obj_new
+        logging.info(f"Concatenating subject valid data, shape: {valid_Sobj_new.shape}")
+        logging.info(f"Concatenating subject forced data, shape: {forced_Sobj_new.shape}")
 
-    def train_dataloader(self):
-        return self.load_data(self.train_subjects_sessions_dict, self.concatenate_subjects)
+        return valid_Sobj_new, forced_Sobj_new
 
-    def test_dataloader(self):
-        return self.load_data(self.test_subjects_sessions_dict, self.concatenate_subjects)
+    def prepare_dataloader(self):
+        """ Prepare the data for the classification """
+
+        if self.loading_data_mode == "within_subject":
+            subject_name = list(self.train_subjects_sessions_dict.keys())[0]
+            valid_trial_trainset, forced_trial_testset = self.load_subject_sessions(subject_name=subject_name,
+                                                                                    subject_dict=self.train_subjects_sessions_dict)
+
+        elif self.loading_data_mode == "within_subject_all":
+            valid_trial_trainset, forced_trial_testset = self.load_subjects(self.train_subjects_sessions_dict,
+                                                                            self.concatenate_subjects)
+
+            valid_trial_trainset = valid_trial_trainset.append(forced_trial_testset, axis=0)
+
+        elif self.loading_data_mode == "cross_subject":
+            valid_trial_trainset, forced_trial_testset = self.load_subjects(self.train_subjects_sessions_dict,
+                                                                            self.concatenate_subjects)
+
+        else:
+            raise Exception(f"Loading data mode {self.loading_data_mode} not supported")
+
+        return valid_trial_trainset, forced_trial_testset
 
     def kfolding_within_subject(self, subject_dict, cv_mode, prepare_test=False):
 
@@ -346,6 +387,7 @@ class SMR_Data():
 
     def calculate_class_weights(self, data):
         """ Calculate the class weights for the data """
+
         pass
 
     def kfolding_cross_subjects(self, subjects_dict, cv_mode, prepare_test=False):

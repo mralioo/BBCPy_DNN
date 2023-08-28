@@ -45,6 +45,7 @@ def classifier_pipeline(steps_config):
 
         elif step_name == 'Transformation':
             for algo_name, algo_config in step_config.items():
+
                 if algo_name == 'log' and algo_config.applied == True:
                     log_step = np.log
                     steps.append(log_step)
@@ -59,15 +60,21 @@ def classifier_pipeline(steps_config):
 
         elif step_name == 'Classification':
             for algo_name, algo_config in step_config.items():
+
                 if algo_name == 'LDA' and algo_config.applied == True:
                     lda_step = LDA(solver=algo_config.solver)
                     steps.append(lda_step)
+
                 elif algo_name == 'SVC-pyriemann' and algo_config.applied == True:
-                    svc_step = pyriemann.classification.SVC(metric='logeuclid')
+                    svc_step = pyriemann.classification.SVC(metric='logeuclid', class_weight=algo_config.class_weight)
                     steps.append(svc_step)
 
                 elif algo_name == 'SVC-sklearn' and algo_config.applied == True:
-                    svc_step = sklearn.svm.SVC
+                    svc_step = sklearn.svm.SVC(class_weight=algo_config.class_weight)
                     steps.append(svc_step)
+
+                elif algo_name == 'MDM' and algo_config.applied == True:
+                    mdm_step = pyriemann.classification.MDM()
+                    steps.append(mdm_step)
 
     return make_pipeline(*steps)
