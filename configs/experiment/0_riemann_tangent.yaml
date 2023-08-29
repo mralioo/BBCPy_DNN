@@ -5,7 +5,7 @@
 
 defaults:
   - override /data: srm_eeg.yaml
-  - override /model: riemann_tanget_clf.yaml
+  - override /model: riemann_tangent_clf.yaml
   - override /callbacks: default.yaml
   - override /trainer: sklearn.yaml
   - override /logger: mlflow.yaml
@@ -38,6 +38,8 @@ data:
       - 9
       - 10
       - 11
+  loading_data_mode: "within_subject"
+
 paths:
   root_dir: ${oc.env:PROJECT_ROOT}
   data_dir: /input-data
@@ -49,4 +51,4 @@ logger:
   mlflow:
     tags: ${tags}
     experiment_name: A-RL-S9-all
-    run_name: riemann_tanget
+    run_name: riemann_tangent

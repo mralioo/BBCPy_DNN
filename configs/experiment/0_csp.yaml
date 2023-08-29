@@ -23,7 +23,7 @@ data:
   bands:
     - 8
     - 13
-  chans: ['C?,~*3,~*4', 'FC*,~*3,~*4']
+  chans: [ "*" ]
   classes:
     - "R"
     - "L"
