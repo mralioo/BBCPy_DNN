@@ -3,7 +3,6 @@
 #SBATCH --partition=cpu-2h
 #SBATCH --gpus-per-node=0
 #SBATCH --ntasks-per-node=8
-#SBATCH -n=2
 #SBATCH --output=../jobs_outputs/riemann-S9/%x_%j.o
 #SBATCH --error=../jobs_outputs/riemann-S9/%x_%j.e
 #SBATCH --mail-user=mr.ali.alouane@gmail.com

@@ -3,7 +3,6 @@
 #SBATCH --partition=cpu-2h
 #SBATCH --gpus-per-node=0
 #SBATCH --ntasks-per-node=8
-#SBATCH -n=2
 #SBATCH --output=../jobs_outputs/csp-S9/%x_%j.o
 #SBATCH --mail-user=mr.ali.alouane@gmail.com
 
