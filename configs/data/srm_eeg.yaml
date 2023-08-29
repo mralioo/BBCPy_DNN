@@ -15,12 +15,6 @@ classes:
   - "U"
   - "D"
 
-train_subjects_sessions_dict:
-  S9:
-    - 2
-test_subjects_sessions_dict:
-  S2:
-    - 1
 concatenate_subjects: True
 
 loading_data_mode : within_subject
