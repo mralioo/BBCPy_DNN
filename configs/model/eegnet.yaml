@@ -1,0 +1,33 @@
+_target_: src.models.eegnet_module.EEGNetLitModule
+
+optimizer:
+  _target_: torch.optim.Adam
+  _partial_: true
+  lr: 0.001
+  weight_decay: 0.0
+
+scheduler:
+  _target_: torch.optim.lr_scheduler.ReduceLROnPlateau
+  _partial_: true
+  mode: min
+  factor: 0.1
+  patience: 10
+
+criterion:
+  _target_: torch.nn.CrossEntropyLoss
+  _partial_: true
+
+net:
+  _target_: src.models.components.eegnet.EEGNetv1
+  in_chans: 62
+  n_classes: 2
+  input_window_samples: 6000
+  second_kernel_size:
+    - 2
+    - 32
+  third_kernel_size:
+    - 8
+    - 4
+  final_conv_length: auto
+  pool_mode: max
+  drop_prob: 0.25

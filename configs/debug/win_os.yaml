@@ -1,0 +1,74 @@
+# @package _global_
+
+# overwrite task name so debugging logs are stored in separate folder
+task_name: "debug-win"
+
+# Train or tune
+# Tune
+#train: False
+#tune: True
+
+# Train
+train: True
+tune: False
+
+defaults:
+  - override /model: riemann_tanget_clf.yaml
+#  - override /hparams_search: hpo_riemann_tanget.yaml
+#  - override /model: riemann_clf.yaml
+#  - override /hparams_search: hpo_riemann.yaml
+#  - override /model: mbcsp_clf.yaml
+#  - override /hparams_search: hpo_mbcsp.yaml
+#  - override /model: csp_clf.yaml
+#  - override /hparams_search: hpo_csp.yaml
+
+paths:
+  root_dir: ${oc.env:PROJECT_ROOT}
+  data_dir: ${paths.root_dir}\data\SMR\raw\
+  log_dir:  ${oc.env:PROJECT_ROOT}\logs
+  output_dir: ${hydra:runtime.output_dir}
+  work_dir: ${hydra:runtime.cwd}
+
+# disable callbacks and loggers during debugging
+callbacks: null
+logger:
+  mlflow:
+#    experiment_name: DEBUG-HPO
+    experiment_name: DEBUG-TRAIN
+    run_name: riemann_tanget
+#    run_name: riemann
+#    run_name: csp
+#    run_name: mbcsp
+
+    tracking_uri: ${paths.log_dir}\mlflow\mlruns # run `mlflow ui` command inside the `logs/mlflow/` dir to open the UI
+
+data:
+  chans: ['C?,~*3,~*4', 'FC*,~*3,~*4']
+  classes:
+    - "R"
+    - "L"
+#    - "U"
+#    - "D"
+#  bands: [ [ 8, 13 ], [ 21, 26 ], [ 31.5, 39 ] ]
+  bands: [ 8, 13 ]
+  train_subjects_sessions_dict:
+    S1:
+      - 2
+      - 3
+  loading_data_mode : "within_subject"
+
+extras:
+  ignore_warnings: False
+  enforce_tags: False
+
+# sets level of all command line loggers to 'DEBUG'
+# https://hydra.cc/docs/tutorials/basic/running_your_app/logging/
+hydra:
+  job_logging:
+    root:
+      level: DEBUG
+
+  # use this to also set hydra loggers to 'DEBUG'
+  verbose: True
+
+

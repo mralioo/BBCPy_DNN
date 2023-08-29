@@ -129,3 +129,22 @@ dmypy.json
 .pyre/
 
 *.idea
+
+# Log folder
+logs/
+# data folder
+/data/
+# jupyter checkpoints
+ **/*.ipynb_checkpoints/
+# local folder
+/local/
+
+# vscode ide
+
+
+# venv folder
+/bbcpy_env/
+
+# apptainer containers
+*.sif
+*.sqfs

@@ -1,0 +1,42 @@
+hyperparam_opt:
+  class: sklearn.model_selection.GridSearchCV
+  params:
+    param_grid:
+      mbcsp__n_cmps: [ 4, 6, 8 ]
+      mbcsp__excllev: [ 1.2, 1.5, 1.8 ]
+      mbcsp__estimator: [ "scm", "lwf"]
+  scoring: accuracy
+  cv:
+    _target_: sklearn.model_selection.KFold
+    n_splits: 10
+    shuffle: True
+    #  n_jobs: -1 # FIXME -1 is not working parallel jobs causes error in  SRM_Data module line 486
+    #_target_: sklearn.model_selection.GridSearchCV
+    #_partial_: true
+    #param_grid:
+    #  csp__n_cmps: [ 4, 6, 8, 10 ]
+    #  csp__excllev: [ 0.2, 0.6, 0.8, 1.5 ]
+    #scoring:
+    #  accuracy
+    #cv:
+    #  _target_: sklearn.model_selection.KFold
+    #  n_splits: 5
+    #  shuffle: False
+    #memory: null
+    #    _target_: bbcpy.functions.helpers.evscoring_medvar
+
+    # The scoring should be choose according with https://scikit-learn.org/stable/modules/model_evaluation.html
+    #parameters = {'wishart__excllev': np.concatenate([[None], np.arange(1, 2, 0.1)]), 'wishart__autobias': [True, False],
+    #              'wishart__estimator': [covariance._scm, covariance._lwf, covariance._oas], 'csp__n_cmps': [4, 6, 8, 10]}
+    #clf = GridSearchCV(pipeline, parameters, cv=cv)
+
+    #      n_cmps: choice(2, 3, 4, 6, 8)
+    #      excllev: interval(0.1, 1.5)
+
+    #    wishart__excllev: np.concatenate([[None], np.arange(1, 2, 0.1)])
+    #    wishart__autobias: [ True, False ]
+    #    wishart__estimator: [ covariance._scm, covariance._lwf, covariance._oas ]
+
+
+    #parameters = {'excllev': np.concatenate([[None], np.arange(1, 2, 0.1)]),
+  #              'estimator': [covariance._scm, covariance._lwf], 'n_cmps': [2, 3, 4, 6, 8]}

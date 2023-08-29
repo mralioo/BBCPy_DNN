@@ -1,0 +1,18 @@
+_target_: src.trainer.baseline_trainer.SklearnTrainer
+
+cv:
+  _target_: sklearn.model_selection.KFold
+  n_splits: 5
+  shuffle: False
+
+#default_root_dir: ${paths.output_dir}
+#
+#min_epochs: 1 # prevents early stopping
+#max_epochs: 10
+#
+#accelerator: cpu
+#devices: 1
+#
+##mixed precision for extra speed-up
+#precision: 16
+
