@@ -63,6 +63,7 @@ class SMR_Data():
         self.srm_data_path = data_dir
         self.train_subjects_sessions_dict = train_subjects_sessions_dict
         self.test_subjects_sessions_dict = test_subjects_sessions_dict
+        self.loaded_subjects_sessions = {}
 
         self.concatenate_subjects = concatenate_subjects
         self.loading_data_mode = loading_data_mode
@@ -249,6 +250,7 @@ class SMR_Data():
         # FIXME : not completed
 
         sessions_path_dict = self.collect_subject_sessions(subject_dict)
+        self.loaded_subjects_sessions[subject_name] = []
 
         # sessions_list = sessions_path_dict[subject_name]
         sessions_list = list(sessions_path_dict[subject_name].keys())
@@ -263,6 +265,7 @@ class SMR_Data():
                                                                                    subject_name])
 
             logging.info(f"Loading {init_session_name} finalized (1 from {str(len(sessions_list))})")
+            self.loaded_subjects_sessions[subject_name].append(init_session_name)
 
             for i, session_name in enumerate(sessions_list[1:]):
                 logging.info(
@@ -276,10 +279,14 @@ class SMR_Data():
                     valid_obj_new = valid_obj_new.append(valid_obj, axis=0)
                     forced_obj_new = forced_obj_new.append(forced_obj, axis=0)
 
+                    # append successfully loaded session
+                    self.loaded_subjects_sessions[subject_name].append(session_name)
+
                 except Exception as e:
                     logging.info(f"Session {session_name} not loaded")
                     logging.warning(f"Exception occurred: {e}")
                     continue
+
 
         else:
 

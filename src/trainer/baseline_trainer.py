@@ -267,6 +267,9 @@ class SklearnTrainer(object):
 
                     hparams["cv_classes_weights"] = cv_classes_weights_dict
 
+                    # load successfull loaded data sessions dict
+                    hparams["loaded_subject_sessions_dict"] = self.datamodule.loaded_subjects_sessions
+
                     # log dataset dict to mlflow parent run
                     train_sessions_dict = self.datamodule.train_subjects_sessions_dict
                     tmp_dict = {}
