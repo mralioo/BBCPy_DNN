@@ -99,7 +99,7 @@ class SklearnTrainer(object):
             mlflow.log_metric("test_forced_precision", test_forced_precision)
 
             cm_vali = confusion_matrix(test_data.y, y_pred)
-            test_forced_cm_title = "confusion matrix on forced trials data model"
+            test_forced_cm_title = "cm_forced_trials"
 
             self.compute_confusion_matrix(conf_mat=cm_vali,
                                           title=test_forced_cm_title)
@@ -221,7 +221,7 @@ class SklearnTrainer(object):
 
                         cm_vali = confusion_matrix(y_test, y_pred)
                         val_cm_list.append(compute_percentages_cm(cm_vali))
-                        val_cm_title = "confusion matrix on valid data model "
+                        val_cm_title = "cm_validation_fold_{}".format(foldNum)
                         self.compute_confusion_matrix(cm_vali, title=val_cm_title)
 
                         # test on forced trials data
@@ -237,7 +237,7 @@ class SklearnTrainer(object):
                         mlflow.log_metric("test_forced_precision", test_forced_precision)
 
                         cm_vali = confusion_matrix(test_data.y, y_pred)
-                        test_forced_cm_title = "confusion matrix on forced trials data model "
+                        test_forced_cm_title = "cm_forced_trials"
 
                         self.compute_confusion_matrix(conf_mat=cm_vali,
                                                       title=test_forced_cm_title)
