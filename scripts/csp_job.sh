@@ -2,11 +2,10 @@
 #SBATCH --job-name=csp-S9
 #SBATCH --partition=cpu-2h
 #SBATCH --gpus-per-node=0
-#SBATCH --ntasks-per-node=2
-#SBATCH --output=logs/job-%j.out
+#SBATCH --ntasks-per-node=8
+#SBATCH -n=2
 #SBATCH --output=../jobs_outputs/csp-S9/%x_%j.o
-#SBATCH --error=../jobs_outputs/csp-S9/%x_%j.e
-#SBATCH --mail-user $mr.ali.alouane@gmail.com
+#SBATCH --mail-user=mr.ali.alouane@gmail.com
 
 echo "I am a job with ID $SLURM_JOB_ID"
 echo "current working directory is $(pwd)"
