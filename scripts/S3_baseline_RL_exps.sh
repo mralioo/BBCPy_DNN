@@ -1,19 +1,19 @@
 #!/bin/bash
 
-#SBATCH --job-name=S1-baseline
+#SBATCH --job-name=S3-baseline
 #SBATCH --partition=cpu-2h
 #SBATCH --gpus-per-node=0
 #SBATCH --nodes=4
 #SBATCH --ntasks-per-node=8
-#SBATCH --output=../jobs_outputs/S1/%x_%j.o
-#SBATCH --error=../jobs_outputs/S1/%x_%j.e
+#SBATCH --output=../jobs_outputs/S3/%x_%j.o
+#SBATCH --error=../jobs_outputs/S3/%x_%j.e
 #SBATCH --mail-user=mr.ali.alouane@gmail.com
 
 echo "I am a job with ID $SLURM_JOB_ID"
 echo "current working directory is $(pwd)"
 
 # 1. copy the squashed dataset to the nodes /tmp
-cp ./../squashfs_smr_data/S1.sqfs /tmp/
+cp ./../squashfs_smr_data/S3.sqfs /tmp/
 
 # Define experiments you want to run
 experiments=("0_csp" "0_mbcsp" "0_riemann" "0_riemann_tangent")
@@ -24,6 +24,6 @@ for experiment in "${experiments[@]}"; do
     echo "Processing experiment $experiment"
 
     # 3. bind the squashed dataset to your apptainer environment and run your script with apptainer
-    apptainer run -B /tmp/S1.sqfs:/input-data:image-src=/ ./../env_images/bbcpy_lightning_v3.sif python ./src/baseline_train.py +experiment=${experiment}
+    apptainer run -B /tmp/S3.sqfs:/input-data:image-src=/ ./../env_images/bbcpy_lightning_v3.sif python ./src/baseline_train.py +experiment=${experiment}
 
 done
