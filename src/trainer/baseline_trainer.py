@@ -167,11 +167,15 @@ class SklearnTrainer(object):
             self.val_roc_curve_list = []
             self.test_roc_curve_list = []
 
+            # roc curve over folds for validation data
+            val_tprs = []
+            val_aucs = []
+
             # roc curve over folds for test data
-            tprs = []
-            aucs = []
+            test_tprs = []
+            test_aucs = []
             num_smaples_test = test_data.y.shape[0]
-            mean_fpr = np.linspace(0, 1, num_smaples_test)
+            test_mean_fpr = np.linspace(0, 1, num_smaples_test)
 
             mlflow.set_tracking_uri(Path(self.logger.mlflow.tracking_uri).as_uri())
 
@@ -205,6 +209,9 @@ class SklearnTrainer(object):
                     X_train, X_vali = train_data[train_index], train_data[vali_index]
                     y_train, y_vali = train_data.y[train_index], train_data.y[vali_index]
 
+                    num_smaples_val = y_vali.shape[0]
+                    val_mean_fpr = np.linspace(0, 1, num_smaples_val)
+
                     # compute classes weights for imbalanced dataset
 
                     fold_classes_weights = sklearn.utils.class_weight.compute_class_weight(class_weight='balanced',
@@ -223,8 +230,6 @@ class SklearnTrainer(object):
 
                         self.clf.fit(X_train, y_train)
 
-                        # test on validation data
-
                         # compute metrics for train data
                         y_pred = self.clf.predict(X_train)
 
@@ -235,6 +240,11 @@ class SklearnTrainer(object):
                         # compute metrics on valid data
                         y_pred = self.clf.predict(X_vali)
                         self.compute_roc_curve(y_true=y_vali, y_pred=y_pred, set_name="vali")
+                        fpr, tpr, _ = sklearn.metrics.roc_curve(y_true=y_vali, y_score=y_pred)
+                        val_tprs.append(np.interp(val_mean_fpr, fpr, tpr))
+                        val_tprs[-1][0] = 0.0  # set first value to 0 to have a better plot
+                        roc_auc = sklearn.metrics.auc(fpr, tpr)
+                        val_aucs.append(roc_auc)
 
                         vali_metrics_dict = self.compute_metrics(y_true=y_vali, y_pred=y_pred, set_name="vali")
 
@@ -251,10 +261,10 @@ class SklearnTrainer(object):
 
                         # roc curve for test data over folds
                         fpr, tpr, _ = sklearn.metrics.roc_curve(y_true=test_data.y, y_score=y_pred)
-                        tprs.append(np.interp(mean_fpr, fpr, tpr))
-                        tprs[-1][0] = 0.0  # set first value to 0 to have a better plot
+                        test_tprs.append(np.interp(test_mean_fpr, fpr, tpr))
+                        test_tprs[-1][0] = 0.0  # set first value to 0 to have a better plot
                         roc_auc = sklearn.metrics.auc(fpr, tpr)
-                        aucs.append(roc_auc)
+                        test_aucs.append(roc_auc)
 
                         test_metrics_dict = self.compute_metrics(y_true=test_data.y, y_pred=y_pred,
                                                                  set_name="test_forced")
@@ -280,20 +290,33 @@ class SklearnTrainer(object):
                 # log the validation mean confusion matrix to mlflow parent run
                 mean_f1_score_vali = np.mean(val_f1_list)
                 mlflow.log_metric("vali-mean_f1_score", mean_f1_score_vali)
+
+                self.plot_roc_curve(tprs=val_tprs,
+                                    aucs=val_aucs,
+                                    mean_fpr=val_mean_fpr,
+                                    set_name="vali",
+                                    title="Cross-validation_roc-curve_validation")
+
                 self.plot_confusion_matrix(val_cm_list,
                                            title=f"cv-{num_cv}_val-avg-cm_{model_name}",
                                            type="mean")
+
                 # log the test mean confusion matrix to mlflow parent run
                 mean_f1_score_test = np.mean(test_f1_list)
                 mlflow.log_metric("test_forced-mean_f1_score", mean_f1_score_test)
-                self.plot_roc_curve(tprs=tprs, aucs=aucs, mean_fpr=mean_fpr)
+
+                self.plot_roc_curve(tprs=test_tprs,
+                                    aucs=test_aucs,
+                                    mean_fpr=test_mean_fpr,
+                                    set_name="test",
+                                    title="Cross-validation_roc-curve_test")
+
                 self.plot_confusion_matrix(test_cm_list,
                                            title=f"cv-{num_cv}_ftest-avg-cm_{model_name}",
                                            type="mean")
 
                 # fetch logged data from parent run
                 # parent_run_id = parent_run.info.run_id
-
                 params, _, tags, _ = fetch_logged_data(child_run.info.run_id)
                 hparams["pipeline_params"] = params
                 hparams["pipeline_tags"] = tags
@@ -457,17 +480,33 @@ class SklearnTrainer(object):
                 plt.savefig(plot_path)  # Save the plot to the temporary directory
                 mlflow.log_artifacts(tmpdirname)
 
-    def plot_roc_curve(self, tprs, aucs, mean_fpr):
+    def plot_roc_curve(self, tprs, aucs, mean_fpr, set_name ,title ):
         """Compute and plot the roc curve. It calculates a standard roc curve or the mean and std of a list of roc curve
             used for cross validation folds. """
 
         plt.rcParams["font.family"] = 'DejaVu Sans'
         plt.figure(figsize=(10, 7))
-        for i, (fpr, tpr) in enumerate(self.train_roc_curve_list):
-            auc_val = sklearn.metrics.auc(fpr, tpr)
-            plt.plot(fpr, tpr, lw=2, alpha=0.3, label='ROC fold %d (AUC = %0.2f)' % (i, auc_val))
 
-        mean_tpr = np.mean(tprs, axis=0)
+        # TODO: remove if not needed
+        if set_name == "vali":
+            for i, (fpr, tpr) in enumerate(self.val_roc_curve_list):
+                auc_val = sklearn.metrics.auc(fpr, tpr)
+                plt.plot(fpr, tpr, lw=2, alpha=0.3, label='ROC fold %d (AUC = %0.2f)' % (i, auc_val))
+        elif set_name == "test":
+            for i, (fpr, tpr) in enumerate(self.test_roc_curve_list):
+                auc_val = sklearn.metrics.auc(fpr, tpr)
+                plt.plot(fpr, tpr, lw=2, alpha=0.3, label='ROC fold %d (AUC = %0.2f)' % (i, auc_val))
+
+
+        # TODO : walkaround check shape of tprs
+        new_tprs = []
+        mean_fpr_len = len(mean_fpr)
+        for tpr in tprs:
+            if len(tpr) != mean_fpr_len:
+                tpr = tpr[:mean_fpr_len]
+            new_tprs.append(tpr)
+
+        mean_tpr = np.mean(new_tprs, axis=0)
         mean_tpr[-1] = 1.0  # set last value to 1.0 to have a complete curve
         mean_auc = sklearn.metrics.auc(mean_fpr, mean_tpr)
         std_auc = np.std(aucs)
@@ -476,12 +515,12 @@ class SklearnTrainer(object):
         plt.plot([0, 1], [0, 1], linestyle='--', lw=2, color='r', label='Chance', alpha=.8)
         plt.xlabel('False Positive Rate')
         plt.ylabel('True Positive Rate')
-        roc_title = "Cross-validation_roc-curve_ftest"
-        plt.title(f'{roc_title}')
+
+        plt.title(title)
         plt.legend(loc='lower right')
 
         with tempfile.TemporaryDirectory() as tmpdirname:
-            plot_path = os.path.join(tmpdirname, f"{roc_title}.png")
+            plot_path = os.path.join(tmpdirname, f"{title}.png")
 
             plt.savefig(plot_path)  # Save the plot to the temporary directory
             mlflow.log_artifacts(tmpdirname)

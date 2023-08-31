@@ -19,7 +19,7 @@ tags: [ "baseline" , "alpha_band" , "Within-Subject" , "RL"]
 seed: 12345
 
 data:
-  ival: 2s:11s:1ms
+  ival: 2s:10s:1ms
   bands:
     - 8
     - 13
