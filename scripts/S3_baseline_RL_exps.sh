@@ -4,7 +4,7 @@
 #SBATCH --partition=cpu-2h
 #SBATCH --gpus-per-node=0
 #SBATCH --nodes=4
-#SBATCH --ntasks-per-node=8
+#SBATCH --ntasks-per-node=16
 #SBATCH --output=../jobs_outputs/S3/%x_%j.o
 #SBATCH --error=../jobs_outputs/S3/%x_%j.e
 #SBATCH --mail-user=mr.ali.alouane@gmail.com
@@ -24,6 +24,6 @@ for experiment in "${experiments[@]}"; do
     echo "Processing experiment $experiment"
 
     # 3. bind the squashed dataset to your apptainer environment and run your script with apptainer
-    apptainer run -B /tmp/S3.sqfs:/input-data:image-src=/ ./../env_images/bbcpy_lightning_v3.sif python ./src/baseline_train.py +experiment=${experiment}
+    apptainer run -B /tmp/S3.sqfs:/input-data:image-src=/ ./../env_images/bbcpy_lightning_v3.sif python ./src/baseline_train.py +experiment=${experiment} +data.train_subjects_sessions_dict={S3: "all"} logger.mlflow.experiment_name="A-RL-S3-all"
 
 done

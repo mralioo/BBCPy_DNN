@@ -4,7 +4,7 @@
 #SBATCH --partition=cpu-2h
 #SBATCH --gpus-per-node=0
 #SBATCH --nodes=4
-#SBATCH --ntasks-per-node=8
+#SBATCH --ntasks-per-node=16
 #SBATCH --output=../jobs_outputs/S1/%x_%j.o
 #SBATCH --error=../jobs_outputs/S1/%x_%j.e
 #SBATCH --mail-user=mr.ali.alouane@gmail.com

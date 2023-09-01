@@ -1,22 +1,17 @@
 _target_: src.data.smr_datamodule.SMR_Data
 data_dir: ${paths.data_dir}
 
-ival: 2s:8s:1ms
-
+ival: "all"
 bands:
   - 8
   - 13
-
 chans: [ "*" ]
-
 classes:
   - "R"
   - "L"
   - "U"
   - "D"
-
-concatenate_subjects: True
-
 loading_data_mode : within_subject
 
 train_val_split: [ 0.8, 0.2 ]
+concatenate_subjects: True
