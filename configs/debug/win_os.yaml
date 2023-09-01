@@ -42,18 +42,18 @@ logger:
     tracking_uri: ${paths.log_dir}\mlflow\mlruns
 
 data:
-  ival: 2s:10s:1ms
+  ival: "all"
   chans: [ "*" ]
   classes:
     - "R"
     - "L"
-  #    - "U"
-  #    - "D"
+    - "U"
+    - "D"
   bands: [ [ 8, 13 ], [ 21, 26 ], [ 31.5, 39 ] ]
 #  bands: [ 8, 13 ]
   train_subjects_sessions_dict:
     S1:
-      - 1
+      - 3
   loading_data_mode: "within_subject"
 
 extras:
