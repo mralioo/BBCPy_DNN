@@ -24,6 +24,6 @@ for experiment in "${experiments[@]}"; do
     echo "Processing experiment $experiment"
 
     # 3. bind the squashed dataset to your apptainer environment and run your script with apptainer
-    apptainer run -B /tmp/S3.sqfs:/input-data:image-src=/ ./../env_images/bbcpy_lightning_v3.sif python ./src/baseline_train.py +experiment=${experiment} +data.train_subjects_sessions_dict={S3: "all"} logger.mlflow.experiment_name="A-RL-S3-all"
+    apptainer run -B /tmp/S3.sqfs:/input-data:image-src=/ ./../env_images/bbcpy_lightning_v3.sif python ./src/baseline_train.py +experiment=${experiment} +data.train_subjects_sessions_dict="{S3: "all"}" logger.mlflow.experiment_name="A-RL-S3-all"
 
 done
