@@ -141,6 +141,9 @@ class SklearnTrainer(object):
                                                                                  classes=np.unique(train_data.y),
                                                                                  y=train_data.y)
 
+        train_data_shape = train_data.shape
+        test_data_shape = test_data.shape
+
         self.classes_names = train_data.className
 
         metrics = None
@@ -324,6 +327,8 @@ class SklearnTrainer(object):
                                                      range(len(self.classes_names))}
 
                 hparams["cv_classes_weights"] = cv_classes_weights_dict
+                hparams["train_data_shape"] = train_data_shape
+                hparams["test_data_shape"] = test_data_shape
 
                 # load successfull loaded data sessions dict
                 hparams["loaded_subject_sessions_dict"] = self.datamodule.loaded_subjects_sessions
@@ -344,14 +349,6 @@ class SklearnTrainer(object):
             return score
 
         return metrics
-
-    def test(self, pipeline, datamodule):
-        # TODO: implement test
-        """Load model and test it on test data."""
-
-        # test_data = datamodule.load_data(self.test_sessions, self.concatenate_subjects)
-        # return pipeline.predict(test_data)
-        return NotImplementedError
 
     def compute_metrics(self, y_true, y_pred, set_name="vali"):
         """Compute metrics for classification task.
@@ -480,7 +477,7 @@ class SklearnTrainer(object):
                 plt.savefig(plot_path)  # Save the plot to the temporary directory
                 mlflow.log_artifacts(tmpdirname)
 
-    def plot_roc_curve(self, tprs, aucs, mean_fpr, set_name ,title ):
+    def plot_roc_curve(self, tprs, aucs, mean_fpr, set_name, title):
         """Compute and plot the roc curve. It calculates a standard roc curve or the mean and std of a list of roc curve
             used for cross validation folds. """
 
@@ -496,7 +493,6 @@ class SklearnTrainer(object):
             for i, (fpr, tpr) in enumerate(self.test_roc_curve_list):
                 auc_val = sklearn.metrics.auc(fpr, tpr)
                 plt.plot(fpr, tpr, lw=2, alpha=0.3, label='ROC fold %d (AUC = %0.2f)' % (i, auc_val))
-
 
         # TODO : walkaround check shape of tprs
         new_tprs = []

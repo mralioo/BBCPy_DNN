@@ -62,6 +62,7 @@ class SMR_Data():
         self.srm_data_path = data_dir
         self.train_subjects_sessions_dict = train_subjects_sessions_dict
         self.loaded_subjects_sessions = {}
+        self.founded_subjects_sessions = {}
 
         self.concatenate_subjects = concatenate_subjects
         self.loading_data_mode = loading_data_mode
@@ -89,9 +90,13 @@ class SMR_Data():
             sessions_group_path = bbcpy.load.srm_eeg.list_all_files(self.srm_data_path,
                                                                     pattern=f"{subject_name}_*.mat")[subject_name]
 
+            self.founded_subjects_sessions[subject_name] = list(sessions_group_path.keys())
+
+
             if sessions_ids == "all":
                 # select all sessions
                 logging.info(f"Found sessions: {list(sessions_group_path.keys())}")
+
                 subjects_sessions_path_dict[subject_name] = sessions_group_path
             else:
                 # select specific sessions

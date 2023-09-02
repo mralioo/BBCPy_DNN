@@ -1,6 +1,6 @@
 #!/bin/bash
 
-#SBATCH --job-name=S1-baseline
+#SBATCH --job-name=S10-baseline
 #SBATCH --partition=cpu-2h
 #SBATCH --gpus-per-node=0
 #SBATCH --nodes=4

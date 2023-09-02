@@ -22,6 +22,7 @@ defaults:
 #  - override /model: csp_clf.yaml
 #  - override /hparams_search: hpo_csp.yaml
 
+
 paths:
   root_dir: ${oc.env:PROJECT_ROOT}
   data_dir: ${paths.root_dir}\data\SMR\raw\
@@ -52,8 +53,7 @@ data:
   bands: [ [ 8, 13 ], [ 21, 26 ], [ 31.5, 39 ] ]
 #  bands: [ 8, 13 ]
   train_subjects_sessions_dict:
-    S1:
-      - 3
+    S2: "all"
   loading_data_mode: "within_subject"
 
 extras:
