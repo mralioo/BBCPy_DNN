@@ -33,7 +33,6 @@ class SMR_Data():
     def __init__(self,
                  data_dir,
                  train_subjects_sessions_dict,
-                 test_subjects_sessions_dict,
                  concatenate_subjects,
                  loading_data_mode,
                  train_val_split,
@@ -62,8 +61,8 @@ class SMR_Data():
 
         self.srm_data_path = data_dir
         self.train_subjects_sessions_dict = train_subjects_sessions_dict
-        self.test_subjects_sessions_dict = test_subjects_sessions_dict
         self.loaded_subjects_sessions = {}
+        self.founded_subjects_sessions = {}
 
         self.concatenate_subjects = concatenate_subjects
         self.loading_data_mode = loading_data_mode
@@ -87,22 +86,31 @@ class SMR_Data():
         subjects_sessions_path_dict = {}
         for subject_name, sessions_ids in subjects_dict.items():
             logging.info(f"Collecting subject {subject_name} sessions from:  {self.srm_data_path}")
+
             sessions_group_path = bbcpy.load.srm_eeg.list_all_files(self.srm_data_path,
                                                                     pattern=f"{subject_name}_*.mat")[subject_name]
 
-            logging.info(f"Found sessions: {list(sessions_group_path.keys())}")
+            self.founded_subjects_sessions[subject_name] = list(sessions_group_path.keys())
 
-            if isinstance(sessions_ids, int):
-                sessions_names = ["Session_" + str(sessions_ids)]
+
+            if sessions_ids == "all":
+                # select all sessions
+                logging.info(f"Found sessions: {list(sessions_group_path.keys())}")
+
+                subjects_sessions_path_dict[subject_name] = sessions_group_path
             else:
-                sessions_names = ["Session_" + str(session_id) for session_id in sessions_ids]
-
-            subjects_sessions_path_dict[subject_name] = {}
-            for session_name in sessions_names:
-                if session_name not in sessions_group_path.keys():
-                    raise Exception(f" {session_name} not found for subject {subject_name}")
+                # select specific sessions
+                if isinstance(sessions_ids, int):
+                    sessions_names = ["Session_" + str(sessions_ids)]
                 else:
-                    subjects_sessions_path_dict[subject_name][session_name] = sessions_group_path[session_name]
+                    sessions_names = ["Session_" + str(session_id) for session_id in sessions_ids]
+
+                subjects_sessions_path_dict[subject_name] = {}
+                for session_name in sessions_names:
+                    if session_name not in sessions_group_path.keys():
+                        raise Exception(f" {session_name} not found for subject {subject_name}")
+                    else:
+                        subjects_sessions_path_dict[subject_name][session_name] = sessions_group_path[session_name]
 
         return subjects_sessions_path_dict
 
