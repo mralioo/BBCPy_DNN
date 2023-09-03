@@ -19,7 +19,7 @@ tags: [ "baseline" , "multi-band" , "Within-Subject" , "RL"]
 seed: 12345
 
 data:
-  ival: 2s:10s:1ms
+  ival: 1s:10s:1ms
   bands: [ [ 8, 13 ], [ 21, 26 ], [ 31.5, 39 ] ]
   chans: [ "*" ]
   classes:

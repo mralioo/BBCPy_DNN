@@ -32,7 +32,7 @@ class SMR_Data():
 
     def __init__(self,
                  data_dir,
-                 train_subjects_sessions_dict,
+                 subject_sessions_dict,
                  concatenate_subjects,
                  loading_data_mode,
                  train_val_split,
@@ -60,7 +60,7 @@ class SMR_Data():
         # FIXME : parameter are in type  omegaconf
 
         self.srm_data_path = data_dir
-        self.train_subjects_sessions_dict = train_subjects_sessions_dict
+        self.subject_sessions_dict = subject_sessions_dict
         self.loaded_subjects_sessions = {}
         self.founded_subjects_sessions = {}
 
@@ -393,18 +393,18 @@ class SMR_Data():
         """ Prepare the data for the classification """
 
         if self.loading_data_mode == "within_subject":
-            subject_name = list(self.train_subjects_sessions_dict.keys())[0]
+            subject_name = list(self.subject_sessions_dict.keys())[0]
             valid_trial_trainset, forced_trial_testset = self.load_subject_sessions(subject_name=subject_name,
-                                                                                    subject_dict=self.train_subjects_sessions_dict)
+                                                                                    subject_dict=self.subject_sessions_dict)
 
         elif self.loading_data_mode == "within_subject_all":
-            valid_trial_trainset, forced_trial_testset = self.load_subjects(self.train_subjects_sessions_dict,
+            valid_trial_trainset, forced_trial_testset = self.load_subjects(self.subject_sessions_dict,
                                                                             self.concatenate_subjects)
 
             valid_trial_trainset = valid_trial_trainset.append(forced_trial_testset, axis=0)
 
         elif self.loading_data_mode == "cross_subject":
-            valid_trial_trainset, forced_trial_testset = self.load_subjects(self.train_subjects_sessions_dict,
+            valid_trial_trainset, forced_trial_testset = self.load_subjects(self.subject_sessions_dict,
                                                                             self.concatenate_subjects)
 
         else:

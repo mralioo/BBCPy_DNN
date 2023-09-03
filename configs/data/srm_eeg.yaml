@@ -11,9 +11,8 @@ classes:
   - "L"
   - "U"
   - "D"
-train_subjects_sessions_dict:
-  S2: "all"
+#subject_sessions_dict:
+#  S3: "all"
 loading_data_mode: within_subject
-
 train_val_split: [ 0.8, 0.2 ]
 concatenate_subjects: True

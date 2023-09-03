@@ -104,7 +104,7 @@ class SklearnTrainer(object):
                                        title=test_forced_cm_title)
 
             # log dataset dict to mlflow parent run
-            train_sessions_dict = self.datamodule.train_subjects_sessions_dict
+            train_sessions_dict = self.datamodule.subject_sessions_dict
             tmp_dict = {}
             for key, value in train_sessions_dict.items():
                 tmp_dict[key] = list(value)

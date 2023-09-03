@@ -13,11 +13,11 @@ train: True
 tune: False
 
 defaults:
-#  - override /model: riemann_tangent_clf.yaml
+  - override /model: riemann_tangent_clf.yaml
 #  - override /hparams_search: hpo_riemann_tanget.yaml
 #  - override /model: riemann_clf.yaml
 #  - override /hparams_search: hpo_riemann.yaml
-  - override /model: mbcsp_clf.yaml
+#  - override /model: mbcsp_clf.yaml
 #  - override /hparams_search: hpo_mbcsp.yaml
 #  - override /model: csp_clf.yaml
 #  - override /hparams_search: hpo_csp.yaml
@@ -36,24 +36,22 @@ logger:
   mlflow:
     #    experiment_name: DEBUG-HPO
     experiment_name: DEBUG-TRAIN
-#    run_name: riemann_tanget
+    run_name: riemann_tanget
 #    run_name: riemann
 #    run_name: csp
-    run_name: mbcsp
+#    run_name: mbcsp
     tracking_uri: ${paths.log_dir}\mlflow\mlruns
 
 data:
-  ival: "all"
+  ival: 2s:10s:1ms
   chans: [ "*" ]
   classes:
     - "R"
     - "L"
-    - "U"
-    - "D"
-  bands: [ [ 8, 13 ], [ 21, 26 ], [ 31.5, 39 ] ]
-#  bands: [ 8, 13 ]
-  train_subjects_sessions_dict:
-    S2: "all"
+#  bands: [ [ 8, 13 ], [ 21, 26 ], [ 31.5, 39 ] ]
+  bands: [ 8, 13 ]
+  subject_sessions_dict:
+    S3: "all"
   loading_data_mode: "within_subject"
 
 extras:
