@@ -27,7 +27,7 @@ defaults:
 #  - local: win_os.yaml
 
   # debugging config (enable through command line, e.g. `python train.py debug=default)
-  - debug: win_os
+#  - debug: win_os
 
 # task name, determines output directory path
 # list of tasks [train, test, hparams_search]
