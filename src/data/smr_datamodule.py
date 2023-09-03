@@ -73,6 +73,8 @@ class SMR_Data():
         self.select_timepoints = ival
         self.bands = OmegaConf.to_container(bands)
 
+        self.subject_info = {}
+
     @property
     def num_classes(self):
         return len(self.classes)
@@ -138,14 +140,21 @@ class SMR_Data():
 
         return obj
 
+    def interpolate_noisy_channels(self, srm_obj, subject_name, session_name):
+        """ Interpolate noisy channels """
+        pass
+
     def load_forced_valid_trials_data(self, session_name, sessions_group_path):
 
         session_path = sessions_group_path[session_name]
-
+        self.subject_info["noisy_chans"] = {}
         srm_data, timepoints, srm_fs, clab, mnt, trial_info, subject_info = \
             self.load_session_raw_data(session_path)
 
         # init channels object
+
+        self.subject_info["noisy_chans"][session_name] = subject_info["noisechan"]
+
         chans = bbcpy.datatypes.eeg.Chans(clab, mnt)
 
         # true labels
@@ -181,6 +190,10 @@ class SMR_Data():
         # select all forced trials to test
         forced_trials = trial_info["forcedresult"]
         forced_trials_idx = np.setdiff1d(np.where(forced_trials == np.bool_(True))[0], valid_trials_idx)
+
+        # if len(forced_trials_idx) == 0:
+        #     raise Exception(f"No forced trials found for session {session_name}")
+
         forced_data = srm_data[forced_trials_idx]
         forced_mrk_class = mrk_class[forced_trials_idx]
         forced_timepoints = timepoints[forced_trials_idx]
@@ -268,6 +281,7 @@ class SMR_Data():
         if len(sessions_list) > 1:
             init_session_name = sessions_list[0]
 
+            # load the first session to init the object
             valid_obj_new, forced_obj_new = self.load_forced_valid_trials_data(session_name=init_session_name,
                                                                                sessions_group_path=sessions_path_dict[
                                                                                    subject_name])
@@ -281,11 +295,29 @@ class SMR_Data():
 
                 try:
                     valid_obj, forced_obj = self.load_forced_valid_trials_data(session_name=session_name,
-                                                                               sessions_group_path=sessions_path_dict[
-                                                                                   subject_name])
+                                                                               sessions_group_path=sessions_path_dict[subject_name])
 
+
+                    # check if the valid data has the same datapoints
+                    if valid_obj.shape[2] != valid_obj_new.shape[2]:
+                        # reshape the data
+                        valid_obj_len = valid_obj_new.shape[2]
+                        valid_obj = valid_obj[:, :, :valid_obj_len]
                     valid_obj_new = valid_obj_new.append(valid_obj, axis=0)
+
+                    # check if the forced data has the same datapoints
+                    if forced_obj.shape[2] != forced_obj_new.shape[2]:
+                        # reshape the data
+                        forced_obj_len = forced_obj_new.shape[2]
+                        forced_obj = forced_obj[:, :, :forced_obj_len]
+
+                    # check if the forced data exists
+                    if forced_obj.shape[0] == 0:
+                        logging.info(f"Session {session_name} has no forced trials")
+                        continue
+
                     forced_obj_new = forced_obj_new.append(forced_obj, axis=0)
+
 
                     # append successfully loaded session
                     self.loaded_subjects_sessions[subject_name].append(session_name)
