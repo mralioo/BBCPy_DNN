@@ -18,6 +18,7 @@ from src import utils
 from src.utils.hyperparam_opt import optimize_hyperparams
 from src.utils.mlflow import fetch_logged_data
 from src.utils.vis import compute_percentages_cm, calculate_cm_stats
+from src.utils.file_mgmt import default
 
 log = utils.get_pylogger(__name__)
 
@@ -331,13 +332,15 @@ class SklearnTrainer(object):
                 hparams["test_data_shape"] = test_data_shape
 
                 # load successfull loaded data sessions dict
-                hparams["loaded_subject_sessions_dict"] = self.datamodule.loaded_subjects_sessions
+                hparams["loaded_sessions"] = self.datamodule.loaded_subjects_sessions
+                hparams["subject_info_dict"] = self.datamodule.subject_info_dict["subject_info"]
+                hparams["noisy_chans"] = self.datamodule.subject_info_dict["noisy_chans"]
 
                 # Use a temporary directory to save
                 with tempfile.TemporaryDirectory() as tmpdirname:
                     hparam_path = os.path.join(tmpdirname, "Hparams.json")
                     with open(hparam_path, "w") as f:
-                        json.dump(hparams, f)
+                        json.dump(hparams, f, default=default)
 
                     mlflow.log_artifacts(tmpdirname)
 

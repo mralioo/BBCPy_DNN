@@ -6,7 +6,6 @@
 defaults:
   - override /data: srm_eeg.yaml
   - override /model: riemann_clf.yaml
-  - override /callbacks: default.yaml
   - override /trainer: sklearn.yaml
   - override /logger: mlflow.yaml
   - override /paths: default.yaml

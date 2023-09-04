@@ -40,6 +40,8 @@ class SMR_Data():
                  bands,
                  chans,
                  classes,
+                 threshold_distance,
+                 fallback_neighbors
                  ):
 
         """ Initialize the SMR datamodule
@@ -73,7 +75,10 @@ class SMR_Data():
         self.select_timepoints = ival
         self.bands = OmegaConf.to_container(bands)
 
-        self.subject_info = {}
+        self.threshold_distance = threshold_distance
+        self.fallback_neighbors = fallback_neighbors
+
+        self.subject_info_dict = {}
 
     @property
     def num_classes(self):
@@ -93,7 +98,6 @@ class SMR_Data():
                                                                     pattern=f"{subject_name}_*.mat")[subject_name]
 
             self.founded_subjects_sessions[subject_name] = list(sessions_group_path.keys())
-
 
             if sessions_ids == "all":
                 # select all sessions
@@ -140,21 +144,47 @@ class SMR_Data():
 
         return obj
 
-    def interpolate_noisy_channels(self, srm_obj, subject_name, session_name):
-        """ Interpolate noisy channels """
+    def interpolate_noisy_channels(self, srm_obj, noisy_chans_idx):
+        """ Interpolate noisy channels
+         62-channel EEG cap (10-10 sytem) """
+
+        # Calculate distances from the noisy channel to all other channels
+        distances = np.linalg.norm(srm_obj.chans.mnt - srm_obj.chans.mnt[noisy_chans_idx], axis=1)
+
+        # Identify neighboring channels
+        neighbors = np.where(distances < self.threshold_distance)[0]
+
+        # If no neighbors found within threshold, take the closest fallback_neighbors channels
+        if len(neighbors) == 0 or (len(neighbors) == 1 and noisy_chans_idx in neighbors):
+            neighbors = np.argsort(distances)[1:self.fallback_neighbors + 1]  # Excluding the channel itself
+
+        # Exclude the noisy channel itself from the neighbors
+        neighbors = neighbors[neighbors != noisy_chans_idx]
+
+        # Calculate the average signal of neighboring channels
+        average_signal = np.mean(srm_obj[neighbors], axis=0)
+
+        # Replace the noisy channel's signal with the average signal
+        srm_obj[noisy_chans_idx] = average_signal
+
+        return srm_obj
+
+    def remove_noisy_channels(self, srm_obj, noisy_chans):
+        """ Remove noisy channels """
         pass
 
     def load_forced_valid_trials_data(self, session_name, sessions_group_path):
 
         session_path = sessions_group_path[session_name]
-        self.subject_info["noisy_chans"] = {}
+        self.subject_info_dict["noisy_chans"] = {}
         srm_data, timepoints, srm_fs, clab, mnt, trial_info, subject_info = \
             self.load_session_raw_data(session_path)
 
+
+        # save subject info
+        self.subject_info_dict["subject_info"] = subject_info
+
         # init channels object
-
-        self.subject_info["noisy_chans"][session_name] = subject_info["noisechan"]
-
         chans = bbcpy.datatypes.eeg.Chans(clab, mnt)
 
         # true labels
@@ -185,8 +215,6 @@ class SMR_Data():
                                                         mrk=valid_mrk,
                                                         chans=chans)
 
-        valid_trials = self.preprocess_data(valid_trials)
-
         # select all forced trials to test
         forced_trials = trial_info["forcedresult"]
         forced_trials_idx = np.setdiff1d(np.where(forced_trials == np.bool_(True))[0], valid_trials_idx)
@@ -209,8 +237,19 @@ class SMR_Data():
                                                          mrk=forced_mrk,
                                                          chans=chans)
 
+        # remove noisy channels
+        # if noisy channels are present, remove them from clab
+        if len(subject_info["noisechan"]) > 0:
+            noisy_chans_id_list = [int(chan) for chan in subject_info["noisechan"]]
+            noisy_chans_name = [clab[chan] for chan in noisy_chans_id_list]
+            self.subject_info_dict["noisy_chans"][session_name] = noisy_chans_name
+            for noisy_chans_id in noisy_chans_id_list:
+                valid_trials = self.interpolate_noisy_channels(valid_trials, noisy_chans_id)
+                forced_trials = self.interpolate_noisy_channels(forced_trials, noisy_chans_id)
 
+        # preprocess the data
 
+        valid_trials = self.preprocess_data(valid_trials)
         forced_trials = self.preprocess_data(forced_trials)
 
         logging.info(
@@ -295,8 +334,8 @@ class SMR_Data():
 
                 try:
                     valid_obj, forced_obj = self.load_forced_valid_trials_data(session_name=session_name,
-                                                                               sessions_group_path=sessions_path_dict[subject_name])
-
+                                                                               sessions_group_path=sessions_path_dict[
+                                                                                   subject_name])
 
                     # check if the valid data has the same datapoints
                     if valid_obj.shape[2] != valid_obj_new.shape[2]:
@@ -318,7 +357,6 @@ class SMR_Data():
 
                     forced_obj_new = forced_obj_new.append(forced_obj, axis=0)
 
-
                     # append successfully loaded session
                     self.loaded_subjects_sessions[subject_name].append(session_name)
 
@@ -331,6 +369,7 @@ class SMR_Data():
         else:
 
             init_session_name = sessions_list[0]
+            self.loaded_subjects_sessions[subject_name].append(init_session_name)
             valid_obj_new, forced_obj_new = self.load_forced_valid_trials_data(session_name=init_session_name,
                                                                                sessions_group_path=sessions_path_dict[
                                                                                    subject_name])

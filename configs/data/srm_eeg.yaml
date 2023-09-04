@@ -11,8 +11,11 @@ classes:
   - "L"
   - "U"
   - "D"
-#subject_sessions_dict:
-#  S3: "all"
+threshold_distance: 0.3
+fallback_neighbors: 4
+
+subject_sessions_dict:
+  S5: "all"
 loading_data_mode: within_subject
 train_val_split: [ 0.8, 0.2 ]
 concatenate_subjects: True
