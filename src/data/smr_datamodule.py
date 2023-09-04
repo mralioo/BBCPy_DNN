@@ -120,12 +120,6 @@ class SMR_Data():
 
         return subjects_sessions_path_dict
 
-    def load_session_raw_data(self, session_path):
-        """ Load session raw data  """
-        srm_data, timepoints, srm_fs, clab, mnt, trial_info, subject_info = \
-            bbcpy.load.srm_eeg.load_single_mat_session(file_path=session_path)
-        return srm_data, timepoints, srm_fs, clab, mnt, trial_info, subject_info
-
     def preprocess_data(self, srm_obj):
         """ Reshape the SRM data object to the desired shape """
 
@@ -169,23 +163,50 @@ class SMR_Data():
 
         return srm_obj
 
-    def remove_noisy_channels(self, srm_obj, noisy_chans):
-        """ Remove noisy channels """
-        pass
+    def set_eeg_channels(self, clab, mnt, reference_channel="REF."):
+        """ Set the EEG channels object, and remove the reference channel if exists
+
+        Parameters
+        ----------
+        clab: numpy array
+            List of channels names
+        mnt: numpy array
+            List of channels positions
+        reference_channel: str
+            Name of the reference channel
+
+        Returns
+        -------
+        chans: bbcpy.datatypes.eeg.Chans
+
+        """
+
+        if reference_channel in clab:
+
+            ref_idx = np.where(clab == "REF.")[0][0]
+            clab = np.delete(clab, ref_idx)
+            mnt = np.delete(mnt, ref_idx, axis=0)
+            chans = bbcpy.datatypes.eeg.Chans(clab, mnt)
+
+        else:
+            logging.warning(f"Reference channel {reference_channel} not found in the data")
+            chans = bbcpy.datatypes.eeg.Chans(clab, mnt)
+
+        return chans
 
     def load_forced_valid_trials_data(self, session_name, sessions_group_path):
 
         session_path = sessions_group_path[session_name]
         self.subject_info_dict["noisy_chans"] = {}
-        srm_data, timepoints, srm_fs, clab, mnt, trial_info, subject_info = \
-            self.load_session_raw_data(session_path)
 
+        srm_data, timepoints, srm_fs, clab, mnt, trial_info, subject_info = \
+            bbcpy.load.srm_eeg.load_single_mat_session(file_path=session_path)
 
         # save subject info
         self.subject_info_dict["subject_info"] = subject_info
 
-        # init channels object
-        chans = bbcpy.datatypes.eeg.Chans(clab, mnt)
+        # create channels object
+        chans = self.set_eeg_channels(clab, mnt)
 
         # true labels
         target_map_dict = {1: "R", 2: "L", 3: "U", 4: "D"}
@@ -238,7 +259,7 @@ class SMR_Data():
                                                          chans=chans)
 
         # remove noisy channels
-        # if noisy channels are present, remove them from clab
+        # if noisy channels are present, remove them from the data
         if len(subject_info["noisechan"]) > 0:
             noisy_chans_id_list = [int(chan) for chan in subject_info["noisechan"]]
             noisy_chans_name = [clab[chan] for chan in noisy_chans_id_list]
@@ -256,53 +277,6 @@ class SMR_Data():
             f"{session_name} loaded;  valid trails shape: {valid_trials.shape},"
             f" forced trials shape: {forced_trials.shape}")
         return valid_trials, forced_trials
-
-    def load_valid_trials_data(self, session_name, sessions_group_path):
-        """ Create a session object from the SRM data sessions """
-
-        session_path = sessions_group_path[session_name]
-
-        srm_data, timepoints, srm_fs, clab, mnt, trial_info, subject_info = \
-            self.load_session_raw_data(session_path)
-
-        # init channels object
-        chans = bbcpy.datatypes.eeg.Chans(clab, mnt)
-
-        # true labels
-        target_map_dict = {1: "R", 2: "L", 3: "U", 4: "D"}
-        mrk_class = np.array(trial_info["targetnumber"])
-        mrk_class = mrk_class.astype(int) - 1  # to start from 0
-
-        # Split data into train and test , where test contained forced trails
-        trialresult = trial_info["result"]
-        valid_trials_idx = np.where(trialresult)[0]
-
-        # select all valid trials to train
-        valid_data = srm_data[valid_trials_idx]
-        valid_mrk_class = mrk_class[valid_trials_idx]
-        valid_timepoints = timepoints[valid_trials_idx]
-        class_names = np.array(["R", "L", "U", "D"])
-
-        valid_mrk = bbcpy.datatypes.eeg.Marker(mrk_pos=valid_trials_idx,
-                                               mrk_class=valid_mrk_class,
-                                               mrk_class_name=class_names,
-                                               mrk_fs=1,
-                                               parent_fs=srm_fs)
-
-        # create SRM_Data object for the session
-        obj = bbcpy.datatypes.srm_eeg.SRM_Data(srm_data=valid_data,
-                                               timepoints=valid_timepoints.reshape(-1, 1),
-                                               fs=srm_fs,
-                                               mrk=valid_mrk,
-                                               chans=chans)
-
-        logging.info(f"Data original shape: {obj.shape}")
-        # preprocess the data
-        logging.info(f"Preprocessing data..")
-        obj = self.preprocess_data(obj)
-        logging.info(f"{session_name} loaded; has the shape: {obj.shape}")
-
-        return obj
 
     def load_subject_sessions(self, subject_name, subject_dict, distributed_mode=False):
 
@@ -364,7 +338,6 @@ class SMR_Data():
                     logging.info(f"Session {session_name} not loaded")
                     logging.warning(f"Exception occurred: {e}")
                     continue
-
 
         else:
 
