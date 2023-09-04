@@ -1,28 +1,21 @@
 _target_: src.data.smr_datamodule.SMR_Data
 data_dir: ${paths.data_dir}
-
-ival: 2s:8s:1ms
-
+task_name: "LR"
+ival: "all"
 bands:
   - 8
   - 13
-
 chans: [ "*" ]
-
 classes:
   - "R"
   - "L"
   - "U"
   - "D"
+threshold_distance: 0.05
+fallback_neighbors: 4
 
-train_subjects_sessions_dict:
-  S9:
-    - 2
-test_subjects_sessions_dict:
-  S2:
-    - 1
-concatenate_subjects: True
-
-loading_data_mode : within_subject
-
+subject_sessions_dict:
+  S1: "all"
+loading_data_mode: within_subject
 train_val_split: [ 0.8, 0.2 ]
+concatenate_subjects: True

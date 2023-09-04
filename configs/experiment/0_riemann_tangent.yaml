@@ -6,7 +6,6 @@
 defaults:
   - override /data: srm_eeg.yaml
   - override /model: riemann_tangent_clf.yaml
-  - override /callbacks: default.yaml
   - override /trainer: sklearn.yaml
   - override /logger: mlflow.yaml
   - override /paths: default.yaml
@@ -19,7 +18,7 @@ tags: [ "baseline" , "alpha_band" , "Within-Subject" , "RL"]
 seed: 12345
 
 data:
-  ival: 2s:11s:1ms
+  ival: 1s:10s:1ms
   bands:
     - 8
     - 13
@@ -27,17 +26,6 @@ data:
   classes:
     - "R"
     - "L"
-  train_subjects_sessions_dict:
-    S9:
-      - 1
-      - 2
-      - 3
-      - 4
-      - 6
-      - 7
-      - 9
-      - 10
-      - 11
   loading_data_mode: "within_subject"
 
 paths:
@@ -50,5 +38,5 @@ paths:
 logger:
   mlflow:
     tags: ${tags}
-    experiment_name: A-RL-S9-all
+    experiment_name: A-RL-S1-all
     run_name: riemann_tangent

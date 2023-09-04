@@ -32,8 +32,8 @@ class SMR_Data():
 
     def __init__(self,
                  data_dir,
-                 train_subjects_sessions_dict,
-                 test_subjects_sessions_dict,
+                 task_name,
+                 subject_sessions_dict,
                  concatenate_subjects,
                  loading_data_mode,
                  train_val_split,
@@ -41,6 +41,8 @@ class SMR_Data():
                  bands,
                  chans,
                  classes,
+                 threshold_distance,
+                 fallback_neighbors
                  ):
 
         """ Initialize the SMR datamodule
@@ -61,9 +63,10 @@ class SMR_Data():
         # FIXME : parameter are in type  omegaconf
 
         self.srm_data_path = data_dir
-        self.train_subjects_sessions_dict = train_subjects_sessions_dict
-        self.test_subjects_sessions_dict = test_subjects_sessions_dict
+        self.task_name = task_name
+        self.subject_sessions_dict = subject_sessions_dict
         self.loaded_subjects_sessions = {}
+        self.founded_subjects_sessions = {}
 
         self.concatenate_subjects = concatenate_subjects
         self.loading_data_mode = loading_data_mode
@@ -73,6 +76,12 @@ class SMR_Data():
         self.select_chans = OmegaConf.to_container(chans)
         self.select_timepoints = ival
         self.bands = OmegaConf.to_container(bands)
+
+        self.threshold_distance = threshold_distance
+        self.fallback_neighbors = fallback_neighbors
+
+        self.subject_info_dict = {"noisechan": {}, "pvc": {self.task_name: {}}}
+        self.subject_pvcs = []
 
     @property
     def num_classes(self):
@@ -87,30 +96,32 @@ class SMR_Data():
         subjects_sessions_path_dict = {}
         for subject_name, sessions_ids in subjects_dict.items():
             logging.info(f"Collecting subject {subject_name} sessions from:  {self.srm_data_path}")
+
             sessions_group_path = bbcpy.load.srm_eeg.list_all_files(self.srm_data_path,
                                                                     pattern=f"{subject_name}_*.mat")[subject_name]
 
-            logging.info(f"Found sessions: {list(sessions_group_path.keys())}")
+            self.founded_subjects_sessions[subject_name] = list(sessions_group_path.keys())
 
-            if isinstance(sessions_ids, int):
-                sessions_names = ["Session_" + str(sessions_ids)]
+            if sessions_ids == "all":
+                # select all sessions
+                logging.info(f"Found sessions: {list(sessions_group_path.keys())}")
+
+                subjects_sessions_path_dict[subject_name] = sessions_group_path
             else:
-                sessions_names = ["Session_" + str(session_id) for session_id in sessions_ids]
-
-            subjects_sessions_path_dict[subject_name] = {}
-            for session_name in sessions_names:
-                if session_name not in sessions_group_path.keys():
-                    raise Exception(f" {session_name} not found for subject {subject_name}")
+                # select specific sessions
+                if isinstance(sessions_ids, int):
+                    sessions_names = ["Session_" + str(sessions_ids)]
                 else:
-                    subjects_sessions_path_dict[subject_name][session_name] = sessions_group_path[session_name]
+                    sessions_names = ["Session_" + str(session_id) for session_id in sessions_ids]
+
+                subjects_sessions_path_dict[subject_name] = {}
+                for session_name in sessions_names:
+                    if session_name not in sessions_group_path.keys():
+                        raise Exception(f" {session_name} not found for subject {subject_name}")
+                    else:
+                        subjects_sessions_path_dict[subject_name][session_name] = sessions_group_path[session_name]
 
         return subjects_sessions_path_dict
-
-    def load_session_raw_data(self, session_path):
-        """ Load session raw data  """
-        srm_data, timepoints, srm_fs, clab, mnt, trial_info, subject_info = \
-            bbcpy.load.srm_eeg.load_single_mat_session(file_path=session_path)
-        return srm_data, timepoints, srm_fs, clab, mnt, trial_info, subject_info
 
     def preprocess_data(self, srm_obj):
         """ Reshape the SRM data object to the desired shape """
@@ -130,119 +141,161 @@ class SMR_Data():
 
         return obj
 
-    def load_forced_valid_trials_data(self, session_name, sessions_group_path):
+    def interpolate_noisy_channels(self, srm_obj, noisy_chans_idx, session_name):
+        """ Interpolate noisy channels of 62-channel EEG cap (10-10 system), take the average of the neighboring channels
 
+        Parameters
+        ----------
+        srm_obj: bbcpy.datatypes.srm_eeg.SRM_Data
+            SRM data object
+        noisy_chans_idx: int
+            Index of the noisy channel
+
+        Returns
+        -------
+        srm_obj: bbcpy.datatypes.srm_eeg.SRM_Data
+            SRM data object with interpolated noisy channel
+
+
+        """
+
+        # Calculate distances from the noisy channel to all other channels
+        distances = np.linalg.norm(srm_obj.chans.mnt - srm_obj.chans.mnt[noisy_chans_idx], axis=1)
+
+        # Identify neighboring channels
+        neighbors = np.where(distances < self.threshold_distance)[0]
+
+        # If no neighbors found within threshold, take the closest fallback_neighbors channels
+        neighbors = np.argsort(distances)[1:self.fallback_neighbors + 1]  # Excluding the channel itself
+
+        noise_chans_name = str(srm_obj.chans[noisy_chans_idx])
+        self.subject_info_dict["noisechan"][session_name][noise_chans_name] = {"neighbors": srm_obj.chans[neighbors]}
+
+        # Calculate the average signal of neighboring channels
+        average_signal = np.mean(srm_obj[:, neighbors, :], axis=1)
+
+        # Replace the noisy channel's signal with the average signal
+        srm_obj[:, noisy_chans_idx, :] = np.expand_dims(average_signal, axis=1)
+
+        return srm_obj
+
+    def set_eeg_channels(self, clab, mnt, reference_channel="REF."):
+        """ Set the EEG channels object, and remove the reference channel if exists
+
+        Parameters
+        ----------
+        clab: numpy array
+            List of channels names
+        mnt: numpy array
+            List of channels positions
+        reference_channel: str
+            Name of the reference channel
+
+        Returns
+        -------
+        chans: bbcpy.datatypes.eeg.Chans
+
+        """
+
+        if reference_channel in clab:
+
+            ref_idx = np.where(clab == "REF.")[0][0]
+            clab = np.delete(clab, ref_idx)
+            mnt = np.delete(mnt, ref_idx, axis=0)
+            chans = bbcpy.datatypes.eeg.Chans(clab, mnt)
+
+        else:
+            logging.warning(f"Reference channel {reference_channel} not found in the data")
+            chans = bbcpy.datatypes.eeg.Chans(clab, mnt)
+
+        return chans
+
+    def load_forced_valid_trials_data(self, session_name, sessions_group_path):
         session_path = sessions_group_path[session_name]
 
         srm_data, timepoints, srm_fs, clab, mnt, trial_info, subject_info = \
-            self.load_session_raw_data(session_path)
+            bbcpy.load.srm_eeg.load_single_mat_session(file_path=session_path)
 
-        # init channels object
-        chans = bbcpy.datatypes.eeg.Chans(clab, mnt)
+        # save subject info
+        self.subject_info_dict["subject_info"] = subject_info
+        self.subject_info_dict["noisechan"][session_name] = {}
+
+        # save pvc
+
+        sessions_pvc = self.calculate_pvc_metrics(trial_info, taskname=self.task_name)
+        self.subject_pvcs.append(sessions_pvc)
+
+        self.subject_info_dict["pvc"][self.task_name][session_name] = sessions_pvc
+
+        # create channels object
+        chans = self.set_eeg_channels(clab, mnt)
 
         # true labels
         target_map_dict = {1: "R", 2: "L", 3: "U", 4: "D"}
         mrk_class = np.array(trial_info["targetnumber"])
         mrk_class = mrk_class.astype(int) - 1  # to start from 0
 
-        # Split data into train and test , where test contained forced trails
-        trialresult = trial_info["result"]
-        valid_trials_idx = np.where(trialresult == np.bool_(True))[0]
-
-        # select all valid trials to train
-        valid_data = srm_data[valid_trials_idx]
-        valid_mrk_class = mrk_class[valid_trials_idx]
-        valid_timepoints = timepoints[valid_trials_idx]
         class_names = np.array(["R", "L", "U", "D"])
 
-        valid_mrk = bbcpy.datatypes.eeg.Marker(mrk_pos=valid_trials_idx,
-                                               mrk_class=valid_mrk_class,
-                                               mrk_class_name=class_names,
-                                               mrk_fs=1,
-                                               parent_fs=srm_fs)
+        # all trials
+        # FIXME : not sure what to pass for mrk_pos
+        # mrk pos here is the results of all trials
+        trialresult = trial_info["result"]
+        mrk = bbcpy.datatypes.eeg.Marker(mrk_pos=trialresult,
+                                         mrk_class=mrk_class,
+                                         mrk_class_name=class_names,
+                                         mrk_fs=1,
+                                         parent_fs=srm_fs)
 
         # create SRM_Data object for the session
-        valid_trials = bbcpy.datatypes.srm_eeg.SRM_Data(srm_data=valid_data,
-                                                        timepoints=valid_timepoints.reshape(-1, 1),
-                                                        fs=srm_fs,
-                                                        mrk=valid_mrk,
-                                                        chans=chans)
+        epo_data = bbcpy.datatypes.srm_eeg.SRM_Data(srm_data=srm_data,
+                                                    timepoints=timepoints.reshape(-1, 1),
+                                                    fs=srm_fs,
+                                                    mrk=mrk,
+                                                    chans=chans)
 
-        valid_trials = self.preprocess_data(valid_trials)
+        # remove noisy channels
+        # if noisy channels are present, remove them from the data
+        if subject_info["noisechan"] is not None:
+            noisy_chans_id_list = [int(chan) for chan in subject_info["noisechan"]]
+            for noisy_chans_id in noisy_chans_id_list:
+                epo_data = self.interpolate_noisy_channels(epo_data, noisy_chans_id, session_name)
 
-        # select all forced trials to test
+        # valid trials are defined as the trials where labeles are correct (true) in trialresult
+
+        valid_trials_idx = np.where(epo_data.mrk == np.bool_(True))[0]
+        valid_trials = epo_data[valid_trials_idx]
+
+        # forced trials are defined as the trials where labeles are correct (true) in forcedresult
+        # and not in valid trials
         forced_trials = trial_info["forcedresult"]
         forced_trials_idx = np.setdiff1d(np.where(forced_trials == np.bool_(True))[0], valid_trials_idx)
-        forced_data = srm_data[forced_trials_idx]
-        forced_mrk_class = mrk_class[forced_trials_idx]
-        forced_timepoints = timepoints[forced_trials_idx]
-        forced_mrk = bbcpy.datatypes.eeg.Marker(mrk_pos=forced_trials_idx,
-                                                mrk_class=forced_mrk_class,
-                                                mrk_class_name=class_names,
-                                                mrk_fs=1,
-                                                parent_fs=srm_fs)
-        # # create SRM_Data object for the session
-        forced_trials = bbcpy.datatypes.srm_eeg.SRM_Data(srm_data=forced_data,
-                                                         timepoints=forced_timepoints.reshape(-1, 1),
-                                                         fs=srm_fs,
-                                                         mrk=forced_mrk,
-                                                         chans=chans)
+        forced_trials = epo_data[forced_trials_idx]
 
-
-
+        # preprocess the data
+        valid_trials = self.preprocess_data(valid_trials)
         forced_trials = self.preprocess_data(forced_trials)
 
-        logging.info(
-            f"{session_name} loaded;  valid trails shape: {valid_trials.shape},"
-            f" forced trials shape: {forced_trials.shape}")
+        logging.info(f"{session_name} loaded;"
+                     f" valid trails shape: {valid_trials.shape},"
+                     f" forced trials shape: {forced_trials.shape}")
         return valid_trials, forced_trials
 
-    def load_valid_trials_data(self, session_name, sessions_group_path):
-        """ Create a session object from the SRM data sessions """
+    def calculate_pvc_metrics(self, trial_info, taskname="LR"):
+        """PVC is metric introduced in the dataset paper and it descibes the percentage of valid correct trials
+        formula: PVC = hits / (hits + misses)
+        """
+        task_num_dict = {"LR": 1.0, "UD": 2.0, "2D": 3.0}
+        task_filter_idx = np.where(np.array(trial_info["tasknumber"]) == task_num_dict[taskname])[0]
 
-        session_path = sessions_group_path[session_name]
+        # get hits and misses TODO forcedresult
+        trials_results = np.array(trial_info["forcedresult"])[task_filter_idx]
+        res_dict = {"hits": np.sum(trials_results == True), "misses": np.sum(trials_results == False)}
 
-        srm_data, timepoints, srm_fs, clab, mnt, trial_info, subject_info = \
-            self.load_session_raw_data(session_path)
+        # calculate pvc
+        pvc = res_dict["hits"] / (res_dict["hits"] + res_dict["misses"])
 
-        # init channels object
-        chans = bbcpy.datatypes.eeg.Chans(clab, mnt)
-
-        # true labels
-        target_map_dict = {1: "R", 2: "L", 3: "U", 4: "D"}
-        mrk_class = np.array(trial_info["targetnumber"])
-        mrk_class = mrk_class.astype(int) - 1  # to start from 0
-
-        # Split data into train and test , where test contained forced trails
-        trialresult = trial_info["result"]
-        valid_trials_idx = np.where(trialresult)[0]
-
-        # select all valid trials to train
-        valid_data = srm_data[valid_trials_idx]
-        valid_mrk_class = mrk_class[valid_trials_idx]
-        valid_timepoints = timepoints[valid_trials_idx]
-        class_names = np.array(["R", "L", "U", "D"])
-
-        valid_mrk = bbcpy.datatypes.eeg.Marker(mrk_pos=valid_trials_idx,
-                                               mrk_class=valid_mrk_class,
-                                               mrk_class_name=class_names,
-                                               mrk_fs=1,
-                                               parent_fs=srm_fs)
-
-        # create SRM_Data object for the session
-        obj = bbcpy.datatypes.srm_eeg.SRM_Data(srm_data=valid_data,
-                                               timepoints=valid_timepoints.reshape(-1, 1),
-                                               fs=srm_fs,
-                                               mrk=valid_mrk,
-                                               chans=chans)
-
-        logging.info(f"Data original shape: {obj.shape}")
-        # preprocess the data
-        logging.info(f"Preprocessing data..")
-        obj = self.preprocess_data(obj)
-        logging.info(f"{session_name} loaded; has the shape: {obj.shape}")
-
-        return obj
+        return pvc
 
     def load_subject_sessions(self, subject_name, subject_dict, distributed_mode=False):
 
@@ -250,7 +303,7 @@ class SMR_Data():
         # FIXME : not completed
 
         sessions_path_dict = self.collect_subject_sessions(subject_dict)
-        self.loaded_subjects_sessions[subject_name] = []
+        self.loaded_subjects_sessions[subject_name] = {}
 
         # sessions_list = sessions_path_dict[subject_name]
         sessions_list = list(sessions_path_dict[subject_name].keys())
@@ -260,12 +313,13 @@ class SMR_Data():
         if len(sessions_list) > 1:
             init_session_name = sessions_list[0]
 
+            # load the first session to init the object
             valid_obj_new, forced_obj_new = self.load_forced_valid_trials_data(session_name=init_session_name,
                                                                                sessions_group_path=sessions_path_dict[
                                                                                    subject_name])
 
             logging.info(f"Loading {init_session_name} finalized (1 from {str(len(sessions_list))})")
-            self.loaded_subjects_sessions[subject_name].append(init_session_name)
+            self.loaded_subjects_sessions[subject_name][init_session_name] = [valid_obj_new.shape, forced_obj_new.shape]
 
             for i, session_name in enumerate(sessions_list[1:]):
                 logging.info(
@@ -276,24 +330,43 @@ class SMR_Data():
                                                                                sessions_group_path=sessions_path_dict[
                                                                                    subject_name])
 
+                    # check if the valid data has the same datapoints
+                    if valid_obj.shape[2] != valid_obj_new.shape[2]:
+                        # reshape the data
+                        valid_obj_len = valid_obj_new.shape[2]
+                        valid_obj = valid_obj[:, :, :valid_obj_len]
                     valid_obj_new = valid_obj_new.append(valid_obj, axis=0)
+
+                    # check if the forced data has the same datapoints
+                    if forced_obj.shape[2] != forced_obj_new.shape[2]:
+                        # reshape the data
+                        forced_obj_len = forced_obj_new.shape[2]
+                        forced_obj = forced_obj[:, :, :forced_obj_len]
+
+                    # check if the forced data exists
+                    if forced_obj.shape[0] == 0:
+                        logging.info(f"Session {session_name} has no forced trials")
+                        continue
+
                     forced_obj_new = forced_obj_new.append(forced_obj, axis=0)
 
                     # append successfully loaded session
-                    self.loaded_subjects_sessions[subject_name].append(session_name)
+                    self.loaded_subjects_sessions[subject_name][session_name] = [valid_obj.shape, forced_obj.shape]
 
                 except Exception as e:
                     logging.info(f"Session {session_name} not loaded")
                     logging.warning(f"Exception occurred: {e}")
                     continue
 
-
         else:
 
             init_session_name = sessions_list[0]
+
             valid_obj_new, forced_obj_new = self.load_forced_valid_trials_data(session_name=init_session_name,
                                                                                sessions_group_path=sessions_path_dict[
                                                                                    subject_name])
+
+            self.loaded_subjects_sessions[subject_name][init_session_name] = [valid_obj_new.shape, forced_obj_new.shape]
             logging.info(f"Loading sessions: {init_session_name} finalized (1 from 1)")
 
         return valid_obj_new, forced_obj_new
@@ -353,18 +426,23 @@ class SMR_Data():
         """ Prepare the data for the classification """
 
         if self.loading_data_mode == "within_subject":
-            subject_name = list(self.train_subjects_sessions_dict.keys())[0]
+            subject_name = list(self.subject_sessions_dict.keys())[0]
             valid_trial_trainset, forced_trial_testset = self.load_subject_sessions(subject_name=subject_name,
-                                                                                    subject_dict=self.train_subjects_sessions_dict)
+                                                                                    subject_dict=self.subject_sessions_dict)
+
+            # calculate subject pvc
+            pvc_mean = np.mean(self.subject_pvcs)
+            self.subject_info_dict["pvc"][self.task_name]["mean"] = pvc_mean
+
 
         elif self.loading_data_mode == "within_subject_all":
-            valid_trial_trainset, forced_trial_testset = self.load_subjects(self.train_subjects_sessions_dict,
+            valid_trial_trainset, forced_trial_testset = self.load_subjects(self.subject_sessions_dict,
                                                                             self.concatenate_subjects)
 
             valid_trial_trainset = valid_trial_trainset.append(forced_trial_testset, axis=0)
 
         elif self.loading_data_mode == "cross_subject":
-            valid_trial_trainset, forced_trial_testset = self.load_subjects(self.train_subjects_sessions_dict,
+            valid_trial_trainset, forced_trial_testset = self.load_subjects(self.subject_sessions_dict,
                                                                             self.concatenate_subjects)
 
         else:
