@@ -13,9 +13,6 @@ classes:
   - "D"
 threshold_distance: 0.05
 fallback_neighbors: 4
-
-subject_sessions_dict:
-  S1: "all"
 loading_data_mode: within_subject
 train_val_split: [ 0.8, 0.2 ]
 concatenate_subjects: True
