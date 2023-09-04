@@ -1,6 +1,6 @@
 _target_: src.data.smr_datamodule.SMR_Data
 data_dir: ${paths.data_dir}
-
+task_name: "LR"
 ival: "all"
 bands:
   - 8

@@ -335,6 +335,7 @@ class SklearnTrainer(object):
                 hparams["loaded_sessions"] = self.datamodule.loaded_subjects_sessions
                 hparams["subject_info_dict"] = self.datamodule.subject_info_dict["subject_info"]
                 hparams["noisechan"] = self.datamodule.subject_info_dict["noisechan"]
+                hparams["subject_pvc"] = self.datamodule.subject_info_dict["pvc"]
 
                 # Use a temporary directory to save
                 with tempfile.TemporaryDirectory() as tmpdirname:

@@ -32,6 +32,7 @@ class SMR_Data():
 
     def __init__(self,
                  data_dir,
+                 task_name,
                  subject_sessions_dict,
                  concatenate_subjects,
                  loading_data_mode,
@@ -62,6 +63,7 @@ class SMR_Data():
         # FIXME : parameter are in type  omegaconf
 
         self.srm_data_path = data_dir
+        self.task_name = task_name
         self.subject_sessions_dict = subject_sessions_dict
         self.loaded_subjects_sessions = {}
         self.founded_subjects_sessions = {}
@@ -78,11 +80,17 @@ class SMR_Data():
         self.threshold_distance = threshold_distance
         self.fallback_neighbors = fallback_neighbors
 
-        self.subject_info_dict = {"noisechan": {}}
+        self.subject_info_dict = {"noisechan": {}, "pvc": {}}
 
     @property
     def num_classes(self):
         return len(self.classes)
+
+    @property
+    def task_name(self):
+        return self.task_name
+
+
 
     def collect_subject_sessions(self, subjects_dict):
         """ Collect all the sessions for the subjects in the list """
@@ -139,7 +147,7 @@ class SMR_Data():
         return obj
 
     def interpolate_noisy_channels(self, srm_obj, noisy_chans_idx, session_name):
-        """ Interpolate noisy channels of 62-channel EEG cap (10-10 system)
+        """ Interpolate noisy channels of 62-channel EEG cap (10-10 system), take the average of the neighboring channels
 
         Parameters
         ----------
@@ -163,13 +171,7 @@ class SMR_Data():
         neighbors = np.where(distances < self.threshold_distance)[0]
 
         # If no neighbors found within threshold, take the closest fallback_neighbors channels
-        if len(neighbors) == 0 or (len(neighbors) == 1 and noisy_chans_idx in neighbors):
-            neighbors = np.argsort(distances)[1:self.fallback_neighbors + 1]  # Excluding the channel itself
-
-        # Exclude the noisy channel itself from the neighbors
-        neighbors = neighbors[neighbors != noisy_chans_idx]
-
-        # add neighbors to the subject info
+        neighbors = np.argsort(distances)[1:self.fallback_neighbors + 1]  # Excluding the channel itself
 
         noise_chans_name = str(srm_obj.chans[noisy_chans_idx])
         self.subject_info_dict["noisechan"][session_name][noise_chans_name] = {"neighbors": srm_obj.chans[neighbors]}
@@ -222,6 +224,8 @@ class SMR_Data():
         # save subject info
         self.subject_info_dict["subject_info"] = subject_info
         self.subject_info_dict["noisechan"][session_name] = {}
+        self.subject_info_dict["pvc"][session_name] = {
+            self.task_name: self.calculate_pvc_metrics(trial_info, taskname=self.task_name)}
 
         # create channels object
         chans = self.set_eeg_channels(clab, mnt)
@@ -277,88 +281,21 @@ class SMR_Data():
                      f" forced trials shape: {forced_trials.shape}")
         return valid_trials, forced_trials
 
-    # def load_forced_valid_trials_data(self, session_name, sessions_group_path):
-    #     """ Load the forced and valid trials data for a single session """
-    #
-    #     session_path = sessions_group_path[session_name]
-    #
-    #     srm_data, timepoints, srm_fs, clab, mnt, trial_info, subject_info = \
-    #         bbcpy.load.srm_eeg.load_single_mat_session(file_path=session_path)
-    #
-    #     # save subject info
-    #     self.subject_info_dict["subject_info"] = subject_info
-    #
-    #     # create channels object
-    #     chans = self.set_eeg_channels(clab, mnt)
-    #
-    #     # true labels
-    #     target_map_dict = {1: "R", 2: "L", 3: "U", 4: "D"}
-    #     mrk_class = np.array(trial_info["targetnumber"])
-    #     mrk_class = mrk_class.astype(int) - 1  # to start from 0
-    #
-    #     # Split data into train and test , where test contained forced trails
-    #     trialresult = trial_info["result"]
-    #     valid_trials_idx = np.where(trialresult == np.bool_(True))[0]
-    #
-    #     # select all valid trials to train
-    #     valid_data = srm_data[valid_trials_idx]
-    #     valid_mrk_class = mrk_class[valid_trials_idx]
-    #     valid_timepoints = timepoints[valid_trials_idx]
-    #     class_names = np.array(["R", "L", "U", "D"])
-    #
-    #     valid_mrk = bbcpy.datatypes.eeg.Marker(mrk_pos=valid_trials_idx,
-    #                                            mrk_class=valid_mrk_class,
-    #                                            mrk_class_name=class_names,
-    #                                            mrk_fs=1,
-    #                                            parent_fs=srm_fs)
-    #
-    #     # create SRM_Data object for the session
-    #     valid_trials = bbcpy.datatypes.srm_eeg.SRM_Data(srm_data=valid_data,
-    #                                                     timepoints=valid_timepoints.reshape(-1, 1),
-    #                                                     fs=srm_fs,
-    #                                                     mrk=valid_mrk,
-    #                                                     chans=chans)
-    #
-    #     # select all forced trials to test
-    #     forced_trials = trial_info["forcedresult"]
-    #     forced_trials_idx = np.setdiff1d(np.where(forced_trials == np.bool_(True))[0], valid_trials_idx)
-    #
-    #     # if len(forced_trials_idx) == 0:
-    #     #     raise Exception(f"No forced trials found for session {session_name}")
-    #
-    #     forced_data = srm_data[forced_trials_idx]
-    #     forced_mrk_class = mrk_class[forced_trials_idx]
-    #     forced_timepoints = timepoints[forced_trials_idx]
-    #     forced_mrk = bbcpy.datatypes.eeg.Marker(mrk_pos=forced_trials_idx,
-    #                                             mrk_class=forced_mrk_class,
-    #                                             mrk_class_name=class_names,
-    #                                             mrk_fs=1,
-    #                                             parent_fs=srm_fs)
-    #     # # create SRM_Data object for the session
-    #     forced_trials = bbcpy.datatypes.srm_eeg.SRM_Data(srm_data=forced_data,
-    #                                                      timepoints=forced_timepoints.reshape(-1, 1),
-    #                                                      fs=srm_fs,
-    #                                                      mrk=forced_mrk,
-    #                                                      chans=chans)
-    #
-    #     # remove noisy channels
-    #     # if noisy channels are present, remove them from the data
-    #     if subject_info["noisechan"] is not None:
-    #         noisy_chans_id_list = [int(chan) for chan in subject_info["noisechan"]]
-    #         noisy_chans_name = [clab[chan] for chan in noisy_chans_id_list]
-    #         self.subject_info_dict["noisechan"][session_name] = {"channel_name": noisy_chans_name}
-    #         for noisy_chans_id in noisy_chans_id_list:
-    #             valid_trials = self.interpolate_noisy_channels(valid_trials, noisy_chans_id, session_name)
-    #             forced_trials = self.interpolate_noisy_channels(forced_trials, noisy_chans_id, session_name)
-    #
-    #     # preprocess the data
-    #     valid_trials = self.preprocess_data(valid_trials)
-    #     forced_trials = self.preprocess_data(forced_trials)
-    #
-    #     logging.info(f"{session_name} loaded;"
-    #                  f" valid trails shape: {valid_trials.shape},"
-    #                  f" forced trials shape: {forced_trials.shape}")
-    #     return valid_trials, forced_trials
+    def calculate_pvc_metrics(self, trial_info, taskname="LR"):
+        """PVC is metric introduced in the dataset paper and it descibes the percentage of valid correct trials
+        formula: PVC = hits / (hits + misses)
+        """
+        task_num_dict = {"LR": 1.0, "UD": 2.0, "2D": 3.0}
+        task_filter_idx = np.where(np.array(trial_info["tasknumber"]) == task_num_dict[taskname])[0]
+
+        # get hits and misses TODO forcedresult
+        trials_results = np.array(trial_info["forcedresult"])[task_filter_idx]
+        res_dict = {"hits": np.sum(trials_results == True), "misses": np.sum(trials_results == False)}
+
+        # calculate pvc
+        pvc = res_dict["hits"] / (res_dict["hits"] + res_dict["misses"])
+
+        return pvc
 
     def load_subject_sessions(self, subject_name, subject_dict, distributed_mode=False):
 
