@@ -25,7 +25,8 @@ defaults:
 
 paths:
   root_dir: ${oc.env:PROJECT_ROOT}
-  data_dir: ${paths.root_dir}\data\SMR\raw\
+#  data_dir: ${paths.root_dir}\data\SMR\raw\
+  data_dir: D:\SMR\
   log_dir: ${oc.env:PROJECT_ROOT}\logs
   output_dir: ${hydra:runtime.output_dir}
   work_dir: ${hydra:runtime.cwd}
@@ -43,7 +44,7 @@ logger:
     tracking_uri: ${paths.log_dir}\mlflow\mlruns
 
 data:
-  ival: 2s:10s:1ms
+  ival: 2s:10s:10ms
   chans: [ "*" ]
   classes:
     - "R"
@@ -51,7 +52,7 @@ data:
 #  bands: [ [ 8, 13 ], [ 21, 26 ], [ 31.5, 39 ] ]
   bands: [ 8, 13 ]
   subject_sessions_dict:
-    S3: "all"
+    S1: "all"
   loading_data_mode: "within_subject"
 
 extras:
