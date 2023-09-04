@@ -80,17 +80,12 @@ class SMR_Data():
         self.threshold_distance = threshold_distance
         self.fallback_neighbors = fallback_neighbors
 
-        self.subject_info_dict = {"noisechan": {}, "pvc": {}}
+        self.subject_info_dict = {"noisechan": {}, "pvc": {self.task_name: {}}}
+        self.subject_pvcs = []
 
     @property
     def num_classes(self):
         return len(self.classes)
-
-    @property
-    def task_name(self):
-        return self.task_name
-
-
 
     def collect_subject_sessions(self, subjects_dict):
         """ Collect all the sessions for the subjects in the list """
@@ -224,8 +219,13 @@ class SMR_Data():
         # save subject info
         self.subject_info_dict["subject_info"] = subject_info
         self.subject_info_dict["noisechan"][session_name] = {}
-        self.subject_info_dict["pvc"][session_name] = {
-            self.task_name: self.calculate_pvc_metrics(trial_info, taskname=self.task_name)}
+
+        # save pvc
+
+        sessions_pvc = self.calculate_pvc_metrics(trial_info, taskname=self.task_name)
+        self.subject_pvcs.append(sessions_pvc)
+
+        self.subject_info_dict["pvc"][self.task_name][session_name] = sessions_pvc
 
         # create channels object
         chans = self.set_eeg_channels(clab, mnt)
@@ -429,6 +429,11 @@ class SMR_Data():
             subject_name = list(self.subject_sessions_dict.keys())[0]
             valid_trial_trainset, forced_trial_testset = self.load_subject_sessions(subject_name=subject_name,
                                                                                     subject_dict=self.subject_sessions_dict)
+
+            # calculate subject pvc
+            pvc_mean = np.mean(self.subject_pvcs)
+            self.subject_info_dict["pvc"][self.task_name]["mean"] = pvc_mean
+
 
         elif self.loading_data_mode == "within_subject_all":
             valid_trial_trainset, forced_trial_testset = self.load_subjects(self.subject_sessions_dict,
