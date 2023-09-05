@@ -1,19 +1,17 @@
 import logging
-from typing import Any, Dict, Optional
 
 import torch
-from lightning import LightningDataModule
 from sklearn.preprocessing import OneHotEncoder
-from src.data.smr_datamodule import SMR_Data
 from torch.utils.data import DataLoader
 from torch.utils.data import Dataset
 
 logging.getLogger().setLevel(logging.INFO)
 
-from pytorch_lightning.data import DataLoader, Dataset
-from pytorch_lightning.models import Model
-from pytorch_lightning.trainer import Trainer
-from pytorch_lightning.utilities import select_device
+
+# from pytorch_lightning.data import DataLoader, Dataset
+# from pytorch_lightning.models import Model
+# from pytorch_lightning.trainer import Trainer
+# from pytorch_lightning.utilities import select_device
 
 class CustomDataset(Dataset):
     def __init__(self, data, label):
@@ -28,10 +26,13 @@ class CustomDataset(Dataset):
     def __len__(self):
         return len(self.data)
 
+
 class MultiGPUDataLoader(DataLoader):
     def __init__(self, dataset, batch_size, num_workers, pin_memory=True):
         super(MultiGPUDataLoader, self).__init__(dataset, batch_size, num_workers)
         self.pin_memory = pin_memory
+
+
 class SRMDataset(Dataset):
     def __init__(self, data):
         # Perform one-hot encoding on labels

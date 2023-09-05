@@ -1,19 +1,18 @@
-_target_: src.data.srm_datamodule_lg.SRM_DataModule
+_target_: src.data.smr_dataloader.SRM_DataModule
 data_dir: ${paths.data_dir}
-ival: 2s:8s:10ms
+task_name: "LR"
+ival: "all"
 bands:
   - 8
   - 13
-chans: ['C?,~*3,~*4', 'FC*,~*3,~*4']
+chans: [ "*" ]
 classes:
   - "R"
   - "L"
+  - "U"
+  - "D"
 train_subjects_sessions_dict:
-  S1:
-    - 1
-vali_subjects_sessions_dict:
-  S1:
-    - 2
+  S2: "all"
 test_subjects_sessions_dict:
   S3:
     - 6
@@ -22,5 +21,10 @@ batch_size: 32
 train_val_split:
   - 0.7
   - 0.3
+
+threshold_distance: 0.05
+fallback_neighbors: 4
+loading_data_mode: within_subject
+
 num_workers: 0
 pin_memory: False

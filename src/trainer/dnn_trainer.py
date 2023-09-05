@@ -218,10 +218,9 @@ class EEGNetLitModule(LightningModule):
             else:
                 fig_file_path = f'{figure_file_name}.png'
 
-            plt.savefig(fig_file_path)
             self.mlflow_client.log_artifact(self.run_id,
                                             local_path=fig_file_path,
-                                            artifact_path=os.path.join(self.mlflow_client.tracking_uri,"plots"))
+                                            artifact_path=os.path.join(self.mlflow_client.tracking_uri, "plots"))
             plt.close(figure)
 
         elif type == 'mean':
@@ -259,7 +258,6 @@ class EEGNetLitModule(LightningModule):
             else:
                 fig_file_path = f'{figure_file_name}.png'
 
-            plt.savefig(fig_file_path)
             self.mlflow_client.log_artifact(self.run_id,
                                             local_path=fig_file_path,
                                             artifact_path="plots")

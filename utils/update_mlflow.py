@@ -38,7 +38,7 @@ def load_mlflow_folder_via_ssh(ssh_client, remote_path, local_path):
 if __name__ == "__main__":
     # Replace with the path to the directory containing your copied MLflow logs
     # logs_directory = "C:/Users/alioo/Desktop/MA/bbcpy_AutoML/logs/mlflow_remote/mlflow/mlruns"
-    logs_directory = "C:/Users/alioo/Desktop/MA/mlflow/mlruns"
+    logs_directory = "C:/Users/alioo/Desktop/MA/05092023/mlflow/mlruns"
     # ssh_client = "ali_alouane@hydra.ml.tu-berlin.de"
     remote_path = "/home/ali_alouane/bbcpy_AutoML/logs/mlflow_remote/mlflow/mlruns"
 

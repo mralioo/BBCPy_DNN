@@ -1,4 +1,3 @@
-# from bbcpy.datatypes.srm_eeg import *
 import logging
 
 import numpy as np
@@ -8,25 +7,6 @@ from sklearn.model_selection import KFold
 import bbcpy
 
 logging.getLogger().setLevel(logging.INFO)
-
-
-def prepare_subject_data(data_dir,
-                         ival,
-                         bands,
-                         chans,
-                         classes,
-                         subject_dict):
-    """ Prepare the data for the classification """
-    srm_data = SMR_Data(data_dir=data_dir,
-                        bands=bands,
-                        classes=classes,
-                        chans=chans,
-                        ival=ival)
-
-    obj = srm_data.load_data(subject_dict=subject_dict)
-
-    return obj
-
 
 class SMR_Data():
 

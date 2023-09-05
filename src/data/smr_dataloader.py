@@ -6,8 +6,7 @@ from torch.utils.data import DataLoader
 from torch.utils.data import Dataset
 
 from src.data.smr_datamodule import SMR_Data
-from src.data.srm_dataset import SRMDataset
-
+from src.data.smr_dataset import SRMDataset
 
 logging.getLogger().setLevel(logging.INFO)
 
@@ -41,31 +40,38 @@ class SRM_DataModule(LightningDataModule):
 
     def __init__(self,
                  data_dir,
+                 task_name,
                  ival,
                  bands,
                  chans,
                  classes,
                  train_subjects_sessions_dict,
                  test_subjects_sessions_dict,
+                 loading_data_mode,
+                 threshold_distance,
+                 fallback_neighbors,
                  concatenate_subjects,
                  train_val_split,
                  batch_size=32,
                  num_workers=0,
                  pin_memory=False):
         super().__init__()
-        self.data_dir = data_dir
 
+        self.data_dir = data_dir
+        self.task_name = task_name
         self.ival = ival
-        self.bands = bands  # FIXME
-        self.chans = chans  # FIXME
+        self.bands = bands
+        self.chans = chans
         self.classes = classes
+        self.loading_data_mode = loading_data_mode
+        self.threshold_distance = threshold_distance
+        self.fallback_neighbors = fallback_neighbors
 
         self.train_subjects_sessions_dict = train_subjects_sessions_dict
         self.test_subjects_sessions_dict = test_subjects_sessions_dict
 
         self.concatenate_subjects = concatenate_subjects
         self.train_val_split = train_val_split
-
 
         self.data_train: Optional[Dataset] = None
         self.data_vali: Optional[Dataset] = None
@@ -93,7 +99,18 @@ class SRM_DataModule(LightningDataModule):
 
     def prepare_data(self):
         """ instantiate srm object. This method is called only from a single GPU."""
-        pass
+        self.smr_datamodule = SMR_Data(data_dir=self.data_dir,
+                                       task_name=self.task_name,
+                                       subject_sessions_dict=self.train_subjects_sessions_dict,
+                                       concatenate_subjects=self.concatenate_subjects,
+                                       loading_data_mode=self.loading_data_mode,
+                                       train_val_split=self.train_val_split,
+                                       ival=self.ival,
+                                       bands=self.bands,
+                                       chans=self.chans,
+                                       classes=self.classes,
+                                       threshold_distance=self.threshold_distance,
+                                       fallback_neighbors=self.fallback_neighbors)
 
     def setup(self, stage: Optional[str] = None):
         """Load data. Set variables: num_classes."""
@@ -102,17 +119,10 @@ class SRM_DataModule(LightningDataModule):
         if not self.data_train and not self.data_test:
             # if stage == "train":
             logging.info("Loading train data...")
-            data_train = self.srm_datamodule.load_data(self.train_subjects_sessions_dict,
-                                                       self.concatenate_subjects)
+            valid_trial_trainset, forced_trial_testset = self.smr_datamodule.prepare_dataloader()
 
-            self.training_set = SRMDataset(data=data_train)
-
-            # if stage == "test":
-            logging.info("Loading test data...")
-            data_test = self.srm_datamodule.load_data(self.test_subjects_sessions_dict,
-                                                      self.concatenate_subjects)
-
-            self.test_set = SRMDataset(data=data_test)
+            self.training_set = SRMDataset(data=valid_trial_trainset)
+            self.test_set = SRMDataset(data=forced_trial_testset)
 
     def train_dataloader(self):
         return DataLoader(self.training_set,
@@ -120,11 +130,11 @@ class SRM_DataModule(LightningDataModule):
                           num_workers=self.hparams.num_workers,
                           pin_memory=self.hparams.pin_memory)
 
-    def vali_dataloader(self):
-        return DataLoader(self.validation_set,
-                          batch_size=self.hparams.batch_size,
-                          num_workers=self.hparams.num_workers,
-                          pin_memory=self.hparams.pin_memory)
+    # def vali_dataloader(self):
+    #     return DataLoader(self.validation_set,
+    #                       batch_size=self.hparams.batch_size,
+    #                       num_workers=self.hparams.num_workers,
+    #                       pin_memory=self.hparams.pin_memory)
 
     def test_dataloader(self):
         return DataLoader(self.test_set,
@@ -144,7 +154,3 @@ class SRM_DataModule(LightningDataModule):
     def load_state_dict(self, state_dict: Dict[str, Any]):
         """Things to do when loading checkpoint."""
         pass
-
-# if __name__ == '__main__':
-#     _ = SRM_DataModule(data_dir='../../data/srm_data',
-#                           ival

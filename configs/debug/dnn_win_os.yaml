@@ -1,0 +1,62 @@
+# @package _global_
+
+# overwrite task name so debugging logs are stored in separate folder
+task_name: "debug-dnn-win"
+
+# Train or tune
+# Tune
+#train: False
+#tune: True
+
+# Train
+train: True
+tune: False
+
+defaults:
+  - override /data: srm_datamodule.yaml
+  - override /model: eegnet.yaml
+
+
+
+
+paths:
+  root_dir: ${oc.env:PROJECT_ROOT}
+  #  data_dir: ${paths.root_dir}\data\SMR\raw\
+  data_dir: D:\SMR\
+  log_dir: ${oc.env:PROJECT_ROOT}\logs
+  output_dir: ${hydra:runtime.output_dir}
+  work_dir: ${hydra:runtime.cwd}
+
+# disable callbacks and loggers during debugging
+callbacks: null
+logger:
+  mlflow:
+    #    experiment_name: DEBUG-HPO
+    experiment_name: DEBUG-DNN-TRAIN
+    run_name: EEGNet-v1
+    tracking_uri: file:\\${paths.log_dir}\mlflow\mlruns
+
+data:
+  ival: 2s:10s:10ms
+  chans: [ "*" ]
+  classes:
+    - "R"
+    - "L"
+  bands: [ 8, 13 ]
+  loading_data_mode: "within_subject"
+
+extras:
+  ignore_warnings: False
+  enforce_tags: False
+
+# sets level of all command line loggers to 'DEBUG'
+# https://hydra.cc/docs/tutorials/basic/running_your_app/logging/
+hydra:
+  job_logging:
+    root:
+      level: DEBUG
+
+  # use this to also set hydra loggers to 'DEBUG'
+  verbose: True
+
+
