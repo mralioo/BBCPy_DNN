@@ -13,4 +13,4 @@ echo "current working directory is $(pwd)"
 cp ./../squashfs_smr_data/S1.sqfs /tmp/
 
 # 3. bind the squashed dataset to your apptainer environment and run your script with apptainer
-apptainer run -B /tmp/S1.sqfs:/input-data:image-src=/ ./../env_images/bbcpy_lightning_v3.sif python ./src/dnn_train.py +experiment=eegnet.yaml
+apptainer run -B /tmp/S1.sqfs:/input-data:image-src=/ ./../env_images/bbcpy_lightning_v4.sif python ./src/dnn_train.py +experiment=eegnet.yaml
