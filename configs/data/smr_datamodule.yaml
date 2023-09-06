@@ -13,18 +13,15 @@ classes:
   - "D"
 train_subjects_sessions_dict:
   S2: "all"
-test_subjects_sessions_dict:
-  S3:
-    - 6
 concatenate_subjects: True
 batch_size: 32
 train_val_split:
   - 0.7
   - 0.3
-
 threshold_distance: 0.05
 fallback_neighbors: 4
 loading_data_mode: within_subject
+transform: none
 
-num_workers: 0
+num_workers: 10
 pin_memory: False

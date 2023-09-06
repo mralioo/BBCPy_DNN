@@ -22,14 +22,11 @@ plots_settings:
   plot_every_n_epoch: 10
 
 net:
-  _target_: src.models.components.EEG-Conformer.Conformer
-  emb_size: 40
-  emb_kernel_size_1:
-    - 1
-    - 22
-  emb_kernel_size_2:
-    - 5
-    - 1
-
-  depth: 3
-  n_classes: 2
+  _target_: torcheeg.models.cnn.TSCeption
+  num_classes: 2
+  num_electrodes: 54
+  sampling_rate: 1000
+  num_T: 15
+  num_S: 15
+  hid_channels: 32
+  dropout: 0.5

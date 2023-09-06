@@ -1,0 +1,53 @@
+# @package _global_
+
+# to execute this experiment run:
+# python train.py experiment=example
+defaults:
+  - override /data: smr_datamodule.yaml
+  - override /model: TSCeption.yaml
+  - override /trainer: gpu.yaml
+  - override /paths: default.yaml
+  - override /extras: default.yaml
+  - override /hydra: default.yaml
+  - override /callbacks: default.yaml
+
+# all parameters below will be merged with parameters from default configurations set above
+# this allows you to overwrite only specified parameters
+
+tags: ["torcheeg", "TSCeption", "Within-Subject", "RL"]
+
+seed: 12345
+
+data:
+  ival: 1s:10s:1ms
+  chans: [ "*" ]
+  classes:
+    - "R"
+    - "L"
+  loading_data_mode: "within_subject"
+  transform: "TSCeption"
+  num_workers: 6
+  pin_memory: False
+
+trainer:
+  min_epochs: 10
+  max_epochs: 50
+  check_val_every_n_epoch: 1
+
+model:
+  plots_settings:
+    plot_every_n_epoch: 10
+
+paths:
+  root_dir: ${oc.env:PROJECT_ROOT}
+  data_dir: /input-data
+  log_dir: ${oc.env:PROJECT_ROOT}/logs
+  output_dir: ${hydra:runtime.output_dir}
+  work_dir: ${hydra:runtime.cwd}
+
+logger:
+  mlflow:
+    tags: ${tags}
+    experiment_name: A-RL-S1-all
+    run_name: TSception
+

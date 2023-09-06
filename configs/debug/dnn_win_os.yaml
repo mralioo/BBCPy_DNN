@@ -9,13 +9,13 @@ tune: False
 
 defaults:
   - override /data: smr_datamodule.yaml
-  - override /model: eegnet.yaml
+#  - override /model: eegnet.yaml
+  - override /model: TSCeption.yaml
   - override /trainer: gpu.yaml
   - override /paths: default.yaml
   - override /extras: default.yaml
   - override /hydra: default.yaml
   - override /callbacks: default.yaml
-
 
 paths:
   root_dir: ${oc.env:PROJECT_ROOT}
@@ -30,29 +30,32 @@ paths:
 logger:
   mlflow:
     experiment_name: DEBUG-DNN-TRAIN
-    run_name: EEGNet-v1
+#    run_name: EEGNet-v1
+    run_name: TSCeption-v1
     tracking_uri: file:${paths.log_dir}/mlflow/mlruns
 
+
 data:
-  ival: 2s:10s:1ms
+  ival: 1s:10s:1ms
   chans: [ "*" ]
   classes:
     - "R"
     - "L"
-  bands: [ 8, 13 ]
   loading_data_mode: "within_subject"
+  transform: "TSCeption"
+  num_workers: 4
+  pin_memory: False
+
 
 trainer:
   min_epochs: 1 # prevents early stopping
-  max_epochs: 20
+  max_epochs: 10
   # perform a validation loop every N training epochs
   check_val_every_n_epoch: 1
 
 model:
-  net:
-    chunk_size: 8000
   plots_settings:
-    plot_every_n_epoch: 10
+    plot_every_n_epoch: 5
 
 
 callbacks:

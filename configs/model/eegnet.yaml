@@ -1,4 +1,4 @@
-_target_: src.models.eegnet_module.EEGNetLitModule
+_target_: src.trainer.dnn_trainer.DnnLitModule
 
 optimizer:
   _target_: torch.optim.Adam
@@ -16,7 +16,6 @@ scheduler:
 criterion:
   _target_: torch.nn.CrossEntropyLoss
   _partial_: true
-
 
 plots_settings:
   # plots each n epochs
