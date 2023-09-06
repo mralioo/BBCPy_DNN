@@ -85,8 +85,6 @@ def train(cfg: DictConfig) -> Tuple[dict, dict]:
         # datamodule.setup(stage="fit")
         trainer.fit(model,
                     datamodule=datamodule,
-                    # train_dataloaders=datamodule,
-                    # val_dataloaders=datamodule,
                     ckpt_path=cfg.get("ckpt_path"))
 
     train_metrics = trainer.callback_metrics

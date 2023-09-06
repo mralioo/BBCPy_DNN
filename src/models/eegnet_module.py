@@ -1,36 +1,29 @@
 import os.path
+import pickle
+import tempfile
 from typing import Any
 
 import numpy as np
 import pyrootutils
+import sklearn
 import torch
 from lightning import LightningModule
 # from pytorch_lightning import LightningModule, Trainer, LightningDataModule
-from torch.utils.data import DataLoader, Dataset
 from sklearn.metrics import confusion_matrix
+from sklearn.metrics import f1_score
 from torchmetrics import MaxMetric, MeanMetric
 from torchmetrics.classification.accuracy import Accuracy
-from sklearn.metrics import f1_score
 
 pyrootutils.setup_root(__file__, indicator=".project-root", pythonpath=True)
 from src.utils.vis import calculate_cm_stats
 import matplotlib.pyplot as plt
 import itertools
+import mlflow
 
 
 class EEGNetLitModule(LightningModule):
-    """Example of LightningModule for MNIST classification.
-
-    A LightningModule organizes your PyTorch code into 6 sections:
-        - Initialization (__init__)
-        - Train Loop (training_step)
-        - Validation loop (validation_step)
-        - Test loop (test_step)
-        - Prediction Loop (predict_step)
-        - Optimizers and LR Schedulers (configure_optimizers)
-
-    Docs:
-        https://lightning.ai/docs/pytorch/latest/common/lightning_module.html
+    """Pytorch Lightning module for EEGNet model.
+    This class implements training, validation and test steps for EEGNet model.
     """
 
     def __init__(
@@ -39,6 +32,7 @@ class EEGNetLitModule(LightningModule):
             optimizer: torch.optim.Optimizer,
             criterion: torch.nn,
             scheduler: torch.optim.lr_scheduler,
+            plots_settings: dict,
     ):
         super().__init__()
         # this line allows to access init params with 'self.hparams' attribute
@@ -50,6 +44,9 @@ class EEGNetLitModule(LightningModule):
 
         # loss function
         self.criterion = self.hparams.criterion
+
+        # plots settings
+        self.plots_settings = plots_settings
 
         # metric objects for calculating and averaging accuracy across batches
         self.train_acc = Accuracy(task="multiclass", num_classes=2)
@@ -64,29 +61,8 @@ class EEGNetLitModule(LightningModule):
         # for tracking best so far validation accuracy
         self.val_acc_best = MaxMetric()
 
-        # --> HERE STEP 1 <--
-        # ATTRIBUTES TO SAVE BATCH OUTPUTS
-        self.training_step_outputs = []  # save outputs in each batch to compute metric overall epoch
-        self.training_step_targets = []  # save targets in each batch to compute metric overall epoch
-        self.val_step_outputs = []  # save outputs in each batch to compute metric overall epoch
-        self.val_step_targets = []  # save targets in each batch to compute metric overall epoch
-
-
     def forward(self, x: torch.Tensor):
         return self.net(x)
-
-    def on_train_start(self):
-        # by default lightning executes validation step sanity checks before training starts,
-        # so it's worth to make sure validation metrics don't store results from these checks
-        self.class_names = self.trainer.datamodule.classes
-        self.num_classes = self.trainer.datamodule.num_classes
-
-        self.mlflow_client = self.logger.experiment
-        self.run_id = self.logger.run_id
-
-        self.val_loss.reset()
-        self.val_acc.reset()
-        self.val_acc_best.reset()
 
     def model_step(self, batch: Any):
         x, y = batch
@@ -97,13 +73,33 @@ class EEGNetLitModule(LightningModule):
         logits = self.forward(x).double()
         loss = self.criterion()(logits, y)
         preds_ie = torch.argmax(logits, dim=1)
-        preds = torch.nn.functional.one_hot(preds_ie, num_classes=self.num_classes)
+        preds = torch.nn.functional.one_hot(preds_ie, num_classes=self.trainer.datamodule.num_classes)
+
         return loss, preds, y
+
+    def on_train_start(self):
+        # by default lightning executes validation step sanity checks before training starts,
+        # so it's worth to make sure validation metrics don't store results from these checks
+
+        self.class_names = self.trainer.datamodule.classes
+        self.num_classes = self.trainer.datamodule.num_classes
+        self.mlflow_client = self.logger.experiment
+        self.run_id = self.logger.run_id
+
+        # --> HERE STEP 1 <--
+        # ATTRIBUTES TO SAVE BATCH OUTPUTS
+        self.training_step_outputs = []  # save outputs in each batch to compute metric overall epoch
+        self.training_step_targets = []  # save targets in each batch to compute metric overall epoch
+
+        self.val_loss.reset()
+        self.val_acc.reset()
+        self.val_acc_best.reset()
 
     def training_step(self, batch: Any):
         loss, preds, targets = self.model_step(batch)
 
         # GET AND SAVE OUTPUTS AND TARGETS PER BATCH
+        # FIXME: only support cpu
         y_pred = preds.argmax(axis=1).cpu().numpy()
         y_true = targets.argmax(axis=1).cpu().numpy()
 
@@ -127,23 +123,35 @@ class EEGNetLitModule(LightningModule):
         f1_macro_epoch = f1_score(train_all_outputs, train_all_targets, average='macro')
         self.log("train_f1_epoch", f1_macro_epoch, on_step=False, on_epoch=True, prog_bar=True)
 
-        if self.current_epoch % 2 == 0:
+        if (self.current_epoch + 1) % self.plots_settings["plot_every_n_epoch"] == 0:
             # Calculate the confusion matrix and log it to mlflow
             cm = confusion_matrix(train_all_targets, train_all_outputs)
-            title = f"Training Confusion matrix, epoch {self.current_epoch}"
-            file_name = f"Training_confusion_matrix_epoch_{self.current_epoch}.png"
-            self.confusion_matrix_to_png(cm, title, file_name)
+            title = f"Training Confusion matrix epoch_{self.current_epoch}"
+            self.confusion_matrix_to_png(cm, title, f"train_cm_epo_{self.current_epoch}")
 
         # free up the memory
         # --> HERE STEP 3 <--
         self.training_step_outputs.clear()
         self.training_step_targets.clear()
 
+    def on_validation_start(self):
+
+        self.class_names = self.trainer.datamodule.classes
+        self.num_classes = self.trainer.datamodule.num_classes
+        self.mlflow_client = self.logger.experiment
+        self.run_id = self.logger.run_id
+
+        # --> HERE STEP 1 <--
+        # ATTRIBUTES TO SAVE BATCH OUTPUTS
+        self.val_step_outputs = []  # save outputs in each batch to compute metric overall epoch
+        self.val_step_targets = []  # save targets in each batch to compute metric overall epoch
+
     def validation_step(self, batch: Any, batch_idx: int):
+
         loss, preds, targets = self.model_step(batch)
         # GET AND SAVE OUTPUTS AND TARGETS PER BATCH
-        y_pred = preds.argmax().cpu().numpy()
-        y_true = targets.argmax().cpu().numpy()
+        y_pred = preds.argmax(axis=1).cpu().numpy()
+        y_true = targets.argmax(axis=1).cpu().numpy()
 
         # --> HERE STEP 2 <--
         self.val_step_outputs.extend(y_pred)
@@ -165,12 +173,11 @@ class EEGNetLitModule(LightningModule):
         val_f1_macro_epoch = f1_score(val_all_outputs, val_all_targets, average='macro')
         self.log("val_f1_epoch", val_f1_macro_epoch, on_step=False, on_epoch=True, prog_bar=True)
 
-        if self.current_epoch % 2 == 0:
+        if (self.current_epoch + 1) % self.plots_settings["plot_every_n_epoch"] == 0:
             # Calculate the confusion matrix and log it to mlflow
             cm = confusion_matrix(val_all_targets, val_all_outputs)
-            title = f"Validation Confusion matrix, epoch {self.current_epoch}"
-            file_name = f"Vali_confusion_matrix_epoch_{self.current_epoch}.png"
-            self.confusion_matrix_to_png(cm, title, file_name)
+            title = f"Validation Confusion matrix epoch_{self.current_epoch}"
+            self.confusion_matrix_to_png(cm, title, f"vali_cm_epo_{self.current_epoch}")
 
         acc = self.val_acc.compute()  # get current val acc
         self.val_acc_best(acc)  # update best so far val acc
@@ -185,6 +192,7 @@ class EEGNetLitModule(LightningModule):
         self.val_step_targets.clear()
 
     def test_step(self, batch: Any, batch_idx: int):
+
         loss, preds, targets = self.model_step(batch)
 
         # update and log metrics
@@ -192,6 +200,9 @@ class EEGNetLitModule(LightningModule):
         self.test_acc(preds, targets)
         self.log("test/loss", self.test_loss, on_step=False, on_epoch=True, prog_bar=True)
         self.log("test/acc", self.test_acc, on_step=False, on_epoch=True, prog_bar=True)
+        cm = confusion_matrix(targets, preds)
+        title = f"Testing Confusion matrix, epoch {self.current_epoch}"
+        self.confusion_matrix_to_png(cm, title, f"test_cm_epo_{self.current_epoch}")
 
     def on_test_epoch_end(self):
         pass
@@ -253,11 +264,15 @@ class EEGNetLitModule(LightningModule):
             else:
                 fig_file_path = f'{figure_file_name}.png'
 
-            plt.savefig(fig_file_path)
-            self.mlflow_client.log_artifact(self.run_id,
-                                            local_path=fig_file_path,
-                                            artifact_path="plots")
-            plt.close(figure)
+            # Use a temporary directory to save the plot
+            with tempfile.TemporaryDirectory() as tmpdirname:
+                plot_path = os.path.join(tmpdirname, fig_file_path)
+
+                plt.savefig(plot_path)  # Save the plot to the temporary directory
+                # self.mlflow_client.log_artifact(tmpdirname)
+                self.mlflow_client.log_artifacts(self.run_id,
+                                                 local_dir=tmpdirname)
+                plt.close(figure)
 
         elif type == 'mean':
 
@@ -294,8 +309,60 @@ class EEGNetLitModule(LightningModule):
             else:
                 fig_file_path = f'{figure_file_name}.png'
 
-            plt.savefig(fig_file_path)
-            self.mlflow_client.log_artifact(self.run_id,
-                                            local_path=fig_file_path,
-                                            artifact_path="plots")
-            plt.close(figure)
+            # Use a temporary directory to save the plot
+            with tempfile.TemporaryDirectory() as tmpdirname:
+                plot_path = os.path.join(tmpdirname, fig_file_path)
+
+                plt.savefig(plot_path)  # Save the plot to the temporary directory
+                self.mlflow_client.log_artifacts(self.run_id,
+                                                 local_dir=tmpdirname)
+                plt.close(figure)
+
+    def roc_curve_to_png(self, fpr, tpr, roc_auc, title, figure_file_name=None):
+        """Compute and plot the roc curve. It calculates a standard roc curve or the mean and std of a list of roc curve
+                    used for cross validation folds. """
+
+        plt.rcParams["font.family"] = 'DejaVu Sans'
+        plt.figure(figsize=(10, 7))
+
+        # TODO: remove if not needed
+        if set_name == "vali":
+            for i, (fpr, tpr) in enumerate(self.val_roc_curve_list):
+                auc_val = sklearn.metrics.auc(fpr, tpr)
+                plt.plot(fpr, tpr, lw=2, alpha=0.3, label='ROC fold %d (AUC = %0.2f)' % (i, auc_val))
+        elif set_name == "test":
+            for i, (fpr, tpr) in enumerate(self.test_roc_curve_list):
+                auc_val = sklearn.metrics.auc(fpr, tpr)
+                plt.plot(fpr, tpr, lw=2, alpha=0.3, label='ROC fold %d (AUC = %0.2f)' % (i, auc_val))
+
+        # TODO : walkaround check shape of tprs
+        new_tprs = []
+        mean_fpr_len = len(mean_fpr)
+        for tpr in tprs:
+            if len(tpr) != mean_fpr_len:
+                tpr = tpr[:mean_fpr_len]
+            new_tprs.append(tpr)
+
+        mean_tpr = np.mean(new_tprs, axis=0)
+        mean_tpr[-1] = 1.0  # set last value to 1.0 to have a complete curve
+        mean_auc = sklearn.metrics.auc(mean_fpr, mean_tpr)
+        std_auc = np.std(aucs)
+        plt.plot(mean_fpr, mean_tpr, color='b', label=r'Mean ROC (AUC = %0.2f $\pm$ %0.2f)' % (mean_auc, std_auc))
+
+        plt.plot([0, 1], [0, 1], linestyle='--', lw=2, color='r', label='Chance', alpha=.8)
+        plt.xlabel('False Positive Rate')
+        plt.ylabel('True Positive Rate')
+
+        plt.title(title)
+        plt.legend(loc='lower right')
+
+        with tempfile.TemporaryDirectory() as tmpdirname:
+            plot_path = os.path.join(tmpdirname, f"{title}.png")
+
+            plt.savefig(plot_path)  # Save the plot to the temporary directory
+            mlflow.log_artifacts(tmpdirname)
+
+    def log_haprams(self):
+        """Log all hyperparameters to mlflow"""
+        for k, v in self.hparams.items():
+            self.mlflow_client.log_param(self.run_id, k, v)

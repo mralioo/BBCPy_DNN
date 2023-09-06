@@ -130,11 +130,11 @@ class SRM_DataModule(LightningDataModule):
                           num_workers=self.hparams.num_workers,
                           pin_memory=self.hparams.pin_memory)
 
-    # def vali_dataloader(self):
-    #     return DataLoader(self.validation_set,
-    #                       batch_size=self.hparams.batch_size,
-    #                       num_workers=self.hparams.num_workers,
-    #                       pin_memory=self.hparams.pin_memory)
+    def val_dataloader(self):
+        return DataLoader(self.test_set,
+                          batch_size=self.hparams.batch_size,
+                          num_workers=self.hparams.num_workers,
+                          pin_memory=self.hparams.pin_memory)
 
     def test_dataloader(self):
         return DataLoader(self.test_set,
