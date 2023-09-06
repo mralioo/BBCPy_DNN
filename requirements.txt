@@ -11,16 +11,16 @@ setuptools>=60.7.0
 # --------- dask --------- #
 dask
 dask-ml
-
 h5py
 
 # --------- optuna --------- #
 optuna>=2.10.0
-# torch==2.0.1+cu117
+torch==1.11.0+cu113
 # --------- pytorch --------- #
 lightning>=2.0.0
 torchsummary
 einops
+torcheeg
 
 # --------- hydra --------- #
 hydra-core==1.3.2
