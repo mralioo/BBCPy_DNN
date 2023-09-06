@@ -4,6 +4,8 @@ from typing import Any, Dict, Optional
 from lightning import LightningDataModule
 from torch.utils.data import DataLoader
 from torch.utils.data import Dataset
+import sklearn
+import numpy as np
 
 from src.data.smr_datamodule import SMR_Data
 from src.data.smr_dataset import SRMDataset
@@ -46,10 +48,10 @@ class SRM_DataModule(LightningDataModule):
                  chans,
                  classes,
                  train_subjects_sessions_dict,
-                 test_subjects_sessions_dict,
                  loading_data_mode,
                  threshold_distance,
                  fallback_neighbors,
+                 transform,
                  concatenate_subjects,
                  train_val_split,
                  batch_size=32,
@@ -66,10 +68,9 @@ class SRM_DataModule(LightningDataModule):
         self.loading_data_mode = loading_data_mode
         self.threshold_distance = threshold_distance
         self.fallback_neighbors = fallback_neighbors
+        self.transform = transform
 
         self.train_subjects_sessions_dict = train_subjects_sessions_dict
-        self.test_subjects_sessions_dict = test_subjects_sessions_dict
-
         self.concatenate_subjects = concatenate_subjects
         self.train_val_split = train_val_split
 
@@ -81,7 +82,7 @@ class SRM_DataModule(LightningDataModule):
         # also ensures init params will be stored in ckpt
         self.save_hyperparameters(logger=False)
 
-        # data transformations
+        # data transformations TODO
         # self.transforms = transforms.Compose(
         #     [transforms.ToTensor(), transforms.Normalize((0.1307,), (0.3081,))]
         # )
@@ -110,7 +111,9 @@ class SRM_DataModule(LightningDataModule):
                                        chans=self.chans,
                                        classes=self.classes,
                                        threshold_distance=self.threshold_distance,
-                                       fallback_neighbors=self.fallback_neighbors)
+                                       fallback_neighbors=self.fallback_neighbors,
+                                       transform=self.transform,
+                                       )
 
     def setup(self, stage: Optional[str] = None):
         """Load data. Set variables: num_classes."""
@@ -142,6 +145,14 @@ class SRM_DataModule(LightningDataModule):
                           num_workers=self.hparams.num_workers,
                           pin_memory=self.hparams.pin_memory,
                           shuffle=False)
+
+    def calculate_class_weights(self, raw_data):
+
+        # compute classes weights for imbalanced dataset
+        global_classes_weights = sklearn.utils.class_weight.compute_class_weight(class_weight='balanced',
+                                                                                 classes=np.unique(raw_data.y),
+                                                                                 y=raw_data.y)
+        return global_classes_weights
 
     def teardown(self, stage: Optional[str] = None):
         """Clean up after fit or test."""

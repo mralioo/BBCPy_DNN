@@ -8,6 +8,7 @@ import bbcpy
 
 logging.getLogger().setLevel(logging.INFO)
 
+
 class SMR_Data():
 
     def __init__(self,
@@ -22,7 +23,8 @@ class SMR_Data():
                  chans,
                  classes,
                  threshold_distance,
-                 fallback_neighbors
+                 fallback_neighbors,
+                 transform
                  ):
 
         """ Initialize the SMR datamodule
@@ -59,6 +61,8 @@ class SMR_Data():
 
         self.threshold_distance = threshold_distance
         self.fallback_neighbors = fallback_neighbors
+
+        self.transform = transform
 
         self.subject_info_dict = {"noisechan": {}, "pvc": {self.task_name: {}}}
         self.subject_pvcs = []
@@ -159,7 +163,7 @@ class SMR_Data():
 
         return srm_obj
 
-    def set_eeg_channels(self, clab, mnt, reference_channel="REF."):
+    def remove_reference_channel(self, clab, mnt, reference_channel="REF."):
         """ Set the EEG channels object, and remove the reference channel if exists
 
         Parameters
@@ -190,6 +194,47 @@ class SMR_Data():
 
         return chans
 
+    def transform_electrodes_configurations(self, epo_data):
+
+        # FIXME : not implemented yet
+
+        """
+           This function will generate the channel order for TSception
+           Parameters
+           ----------
+           original_order: list of the channel names
+
+           Returns
+           -------
+           TS: list of channel names which is for TSception
+           """
+
+        original_order = epo_data.chans
+        chan_name, chan_num, chan_final = [], [], []
+        for channel in original_order:
+            chan_name_len = len(channel)
+            k = 0
+            for s in [*channel[:]]:
+                if s.isdigit():
+                    k += 1
+            if k != 0:
+                chan_name.append(channel[:chan_name_len - k])
+                chan_num.append(int(channel[chan_name_len - k:]))
+                chan_final.append(channel)
+        chan_pair = []
+        for ch, id in enumerate(chan_num):
+            if id % 2 == 0:
+                chan_pair.append(chan_name[ch] + str(id - 1))
+            else:
+                chan_pair.append(chan_name[ch] + str(id + 1))
+        chan_no_duplicate = []
+        [chan_no_duplicate.extend([f, chan_pair[i]]) for i, f in enumerate(chan_final) if
+         f not in chan_no_duplicate]
+
+        new_order = chan_no_duplicate[0::2] + chan_no_duplicate[1::2]
+        # FIXME : not sure if this is the correct way to do it
+        return epo_data[:, new_order, :]
+
     def load_forced_valid_trials_data(self, session_name, sessions_group_path):
         session_path = sessions_group_path[session_name]
 
@@ -207,8 +252,9 @@ class SMR_Data():
 
         self.subject_info_dict["pvc"][self.task_name][session_name] = sessions_pvc
 
-        # create channels object
-        chans = self.set_eeg_channels(clab, mnt)
+        # set the EEG channels object, and remove the reference channel if exists
+        chans = self.remove_reference_channel(clab, mnt)
+        # transform the channels order
 
         # true labels
         target_map_dict = {1: "R", 2: "L", 3: "U", 4: "D"}
@@ -240,6 +286,9 @@ class SMR_Data():
             noisy_chans_id_list = [int(chan) for chan in subject_info["noisechan"]]
             for noisy_chans_id in noisy_chans_id_list:
                 epo_data = self.interpolate_noisy_channels(epo_data, noisy_chans_id, session_name)
+
+        if self.transform == "TSCeption":
+            epo_data = self.transform_electrodes_configurations(epo_data)
 
         # valid trials are defined as the trials where labeles are correct (true) in trialresult
 
@@ -274,7 +323,6 @@ class SMR_Data():
 
         # calculate pvc
         pvc = res_dict["hits"] / (res_dict["hits"] + res_dict["misses"])
-
         return pvc
 
     def load_subject_sessions(self, subject_name, subject_dict, distributed_mode=False):
@@ -309,7 +357,6 @@ class SMR_Data():
                     valid_obj, forced_obj = self.load_forced_valid_trials_data(session_name=session_name,
                                                                                sessions_group_path=sessions_path_dict[
                                                                                    subject_name])
-
                     # check if the valid data has the same datapoints
                     if valid_obj.shape[2] != valid_obj_new.shape[2]:
                         # reshape the data
@@ -337,9 +384,7 @@ class SMR_Data():
                     logging.info(f"Session {session_name} not loaded")
                     logging.warning(f"Exception occurred: {e}")
                     continue
-
         else:
-
             init_session_name = sessions_list[0]
 
             valid_obj_new, forced_obj_new = self.load_forced_valid_trials_data(session_name=init_session_name,
@@ -350,57 +395,6 @@ class SMR_Data():
             logging.info(f"Loading sessions: {init_session_name} finalized (1 from 1)")
 
         return valid_obj_new, forced_obj_new
-
-    def load_subjects(self, subject_dict, concatenate_subjects=True):
-        """ Prepare the data for the classification """
-
-        subjects_data = {"valid": {}, "forced": {}}
-        subjects_sessions_path_dict = self.collect_subject_sessions(subject_dict)
-        subjects_key = list(subjects_sessions_path_dict.keys())
-
-        if len(subjects_key) > 1:
-            init_subject_name = subjects_key[0]
-            logging.info(f"Loading subject: {init_subject_name} finalized (1 from  {str(len(subjects_key))})")
-            valid_Sobj_new, forced_Sobj_new = self.load_subject_sessions(subject_name=init_subject_name,
-                                                                         sessions_group_path=subjects_sessions_path_dict)
-
-            subjects_data["valid"][init_subject_name] = valid_Sobj_new.copy()
-            subjects_data["forced"][init_subject_name] = forced_Sobj_new.copy()
-
-            for i, subject_name in enumerate(subjects_key[1:]):
-                logging.info(f"Loading subject: {subject_name} finalized ({str(i + 2)} from {str(len(subjects_key))})")
-
-                valid_Sobj, forced_Sobj = self.load_subject_sessions(subject_name=subject_name,
-                                                                     sessions_group_path=subjects_sessions_path_dict)
-
-                valid_Sobj_new = valid_Sobj_new.append(valid_Sobj, axis=0)
-                forced_Sobj_new = forced_Sobj_new.append(forced_Sobj, axis=0)
-
-                subjects_data["valid"][subject_name] = valid_Sobj_new.copy()
-                subjects_data["forced"][subject_name] = forced_Sobj_new.copy()
-        else:
-            init_subject_name = subjects_key[0]
-            logging.info(f"Loading subject: {init_subject_name} finalized (1 from 1)")
-
-            valid_Sobj_new, forced_Sobj_new = self.load_subject_sessions(subject_name=init_subject_name,
-                                                                         sessions_group_path=subjects_sessions_path_dict)
-
-            subjects_data["valid"][init_subject_name] = valid_Sobj_new.copy()
-            subjects_data["forced"][init_subject_name] = forced_Sobj_new.copy()
-
-        if not concatenate_subjects:
-            # remove object from memory FIXME
-            del valid_Sobj_new
-            del forced_Sobj_new
-
-            return subjects_data
-
-        del subjects_data
-
-        logging.info(f"Concatenating subject valid data, shape: {valid_Sobj_new.shape}")
-        logging.info(f"Concatenating subject forced data, shape: {forced_Sobj_new.shape}")
-
-        return valid_Sobj_new, forced_Sobj_new
 
     def prepare_dataloader(self):
         """ Prepare the data for the classification """
@@ -459,6 +453,8 @@ class SMR_Data():
 
     def calculate_class_weights(self, data):
         """ Calculate the class weights for the data """
+
+
 
         pass
 
