@@ -3,41 +3,38 @@
 # overwrite task name so debugging logs are stored in separate folder
 task_name: "debug-dnn-win"
 
-# Train or tune
-# Tune
-#train: False
-#tune: True
-
 # Train
 train: True
 tune: False
 
 defaults:
-  - override /data: srm_datamodule.yaml
+  - override /data: smr_datamodule.yaml
   - override /model: eegnet.yaml
-
-
+  - override /trainer: gpu.yaml
+  - override /paths: default.yaml
+  - override /extras: default.yaml
+  - override /hydra: default.yaml
+  - override /callbacks: default.yaml
 
 
 paths:
   root_dir: ${oc.env:PROJECT_ROOT}
-  #  data_dir: ${paths.root_dir}\data\SMR\raw\
   data_dir: D:\SMR\
   log_dir: ${oc.env:PROJECT_ROOT}\logs
   output_dir: ${hydra:runtime.output_dir}
   work_dir: ${hydra:runtime.cwd}
 
 # disable callbacks and loggers during debugging
-callbacks: null
+#callbacks: null
+
 logger:
   mlflow:
-    #    experiment_name: DEBUG-HPO
     experiment_name: DEBUG-DNN-TRAIN
     run_name: EEGNet-v1
-    tracking_uri: file:\\${paths.log_dir}\mlflow\mlruns
+    tracking_uri: file:${paths.log_dir}/mlflow/mlruns
 
 data:
-  ival: 2s:10s:10ms
+  ival: 2s:10s:1ms
   chans: [ "*" ]
   classes:
     - "R"
@@ -45,9 +42,29 @@ data:
   bands: [ 8, 13 ]
   loading_data_mode: "within_subject"
 
+trainer:
+  min_epochs: 1 # prevents early stopping
+  max_epochs: 20
+  # perform a validation loop every N training epochs
+  check_val_every_n_epoch: 1
+
+model:
+  net:
+    chunk_size: 8000
+  plots_settings:
+    plot_every_n_epoch: 10
+
+
+callbacks:
+  early_stopping:
+    monitor: "val_f1_epoch"
+    patience: 20
+    mode: "max"
+
 extras:
   ignore_warnings: False
   enforce_tags: False
+
 
 # sets level of all command line loggers to 'DEBUG'
 # https://hydra.cc/docs/tutorials/basic/running_your_app/logging/
