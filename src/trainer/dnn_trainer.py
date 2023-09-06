@@ -1,5 +1,4 @@
 import os.path
-import pickle
 import tempfile
 from typing import Any
 
@@ -21,8 +20,8 @@ import itertools
 import mlflow
 
 
-class EEGNetLitModule(LightningModule):
-    """Pytorch Lightning module for EEGNet model.
+class DnnLitModule(LightningModule):
+    """Pytorch Lightning module for deep neural network model.
     This class implements training, validation and test steps for EEGNet model.
     """
 
@@ -41,6 +40,7 @@ class EEGNetLitModule(LightningModule):
 
         # set net
         self.net = net
+        self.num_classes = self.net.num_classes
 
         # loss function
         self.criterion = self.hparams.criterion
@@ -48,32 +48,35 @@ class EEGNetLitModule(LightningModule):
         # plots settings
         self.plots_settings = plots_settings
 
-        # metric objects for calculating and averaging accuracy across batches
-        self.train_acc = Accuracy(task="multiclass", num_classes=2)
-        self.val_acc = Accuracy(task="multiclass", num_classes=2)
-        self.test_acc = Accuracy(task="multiclass", num_classes=2)
-
-        # for averaging loss across batches
+        # Training metric objects for calculating and averaging accuracy across batches
+        self.train_acc = Accuracy(task="multiclass", num_classes=self.num_classes)
         self.train_loss = MeanMetric()
-        self.val_loss = MeanMetric()
-        self.test_loss = MeanMetric()
+        # --> HERE STEP 1 <--
+        # ATTRIBUTES TO SAVE BATCH OUTPUTS
+        self.training_step_outputs = []  # save outputs in each batch to compute metric overall epoch
+        self.training_step_targets = []  # save targets in each batch to compute metric overall epoch
 
+        # Validation metric objects for calculating and averaging accuracy across batches
+        self.val_acc = Accuracy(task="multiclass", num_classes=self.num_classes)
+        self.val_loss = MeanMetric()
         # for tracking best so far validation accuracy
         self.val_acc_best = MaxMetric()
+
+        # Testing metric objects for calculating and averaging accuracy across batches
+        self.test_acc = Accuracy(task="multiclass", num_classes=self.num_classes)
+        self.test_loss = MeanMetric()
 
     def forward(self, x: torch.Tensor):
         return self.net(x)
 
     def model_step(self, batch: Any):
+
         x, y = batch
-
-        # fixme
-        # x = torch.squeeze(x)
-
         logits = self.forward(x).double()
-        loss = self.criterion()(logits, y)
+        classes_weights_tensor = torch.tensor(self.calculate_sample_weights(y)).to(self.device)
+        loss = self.criterion(weight=classes_weights_tensor)(logits, y)
         preds_ie = torch.argmax(logits, dim=1)
-        preds = torch.nn.functional.one_hot(preds_ie, num_classes=self.trainer.datamodule.num_classes)
+        preds = torch.nn.functional.one_hot(preds_ie, num_classes=self.num_classes)
 
         return loss, preds, y
 
@@ -82,14 +85,8 @@ class EEGNetLitModule(LightningModule):
         # so it's worth to make sure validation metrics don't store results from these checks
 
         self.class_names = self.trainer.datamodule.classes
-        self.num_classes = self.trainer.datamodule.num_classes
         self.mlflow_client = self.logger.experiment
         self.run_id = self.logger.run_id
-
-        # --> HERE STEP 1 <--
-        # ATTRIBUTES TO SAVE BATCH OUTPUTS
-        self.training_step_outputs = []  # save outputs in each batch to compute metric overall epoch
-        self.training_step_targets = []  # save targets in each batch to compute metric overall epoch
 
         self.val_loss.reset()
         self.val_acc.reset()
@@ -137,7 +134,7 @@ class EEGNetLitModule(LightningModule):
     def on_validation_start(self):
 
         self.class_names = self.trainer.datamodule.classes
-        self.num_classes = self.trainer.datamodule.num_classes
+
         self.mlflow_client = self.logger.experiment
         self.run_id = self.logger.run_id
 
@@ -235,6 +232,7 @@ class EEGNetLitModule(LightningModule):
 
             plt.imshow(conf_mat, interpolation='nearest', cmap=plt.cm.Blues)
             plt.colorbar()
+            # FIXME : check if this is correct order of classes names
             tick_marks = np.arange(self.num_classes)
             plt.xticks(tick_marks, self.class_names)
             plt.yticks(tick_marks, self.class_names)
@@ -366,3 +364,11 @@ class EEGNetLitModule(LightningModule):
         """Log all hyperparameters to mlflow"""
         for k, v in self.hparams.items():
             self.mlflow_client.log_param(self.run_id, k, v)
+
+    def calculate_sample_weights(self, y):
+        """Calculate sample weights for unbalanced dataset"""
+        y_np = np.argmax(y.cpu().numpy(), axis=1)
+        class_weights = sklearn.utils.class_weight.compute_class_weight(class_weight='balanced',
+                                                                        classes=np.unique(y_np),
+                                                                        y=y_np)
+        return class_weights
