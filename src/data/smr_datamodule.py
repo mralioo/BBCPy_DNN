@@ -9,6 +9,95 @@ import bbcpy
 logging.getLogger().setLevel(logging.INFO)
 
 
+def transform_electrodes_configurations(epo_data):
+    # FIXME : not implemented yet
+
+    """
+       This function will generate the channel order for TSception
+       Parameters
+       ----------
+       original_order: list of the channel names
+
+       Returns
+       -------
+       TS: list of channel names which is for TSception
+       """
+
+    original_order = epo_data.chans
+    chan_name, chan_num, chan_final = [], [], []
+    for channel in original_order:
+        chan_name_len = len(channel)
+        k = 0
+        for s in [*channel[:]]:
+            if s.isdigit():
+                k += 1
+        if k != 0:
+            chan_name.append(channel[:chan_name_len - k])
+            chan_num.append(int(channel[chan_name_len - k:]))
+            chan_final.append(channel)
+    chan_pair = []
+    for ch, id in enumerate(chan_num):
+        if id % 2 == 0:
+            chan_pair.append(chan_name[ch] + str(id - 1))
+        else:
+            chan_pair.append(chan_name[ch] + str(id + 1))
+    chan_no_duplicate = []
+    [chan_no_duplicate.extend([f, chan_pair[i]]) for i, f in enumerate(chan_final) if
+     f not in chan_no_duplicate]
+
+    new_order = chan_no_duplicate[0::2] + chan_no_duplicate[1::2]
+    # FIXME : not sure if this is the correct way to do it
+    return epo_data[:, new_order, :]
+
+
+def remove_reference_channel(clab, mnt, reference_channel="REF."):
+    """ Set the EEG channels object, and remove the reference channel if exists
+
+    Parameters
+    ----------
+    clab: numpy array
+        List of channels names
+    mnt: numpy array
+        List of channels positions
+    reference_channel: str
+        Name of the reference channel
+
+    Returns
+    -------
+    chans: bbcpy.datatypes.eeg.Chans
+
+    """
+
+    if reference_channel in clab:
+
+        ref_idx = np.where(clab == "REF.")[0][0]
+        clab = np.delete(clab, ref_idx)
+        mnt = np.delete(mnt, ref_idx, axis=0)
+        chans = bbcpy.datatypes.eeg.Chans(clab, mnt)
+
+    else:
+        logging.warning(f"Reference channel {reference_channel} not found in the data")
+        chans = bbcpy.datatypes.eeg.Chans(clab, mnt)
+
+    return chans
+
+
+def calculate_pvc_metrics(trial_info, taskname="LR"):
+    """PVC is metric introduced in the dataset paper and it descibes the percentage of valid correct trials
+    formula: PVC = hits / (hits + misses)
+    """
+    task_num_dict = {"LR": 1.0, "UD": 2.0, "2D": 3.0}
+    task_filter_idx = np.where(np.array(trial_info["tasknumber"]) == task_num_dict[taskname])[0]
+
+    # get hits and misses TODO forcedresult
+    trials_results = np.array(trial_info["forcedresult"])[task_filter_idx]
+    res_dict = {"hits": np.sum(trials_results == True), "misses": np.sum(trials_results == False)}
+
+    # calculate pvc
+    pvc = res_dict["hits"] / (res_dict["hits"] + res_dict["misses"])
+    return pvc
+
+
 class SMR_Data():
 
     def __init__(self,
@@ -147,7 +236,7 @@ class SMR_Data():
         distances = np.linalg.norm(srm_obj.chans.mnt - srm_obj.chans.mnt[noisy_chans_idx], axis=1)
 
         # Identify neighboring channels
-        neighbors = np.where(distances < self.threshold_distance)[0]
+        # neighbors = np.where(distances < self.threshold_distance)[0]
 
         # If no neighbors found within threshold, take the closest fallback_neighbors channels
         neighbors = np.argsort(distances)[1:self.fallback_neighbors + 1]  # Excluding the channel itself
@@ -163,78 +252,6 @@ class SMR_Data():
 
         return srm_obj
 
-    def remove_reference_channel(self, clab, mnt, reference_channel="REF."):
-        """ Set the EEG channels object, and remove the reference channel if exists
-
-        Parameters
-        ----------
-        clab: numpy array
-            List of channels names
-        mnt: numpy array
-            List of channels positions
-        reference_channel: str
-            Name of the reference channel
-
-        Returns
-        -------
-        chans: bbcpy.datatypes.eeg.Chans
-
-        """
-
-        if reference_channel in clab:
-
-            ref_idx = np.where(clab == "REF.")[0][0]
-            clab = np.delete(clab, ref_idx)
-            mnt = np.delete(mnt, ref_idx, axis=0)
-            chans = bbcpy.datatypes.eeg.Chans(clab, mnt)
-
-        else:
-            logging.warning(f"Reference channel {reference_channel} not found in the data")
-            chans = bbcpy.datatypes.eeg.Chans(clab, mnt)
-
-        return chans
-
-    def transform_electrodes_configurations(self, epo_data):
-
-        # FIXME : not implemented yet
-
-        """
-           This function will generate the channel order for TSception
-           Parameters
-           ----------
-           original_order: list of the channel names
-
-           Returns
-           -------
-           TS: list of channel names which is for TSception
-           """
-
-        original_order = epo_data.chans
-        chan_name, chan_num, chan_final = [], [], []
-        for channel in original_order:
-            chan_name_len = len(channel)
-            k = 0
-            for s in [*channel[:]]:
-                if s.isdigit():
-                    k += 1
-            if k != 0:
-                chan_name.append(channel[:chan_name_len - k])
-                chan_num.append(int(channel[chan_name_len - k:]))
-                chan_final.append(channel)
-        chan_pair = []
-        for ch, id in enumerate(chan_num):
-            if id % 2 == 0:
-                chan_pair.append(chan_name[ch] + str(id - 1))
-            else:
-                chan_pair.append(chan_name[ch] + str(id + 1))
-        chan_no_duplicate = []
-        [chan_no_duplicate.extend([f, chan_pair[i]]) for i, f in enumerate(chan_final) if
-         f not in chan_no_duplicate]
-
-        new_order = chan_no_duplicate[0::2] + chan_no_duplicate[1::2]
-        # FIXME : not sure if this is the correct way to do it
-        return epo_data[:, new_order, :]
-
     def load_forced_valid_trials_data(self, session_name, sessions_group_path):
         session_path = sessions_group_path[session_name]
 
@@ -247,13 +264,13 @@ class SMR_Data():
 
         # save pvc
 
-        sessions_pvc = self.calculate_pvc_metrics(trial_info, taskname=self.task_name)
+        sessions_pvc = calculate_pvc_metrics(trial_info, taskname=self.task_name)
         self.subject_pvcs.append(sessions_pvc)
 
         self.subject_info_dict["pvc"][self.task_name][session_name] = sessions_pvc
 
         # set the EEG channels object, and remove the reference channel if exists
-        chans = self.remove_reference_channel(clab, mnt)
+        chans = remove_reference_channel(clab, mnt)
         # transform the channels order
 
         # true labels
@@ -288,7 +305,7 @@ class SMR_Data():
                 epo_data = self.interpolate_noisy_channels(epo_data, noisy_chans_id, session_name)
 
         if self.transform == "TSCeption":
-            epo_data = self.transform_electrodes_configurations(epo_data)
+            epo_data = transform_electrodes_configurations(epo_data)
 
         # valid trials are defined as the trials where labeles are correct (true) in trialresult
 
@@ -309,21 +326,6 @@ class SMR_Data():
                      f" valid trails shape: {valid_trials.shape},"
                      f" forced trials shape: {forced_trials.shape}")
         return valid_trials, forced_trials
-
-    def calculate_pvc_metrics(self, trial_info, taskname="LR"):
-        """PVC is metric introduced in the dataset paper and it descibes the percentage of valid correct trials
-        formula: PVC = hits / (hits + misses)
-        """
-        task_num_dict = {"LR": 1.0, "UD": 2.0, "2D": 3.0}
-        task_filter_idx = np.where(np.array(trial_info["tasknumber"]) == task_num_dict[taskname])[0]
-
-        # get hits and misses TODO forcedresult
-        trials_results = np.array(trial_info["forcedresult"])[task_filter_idx]
-        res_dict = {"hits": np.sum(trials_results == True), "misses": np.sum(trials_results == False)}
-
-        # calculate pvc
-        pvc = res_dict["hits"] / (res_dict["hits"] + res_dict["misses"])
-        return pvc
 
     def load_subject_sessions(self, subject_name, subject_dict, distributed_mode=False):
 
@@ -401,7 +403,7 @@ class SMR_Data():
 
         if self.loading_data_mode == "within_subject":
             subject_name = list(self.subject_sessions_dict.keys())[0]
-            valid_trial_trainset, forced_trial_testset = self.load_subject_sessions(subject_name=subject_name,
+            valid_trials, forced_trials = self.load_subject_sessions(subject_name=subject_name,
                                                                                     subject_dict=self.subject_sessions_dict)
 
             # calculate subject pvc
@@ -410,21 +412,21 @@ class SMR_Data():
 
 
         elif self.loading_data_mode == "within_subject_all":
-            valid_trial_trainset, forced_trial_testset = self.load_subjects(self.subject_sessions_dict,
+            valid_trials, forced_trials = self.load_subjects(self.subject_sessions_dict,
                                                                             self.concatenate_subjects)
 
-            valid_trial_trainset = valid_trial_trainset.append(forced_trial_testset, axis=0)
+            valid_trials = valid_trials.append(forced_trials, axis=0)
 
         elif self.loading_data_mode == "cross_subject":
-            valid_trial_trainset, forced_trial_testset = self.load_subjects(self.subject_sessions_dict,
+            valid_trials, forced_trials = self.load_subjects(self.subject_sessions_dict,
                                                                             self.concatenate_subjects)
 
         else:
             raise Exception(f"Loading data mode {self.loading_data_mode} not supported")
 
-        return valid_trial_trainset, forced_trial_testset
+        return valid_trials, forced_trials
 
-    def kfolding_within_subject(self, subject_dict, cv_mode, prepare_test=False):
+    def folding_within_subject(self, subject_dict, cv_mode, prepare_test=False):
 
         subject_id = subject_dict.keys()[0]
         sessions_ids = subject_dict[subject_id]
@@ -451,28 +453,23 @@ class SMR_Data():
 
         pass
 
-    def calculate_class_weights(self, data):
-        """ Calculate the class weights for the data """
+    def train_valid_split(self, data):
+        """ Split the data into train and validation sets """
 
+        # Shuffle the data
+        assert np.isclose(sum(self.train_val_split), 1.0), "Split ratios should sum up to 1.0"
 
+        # TODO : Shuffle the SMR data object
+        indices = np.random.permutation(len(data))
+        data = data[indices]
+        data.y = data.y[indices]
 
-        pass
+        splits = []
+        start_idx = 0
 
-    def kfolding_cross_subjects(self, subjects_dict, cv_mode, prepare_test=False):
-        pass
+        for ratio in self.train_val_split:
+            end_idx = start_idx + int(len(data) * ratio)
+            splits.append(data[start_idx:end_idx])
+            start_idx = end_idx
 
-    def split_data(self, data):
-        pass
-
-
-if __name__ == "__main__":
-    srm_raw_path = "../../data/SMR/raw/"
-
-    obj = prepare_subject_data(data_dir=srm_raw_path,
-                               ival="2s:8s:10ms",
-                               bands=[8, 13],
-                               chans=['C*', 'FC*'],
-                               classes=["R", "L", "U"],
-                               subject_dict={"S1": [1, 2, 3, 4]})
-
-    print(obj)
+        return splits[0], splits[1]

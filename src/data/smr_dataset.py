@@ -37,7 +37,7 @@ class SRMDataset(Dataset):
     def __init__(self, data):
         # Perform one-hot encoding on labels
         y = data.y
-        onehot_encoder = OneHotEncoder(sparse=False)
+        onehot_encoder = OneHotEncoder(sparse_output=False)
         integer_encoded = y.reshape(-1, 1)
         onehot_encoded = onehot_encoder.fit_transform(integer_encoded)
 

@@ -1,11 +1,12 @@
+import gc
 import logging
 from typing import Any, Dict, Optional
 
-from lightning import LightningDataModule
-from torch.utils.data import DataLoader
-from torch.utils.data import Dataset
-import sklearn
 import numpy as np
+import sklearn
+import torch
+from lightning import LightningDataModule
+from torch.utils.data import DataLoader, Dataset
 
 from src.data.smr_datamodule import SMR_Data
 from src.data.smr_dataset import SRMDataset
@@ -47,7 +48,7 @@ class SRM_DataModule(LightningDataModule):
                  bands,
                  chans,
                  classes,
-                 train_subjects_sessions_dict,
+                 subject_sessions_dict,
                  loading_data_mode,
                  threshold_distance,
                  fallback_neighbors,
@@ -70,7 +71,7 @@ class SRM_DataModule(LightningDataModule):
         self.fallback_neighbors = fallback_neighbors
         self.transform = transform
 
-        self.train_subjects_sessions_dict = train_subjects_sessions_dict
+        self.subject_sessions_dict = subject_sessions_dict
         self.concatenate_subjects = concatenate_subjects
         self.train_val_split = train_val_split
 
@@ -90,19 +91,14 @@ class SRM_DataModule(LightningDataModule):
         self.batch_size = batch_size
         self.num_workers = num_workers
         self.pin_memory = pin_memory
-
-        # self.prepare_data()
-        # self.setup()
-
     @property
     def num_classes(self):
         return len(self.classes)
-
     def prepare_data(self):
         """ instantiate srm object. This method is called only from a single GPU."""
         self.smr_datamodule = SMR_Data(data_dir=self.data_dir,
                                        task_name=self.task_name,
-                                       subject_sessions_dict=self.train_subjects_sessions_dict,
+                                       subject_sessions_dict=self.subject_sessions_dict,
                                        concatenate_subjects=self.concatenate_subjects,
                                        loading_data_mode=self.loading_data_mode,
                                        train_val_split=self.train_val_split,
@@ -112,56 +108,77 @@ class SRM_DataModule(LightningDataModule):
                                        classes=self.classes,
                                        threshold_distance=self.threshold_distance,
                                        fallback_neighbors=self.fallback_neighbors,
-                                       transform=self.transform,
-                                       )
+                                       transform=self.transform)
 
     def setup(self, stage: Optional[str] = None):
         """Load data. Set variables: num_classes."""
-        # if stage == "train" or stage is None:
-        # load and split datasets only if not loaded already
-        if not self.data_train and not self.data_test:
-            # if stage == "train":
+        # FIXME: chose data strategy concatenation or train_val_split
+        if stage == "fit":
+            # loading data and splitting into train and test sets
             logging.info("Loading train data...")
-            valid_trial_trainset, forced_trial_testset = self.smr_datamodule.prepare_dataloader()
+            self.valid_trials, self.forced_trials = self.smr_datamodule.prepare_dataloader()
+            self.subject_sessions_dict = self.smr_datamodule.subject_sessions_dict
 
-            self.training_set = SRMDataset(data=valid_trial_trainset)
-            self.test_set = SRMDataset(data=forced_trial_testset)
+            # load and split datasets only if not loaded already
+            if self.train_val_split is not None:
+                train_data, val_data = self.smr_datamodule.train_valid_split(self.valid_trials)
+                self.training_set = SRMDataset(data=train_data)
+                self.validation_set = SRMDataset(data=val_data)
+                self.testing_set = SRMDataset(data=self.forced_trials)
+            else:
+                self.training_set = SRMDataset(data=self.valid_trials)
+                self.validation_set = SRMDataset(data=self.forced_trials)
 
+        if stage == "test":
+            logging.info("Loading test data...")
+            self.testing_set = SRMDataset(data=self.forced_trials)
     def train_dataloader(self):
         return DataLoader(self.training_set,
                           batch_size=self.hparams.batch_size,
                           num_workers=self.hparams.num_workers,
-                          pin_memory=self.hparams.pin_memory)
-
+                          pin_memory=self.hparams.pin_memory,
+                          shuffle=True)
     def val_dataloader(self):
-        return DataLoader(self.test_set,
-                          batch_size=self.hparams.batch_size,
-                          num_workers=self.hparams.num_workers,
-                          pin_memory=self.hparams.pin_memory)
-
-    def test_dataloader(self):
-        return DataLoader(self.test_set,
+        return DataLoader(self.validation_set,
                           batch_size=self.hparams.batch_size,
                           num_workers=self.hparams.num_workers,
                           pin_memory=self.hparams.pin_memory,
                           shuffle=False)
-
-    def calculate_class_weights(self, raw_data):
-
-        # compute classes weights for imbalanced dataset
-        global_classes_weights = sklearn.utils.class_weight.compute_class_weight(class_weight='balanced',
-                                                                                 classes=np.unique(raw_data.y),
-                                                                                 y=raw_data.y)
-        return global_classes_weights
-
+    def test_dataloader(self):
+        return DataLoader(self.testing_set,
+                          batch_size=self.hparams.batch_size,
+                          num_workers=self.hparams.num_workers,
+                          pin_memory=self.hparams.pin_memory,
+                          shuffle=False)
     def teardown(self, stage: Optional[str] = None):
         """Clean up after fit or test."""
-        pass
+        # Move data off GPU (if necessary)
+        if stage == "fit":
+            del self.training_set
+            del self.validation_set
+        if stage == "test":
+            del self.testing_set
+
+            # Delete large objects
+            if hasattr(self, 'valid_trials'):
+                del self.valid_trials
+            self.valid_trials = None
+
+            if hasattr(self, 'forced_trials'):
+                del self.forced_trials
+            self.forced_trials = None
+
+            # Explicitly run garbage collection
+            gc.collect()
+
+            # If using CUDA
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
 
     def state_dict(self):
         """Extra things to save to checkpoint."""
-        return {}
+        return {"subject_sessions_dict": self.subject_sessions_dict}
 
     def load_state_dict(self, state_dict: Dict[str, Any]):
         """Things to do when loading checkpoint."""
-        pass
+        self.subject_sessions_dict = state_dict["subject_sessions_dict"]
