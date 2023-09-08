@@ -13,4 +13,4 @@ echo "current working directory is $(pwd)"
 cp ./../squashfs_smr_data/S1.sqfs /tmp/
 #export CUDA_VISIBLE_DEVICES=0
 # 3. bind the squashed dataset to your apptainer environment and run your script with apptainer
-apptainer run --nv -B /tmp/S1.sqfs:/input-data:image-src=/ ./../env_images/bbcpy_lightning_v5.sif python ./src/dnn_train.py experiment=eegnet +data.subject_sessions_dict="{S1: "all"}" logger.mlflow.run_name="S1-all"
+apptainer run --nv -B /tmp/S1.sqfs:/input-data:image-src=/ ./../env_images/bbcpy_lightning_v5.sif python ./src/dnn_train.py experiment=eegnet +data.subject_sessions_dict="{S1: "all"}"
