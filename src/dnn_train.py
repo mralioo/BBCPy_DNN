@@ -92,14 +92,13 @@ def train(cfg: DictConfig) -> Tuple[dict, dict]:
     if cfg.get("test"):
         log.info("Starting testing!")
         ckpt_path = trainer.checkpoint_callback.best_model_path
+        log.info(f"Best ckpt path: {ckpt_path}")
         if ckpt_path == "":
             log.warning("Best ckpt not found! Using current weights for testing...")
 
-        ckpt_path = None
         trainer.test(model=model,
-                     dataloaders=datamodule.test_dataloader,
+                     dataloaders=datamodule,
                      ckpt_path=ckpt_path)
-        log.info(f"Best ckpt path: {ckpt_path}")
 
     test_metrics = trainer.callback_metrics
 
@@ -122,6 +121,7 @@ def main(cfg: DictConfig) -> Optional[float]:
     metric_value = utils.get_metric_value(
         metric_dict=metric_dict, metric_name=cfg.get("optimized_metric")
     )
+    print(metric_value)
 
     # return optimized metric
     return metric_value

@@ -63,8 +63,11 @@ class DnnLitModule(LightningModule):
         self.val_acc_best = MaxMetric()
 
         # Testing metric objects for calculating and averaging accuracy across batches
-        self.test_acc = Accuracy(task="multiclass", num_classes=self.num_classes)
         self.test_loss = MeanMetric()
+        self.test_acc = Accuracy(task="multiclass", num_classes=self.num_classes)
+
+
+
 
     def forward(self, x: torch.Tensor):
         return self.net(x)
@@ -83,10 +86,7 @@ class DnnLitModule(LightningModule):
     def on_train_start(self):
         # by default lightning executes validation step sanity checks before training starts,
         # so it's worth to make sure validation metrics don't store results from these checks
-
         self.class_names = self.trainer.datamodule.classes
-        self.mlflow_client = self.logger.experiment
-        self.run_id = self.logger.run_id
 
         self.val_loss.reset()
         self.val_acc.reset()
@@ -135,8 +135,12 @@ class DnnLitModule(LightningModule):
 
         self.class_names = self.trainer.datamodule.classes
 
+        # mlflow autologging
         self.mlflow_client = self.logger.experiment
         self.run_id = self.logger.run_id
+
+        mlflow.set_tracking_uri(self.mlflow_client.tracking_uri)
+        mlflow.pytorch.autolog()
 
         # --> HERE STEP 1 <--
         # ATTRIBUTES TO SAVE BATCH OUTPUTS
@@ -197,7 +201,11 @@ class DnnLitModule(LightningModule):
         self.test_acc(preds, targets)
         self.log("test/loss", self.test_loss, on_step=False, on_epoch=True, prog_bar=True)
         self.log("test/acc", self.test_acc, on_step=False, on_epoch=True, prog_bar=True)
-        cm = confusion_matrix(targets, preds)
+
+        y_pred = preds.argmax(axis=1).cpu().numpy()
+        y_true = targets.argmax(axis=1).cpu().numpy()
+
+        cm = confusion_matrix(y_true, y_pred)
         title = f"Testing Confusion matrix, epoch {self.current_epoch}"
         self.confusion_matrix_to_png(cm, title, f"test_cm_epo_{self.current_epoch}")
 
