@@ -1,9 +1,11 @@
-from typing import Optional, Tuple
+from typing import List, Optional, Tuple
 
 import hydra
 import lightning as L
 import pyrootutils
 import torch
+from lightning import Callback, LightningDataModule, LightningModule, Trainer
+from lightning.pytorch.loggers import Logger
 from omegaconf import DictConfig
 
 pyrootutils.setup_root(__file__, indicator=".project-root", pythonpath=True)
@@ -49,19 +51,19 @@ def train(cfg: DictConfig) -> Tuple[dict, dict]:
         L.seed_everything(cfg.seed, workers=True)
 
     log.info(f"Instantiating datamodule <{cfg.data._target_}>")
-    datamodule = hydra.utils.instantiate(cfg.data)
+    datamodule: LightningDataModule = hydra.utils.instantiate(cfg.data)
 
     log.info(f"Instantiating model <{cfg.model._target_}>")
-    model = hydra.utils.instantiate(cfg.model)
+    model: LightningModule = hydra.utils.instantiate(cfg.model)
 
     log.info("Instantiating callbacks...")
-    callbacks = utils.instantiate_callbacks(cfg.get("callbacks"))
+    callbacks: List[Callback] = utils.instantiate_callbacks(cfg.get("callbacks"))
 
     log.info("Instantiating loggers...")
-    logger = utils.instantiate_loggers(cfg.get("logger"))
+    logger: List[Logger] = utils.instantiate_loggers(cfg.get("logger"))
 
     log.info(f"Instantiating trainer <{cfg.trainer._target_}>")
-    trainer = hydra.utils.instantiate(cfg.trainer, callbacks=callbacks, logger=logger)
+    trainer: Trainer = hydra.utils.instantiate(cfg.trainer, callbacks=callbacks, logger=logger)
 
     object_dict = {
         "cfg": cfg,
@@ -82,7 +84,6 @@ def train(cfg: DictConfig) -> Tuple[dict, dict]:
 
     if cfg.get("train"):
         log.info("Starting training!")
-
         trainer.fit(model,
                     datamodule=datamodule,
                     ckpt_path=cfg.get("ckpt_path"))
@@ -107,6 +108,7 @@ def train(cfg: DictConfig) -> Tuple[dict, dict]:
 
     return metric_dict, object_dict
 
+
 def print_gpu_info():
     # Check if CUDA is available
     if not torch.cuda.is_available():
@@ -122,6 +124,8 @@ def print_gpu_info():
     print(f"Number of GPUs available: {num_gpus}")
     for i in range(num_gpus):
         print(f"GPU {i}: {torch.cuda.get_device_name(i)}")
+
+
 @hydra.main(version_base="1.3", config_path="../configs", config_name="dnn_train.yaml")
 def main(cfg: DictConfig) -> Optional[float]:
     # apply extra utilities

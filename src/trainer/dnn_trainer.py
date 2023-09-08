@@ -107,8 +107,6 @@ class DnnLitModule(LightningModule):
 
             self.mlflow_client.log_artifacts(self.run_id,
                                              local_dir=tmpdirname)
-
-
         self.val_loss.reset()
         self.val_acc.reset()
         self.val_acc_best.reset()
