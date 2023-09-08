@@ -9,14 +9,12 @@ pandas>=1.4.0
 setuptools>=60.7.0
 
 # --------- dask --------- #
-dask
-dask-ml
 h5py
 
 # --------- optuna --------- #
-optuna>=2.10.0
-torch==1.11.0+cu113
+optuna
 # --------- pytorch --------- #
+torch
 lightning>=2.0.0
 torchsummary
 einops
@@ -42,4 +40,4 @@ rich            # beautiful text formatting in terminal
 pytest          # tests
 pytest-cov
 docstr-coverage
-# sh            # for running bash commands in some tests (linux/macos only)
+sh            # for running bash commands in some tests (linux/macos only)
