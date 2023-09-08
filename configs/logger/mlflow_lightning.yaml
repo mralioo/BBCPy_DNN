@@ -1,11 +1,12 @@
 # https://mlflow.org
 mlflow:
   _target_: lightning.pytorch.loggers.mlflow.MLFlowLogger
-  experiment_name: "lightning-exp"
-  run_name: "eegnet"
+  experiment_name: lightning-exp
+  run_name: eegnet
   tracking_uri: file:${paths.log_dir}/mlflow/mlruns
   tags: null
-  prefix: ""
   artifact_location: null
-  # run_id: ""
-  # save_dir: "./mlruns"
+#  prefix: ""
+
+#  run_id: ""
+#  save_dir: ${paths.log_dir}/mlflow/mlruns

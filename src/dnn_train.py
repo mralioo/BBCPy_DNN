@@ -74,7 +74,7 @@ def train(cfg: DictConfig) -> Tuple[dict, dict]:
 
     if logger:
         log.info("Logging hyperparameters!")
-        # utils.log_hyperparameters(object_dict)
+        utils.log_hyperparameters(object_dict)
 
     if cfg.get("compile"):
         log.info("Compiling model!")
@@ -82,7 +82,7 @@ def train(cfg: DictConfig) -> Tuple[dict, dict]:
 
     if cfg.get("train"):
         log.info("Starting training!")
-        # datamodule.setup(stage="fit")
+
         trainer.fit(model,
                     datamodule=datamodule,
                     ckpt_path=cfg.get("ckpt_path"))

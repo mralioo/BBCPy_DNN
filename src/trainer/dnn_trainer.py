@@ -87,6 +87,28 @@ class DnnLitModule(LightningModule):
         # so it's worth to make sure validation metrics don't store results from these checks
         self.class_names = self.trainer.datamodule.classes
 
+        # log hyperparameters
+        # self.log_haprams()
+        hparams = {}
+        # load successfull loaded data sessions dict
+        state_dict = self.trainer.datamodule.state_dict()
+
+        # hparams["classes_weights"] = state_dict["classes_weights"]
+        hparams["train_data_shape"] = state_dict["train_data_shape"]
+        hparams["valid_data_shape"] = state_dict["valid_data_shape"]
+        hparams["test_data_shape"] = state_dict["test_data_shape"]
+        hparams["subject_info_dict"] = state_dict["subject_info_dict"]
+
+        # Use a temporary directory to save
+        with tempfile.TemporaryDirectory() as tmpdirname:
+            hparam_path = os.path.join(tmpdirname, "Subject_info.json")
+            with open(hparam_path, "w") as f:
+                json.dump(hparams, f, default=default)
+
+            self.mlflow_client.log_artifacts(self.run_id,
+                                             local_dir=tmpdirname)
+
+
         self.val_loss.reset()
         self.val_acc.reset()
         self.val_acc_best.reset()
@@ -124,29 +146,6 @@ class DnnLitModule(LightningModule):
             cm = confusion_matrix(train_all_targets, train_all_outputs)
             title = f"Training Confusion matrix epoch_{self.current_epoch}"
             self.confusion_matrix_to_png(cm, title, f"train_cm_epo_{self.current_epoch}")
-
-        if self.current_epoch == 0:
-            # log hyperparameters
-            # self.log_haprams()
-            hparams = {}
-            # load successfull loaded data sessions dict
-            state_dict = self.trainer.datamodule.state_dict()
-
-            # hparams["classes_weights"] = state_dict["classes_weights"]
-            hparams["train_data_shape"] = state_dict["train_data_shape"]
-            hparams["valid_data_shape"] = state_dict["valid_data_shape"]
-            hparams["test_data_shape"] = state_dict["test_data_shape"]
-            hparams["subject_info_dict"] = state_dict["subject_info_dict"]
-
-
-            # Use a temporary directory to save
-            with tempfile.TemporaryDirectory() as tmpdirname:
-                hparam_path = os.path.join(tmpdirname, "Subject_info.json")
-                with open(hparam_path, "w") as f:
-                    json.dump(hparams, f, default=default)
-
-                self.mlflow_client.log_artifacts(self.run_id,
-                                                 local_dir=tmpdirname)
 
         # free up the memory
         # --> HERE STEP 3 <--

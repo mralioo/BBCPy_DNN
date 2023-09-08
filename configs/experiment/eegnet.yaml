@@ -50,6 +50,7 @@ paths:
 logger:
   mlflow:
     tags: ${tags}
-    experiment_name: A-RL-S1-all
-    run_name: eegnet-v1
+    experiment_name: EEGNET-v1
+    run_name: S1
+
 
