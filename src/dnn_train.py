@@ -126,10 +126,10 @@ def print_gpu_info():
 def main(cfg: DictConfig) -> Optional[float]:
     # apply extra utilities
     # (e.g. ask for tags if none are provided in cfg, print cfg tree, etc.)
-    utils.extras(cfg)
-
-
+    
     print_gpu_info()
+
+    utils.extras(cfg)
 
     # train the model
     metric_dict, _ = train(cfg)
