@@ -25,23 +25,27 @@ data:
     - "R"
     - "L"
   loading_data_mode: "within_subject"
+  subject_sessions_dict:
+    S1: "all"
   transform: None
   num_workers: 6
   pin_memory: False
+
+model:
+  net:
+    chunk_size: 9000
+  plots_settings:
+    plot_every_n_epoch: 5
 
 trainer:
   min_epochs: 10
   max_epochs: 50
   check_val_every_n_epoch: 1
 
-model:
-  plots_settings:
-    plot_every_n_epoch: 10
-
 paths:
   root_dir: ${oc.env:PROJECT_ROOT}
   data_dir: /input-data
-  log_dir: ${oc.env:PROJECT_ROOT}/logs
+  log_dir: ${oc.env:PROJECT_ROOT}/logs/dnn
   output_dir: ${hydra:runtime.output_dir}
   work_dir: ${hydra:runtime.cwd}
 

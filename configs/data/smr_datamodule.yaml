@@ -11,8 +11,6 @@ classes:
   - "L"
   - "U"
   - "D"
-train_subjects_sessions_dict:
-  S2: "all"
 concatenate_subjects: True
 batch_size: 32
 train_val_split:

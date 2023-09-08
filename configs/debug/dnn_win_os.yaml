@@ -36,24 +36,26 @@ logger:
 
 model:
   net:
-    chunk_size: 8000
+    chunk_size: 900
   plots_settings:
-    plot_every_n_epoch: 5
+    plot_every_n_epoch: 1
 
 data:
-  ival: 1s:10s:1ms
+  ival: 1s:10s:10ms
   chans: [ "*" ]
   classes:
     - "R"
     - "L"
   loading_data_mode: "within_subject"
+  subject_sessions_dict:
+    S3: "all"
   transform: None
   num_workers: 4
   pin_memory: False
 
 trainer:
   min_epochs: 1 # prevents early stopping
-  max_epochs: 10
+  max_epochs: 2
   # perform a validation loop every N training epochs
   check_val_every_n_epoch: 1
 
