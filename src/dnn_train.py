@@ -107,12 +107,29 @@ def train(cfg: DictConfig) -> Tuple[dict, dict]:
 
     return metric_dict, object_dict
 
+def print_gpu_info():
+    # Check if CUDA is available
+    if not torch.cuda.is_available():
+        print("CUDA is not available.")
+        return
 
+    # Print PyTorch and CUDA version
+    print("PyTorch Version:", torch.__version__)
+    print("CUDA Version:", torch.version.cuda)
+
+    # Print available GPUs
+    num_gpus = torch.cuda.device_count()
+    print(f"Number of GPUs available: {num_gpus}")
+    for i in range(num_gpus):
+        print(f"GPU {i}: {torch.cuda.get_device_name(i)}")
 @hydra.main(version_base="1.3", config_path="../configs", config_name="dnn_train.yaml")
 def main(cfg: DictConfig) -> Optional[float]:
     # apply extra utilities
     # (e.g. ask for tags if none are provided in cfg, print cfg tree, etc.)
     utils.extras(cfg)
+
+
+    print_gpu_info()
 
     # train the model
     metric_dict, _ = train(cfg)
