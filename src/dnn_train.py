@@ -5,9 +5,6 @@ import lightning as L
 import pyrootutils
 import torch
 from omegaconf import DictConfig
-import os
-
-os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 
 pyrootutils.setup_root(__file__, indicator=".project-root", pythonpath=True)
 # ------------------------------------------------------------------------------------ #
