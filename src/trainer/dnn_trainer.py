@@ -395,7 +395,11 @@ class DnnLitModule(LightningModule):
     def calculate_sample_weights(self, y):
         """Calculate sample weights for unbalanced dataset"""
         y_np = np.argmax(y.cpu().numpy(), axis=1)
-        class_weights = sklearn.utils.class_weight.compute_class_weight(class_weight='balanced',
-                                                                        classes=np.unique(y_np),
-                                                                        y=y_np)
+        classes = np.unique(y_np)
+        if len(classes) == 1:
+            class_weights = np.array([1, 1])
+        else:
+            class_weights = sklearn.utils.class_weight.compute_class_weight(class_weight='balanced',
+                                                                            classes=classes,
+                                                                            y=y_np)
         return class_weights

@@ -6,11 +6,6 @@ bands:
   - 8
   - 13
 chans: [ "*" ]
-classes:
-  - "R"
-  - "L"
-  - "U"
-  - "D"
 concatenate_subjects: True
 batch_size: 32
 train_val_split:
