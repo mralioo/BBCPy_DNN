@@ -15,13 +15,13 @@ defaults:
 
   # experiment configs allow for version control of specific hyperparameters
   # e.g. best hyperparameters for given model and datamodule
-  - experiment: null
+#  - experiment: null
 
   # config for hyperparameter optimization
   - hparams_search: null
 
   # debugging config (enable through command line, e.g. `python train.py debug=default)
-  - debug: dnn_win_os.yaml
+#  - debug: dnn_win_os.yaml
 
 # task name, determines output directory path
 task_name: "train"

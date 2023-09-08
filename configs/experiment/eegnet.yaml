@@ -25,8 +25,6 @@ data:
     - "R"
     - "L"
   loading_data_mode: "within_subject"
-  subject_sessions_dict:
-    S1: "all"
   transform: None
   num_workers: 6
   pin_memory: False
