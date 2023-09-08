@@ -14,7 +14,7 @@ defaults:
 # all parameters below will be merged with parameters from default configurations set above
 # this allows you to overwrite only specified parameters
 
-tags: ["torcheeg", "TSCeption", "Within-Subject", "RL"]
+tags: [ "torcheeg", "TSCeption", "Within-Subject", "RL" ]
 
 seed: 12345
 
@@ -29,14 +29,17 @@ data:
   num_workers: 6
   pin_memory: False
 
+model:
+  net:
+    num_electrodes: 54
+  plots_settings:
+    plot_every_n_epoch: 10
+
+
 trainer:
   min_epochs: 10
   max_epochs: 50
   check_val_every_n_epoch: 1
-
-model:
-  plots_settings:
-    plot_every_n_epoch: 10
 
 paths:
   root_dir: ${oc.env:PROJECT_ROOT}
@@ -47,7 +50,6 @@ paths:
 
 logger:
   mlflow:
-    tags: ${tags}
-    experiment_name: A-RL-S1-all
-    run_name: TSception
-
+#    tags: ${tags}
+    experiment_name: TSception
+    run_name: S1

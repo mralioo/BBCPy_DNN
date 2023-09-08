@@ -14,7 +14,7 @@ defaults:
 # all parameters below will be merged with parameters from default configurations set above
 # this allows you to overwrite only specified parameters
 
-tags: ["torcheeg", "EEGNET-v1"]
+tags: ["torcheeg", "EEGNET-v1","Within-Subject", "RL"]
 
 seed: 12345
 
@@ -33,7 +33,7 @@ model:
   net:
     chunk_size: 9000
   plots_settings:
-    plot_every_n_epoch: 5
+    plot_every_n_epoch: 10
 
 trainer:
   min_epochs: 10
