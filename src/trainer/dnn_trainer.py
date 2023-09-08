@@ -1,3 +1,4 @@
+import json
 import os.path
 import tempfile
 from typing import Any
@@ -7,11 +8,12 @@ import pyrootutils
 import sklearn
 import torch
 from lightning import LightningModule
-# from pytorch_lightning import LightningModule, Trainer, LightningDataModule
 from sklearn.metrics import confusion_matrix
 from sklearn.metrics import f1_score
 from torchmetrics import MaxMetric, MeanMetric
 from torchmetrics.classification.accuracy import Accuracy
+
+from src.utils.file_mgmt import default
 
 pyrootutils.setup_root(__file__, indicator=".project-root", pythonpath=True)
 from src.utils.vis import calculate_cm_stats
@@ -65,9 +67,6 @@ class DnnLitModule(LightningModule):
         # Testing metric objects for calculating and averaging accuracy across batches
         self.test_loss = MeanMetric()
         self.test_acc = Accuracy(task="multiclass", num_classes=self.num_classes)
-
-
-
 
     def forward(self, x: torch.Tensor):
         return self.net(x)
@@ -126,6 +125,29 @@ class DnnLitModule(LightningModule):
             title = f"Training Confusion matrix epoch_{self.current_epoch}"
             self.confusion_matrix_to_png(cm, title, f"train_cm_epo_{self.current_epoch}")
 
+        if self.current_epoch == 0:
+            # log hyperparameters
+            # self.log_haprams()
+            hparams = {}
+            # load successfull loaded data sessions dict
+            state_dict = self.trainer.datamodule.state_dict()
+
+            # hparams["classes_weights"] = state_dict["classes_weights"]
+            hparams["train_data_shape"] = state_dict["train_data_shape"]
+            hparams["valid_data_shape"] = state_dict["valid_data_shape"]
+            hparams["test_data_shape"] = state_dict["test_data_shape"]
+            hparams["subject_info_dict"] = state_dict["subject_info_dict"]
+
+
+            # Use a temporary directory to save
+            with tempfile.TemporaryDirectory() as tmpdirname:
+                hparam_path = os.path.join(tmpdirname, "Subject_info.json")
+                with open(hparam_path, "w") as f:
+                    json.dump(hparams, f, default=default)
+
+                self.mlflow_client.log_artifacts(self.run_id,
+                                                 local_dir=tmpdirname)
+
         # free up the memory
         # --> HERE STEP 3 <--
         self.training_step_outputs.clear()
@@ -139,8 +161,8 @@ class DnnLitModule(LightningModule):
         self.mlflow_client = self.logger.experiment
         self.run_id = self.logger.run_id
 
-        mlflow.set_tracking_uri(self.mlflow_client.tracking_uri)
-        mlflow.pytorch.autolog()
+        # mlflow.set_tracking_uri(self.mlflow_client.tracking_uri)
+        # mlflow.pytorch.autolog()
 
         # --> HERE STEP 1 <--
         # ATTRIBUTES TO SAVE BATCH OUTPUTS

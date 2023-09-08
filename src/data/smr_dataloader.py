@@ -2,11 +2,9 @@ import gc
 import logging
 from typing import Any, Dict, Optional
 
-import numpy as np
-import sklearn
 import torch
 from lightning import LightningDataModule
-from torch.utils.data import DataLoader, Dataset
+from torch.utils.data import DataLoader
 
 from src.data.smr_datamodule import SMR_Data
 from src.data.smr_dataset import SRMDataset
@@ -75,10 +73,6 @@ class SRM_DataModule(LightningDataModule):
         self.concatenate_subjects = concatenate_subjects
         self.train_val_split = train_val_split
 
-        self.data_train: Optional[Dataset] = None
-        self.data_vali: Optional[Dataset] = None
-        self.data_test: Optional[Dataset] = None
-
         # this line allows to access init params with 'self.hparams' attribute
         # also ensures init params will be stored in ckpt
         self.save_hyperparameters(logger=False)
@@ -91,9 +85,11 @@ class SRM_DataModule(LightningDataModule):
         self.batch_size = batch_size
         self.num_workers = num_workers
         self.pin_memory = pin_memory
+
     @property
     def num_classes(self):
         return len(self.classes)
+
     def prepare_data(self):
         """ instantiate srm object. This method is called only from a single GPU."""
         self.smr_datamodule = SMR_Data(data_dir=self.data_dir,
@@ -117,7 +113,6 @@ class SRM_DataModule(LightningDataModule):
             # loading data and splitting into train and test sets
             logging.info("Loading train data...")
             self.valid_trials, self.forced_trials = self.smr_datamodule.prepare_dataloader()
-            self.subject_sessions_dict = self.smr_datamodule.subject_sessions_dict
 
             # load and split datasets only if not loaded already
             if self.train_val_split is not None:
@@ -132,24 +127,28 @@ class SRM_DataModule(LightningDataModule):
         if stage == "test":
             logging.info("Loading test data...")
             self.testing_set = SRMDataset(data=self.forced_trials)
+
     def train_dataloader(self):
         return DataLoader(self.training_set,
                           batch_size=self.hparams.batch_size,
                           num_workers=self.hparams.num_workers,
                           pin_memory=self.hparams.pin_memory,
                           shuffle=True)
+
     def val_dataloader(self):
         return DataLoader(self.validation_set,
                           batch_size=self.hparams.batch_size,
                           num_workers=self.hparams.num_workers,
                           pin_memory=self.hparams.pin_memory,
                           shuffle=False)
+
     def test_dataloader(self):
         return DataLoader(self.testing_set,
                           batch_size=self.hparams.batch_size,
                           num_workers=self.hparams.num_workers,
                           pin_memory=self.hparams.pin_memory,
                           shuffle=False)
+
     def teardown(self, stage: Optional[str] = None):
         """Clean up after fit or test."""
         # Move data off GPU (if necessary)
@@ -170,15 +169,18 @@ class SRM_DataModule(LightningDataModule):
 
             # Explicitly run garbage collection
             gc.collect()
-
             # If using CUDA
             if torch.cuda.is_available():
                 torch.cuda.empty_cache()
 
     def state_dict(self):
         """Extra things to save to checkpoint."""
-        return {"subject_sessions_dict": self.subject_sessions_dict}
+        return {
+            "train_data_shape": self.training_set.data.shape,
+            "valid_data_shape": self.validation_set.data.shape,
+            "test_data_shape": self.testing_set.data.shape,
+            "subject_info_dict": self.smr_datamodule.subject_info_dict}
 
     def load_state_dict(self, state_dict: Dict[str, Any]):
         """Things to do when loading checkpoint."""
-        self.subject_sessions_dict = state_dict["subject_sessions_dict"]
+        self.subject_info_dict = state_dict["subject_info_dict"]
