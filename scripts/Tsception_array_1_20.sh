@@ -20,6 +20,6 @@ cp ./../squashfs_smr_data/${SUBJECT}.sqfs /tmp/
 echo "Processing data for subject $SUBJECT"
 
 # 3. bind the squashed dataset to your apptainer environment and run your script with apptainer
-apptainer run -B /tmp/${SUBJECT}.sqfs:/input-data:image-src=/ ./../env_images/bbcpy_lightning_v5.sif python ./src/dnn_train.py experiment=Tsception +data.subject_sessions_dict="{$SUBJECT: "all"}" logger.mlflow.run_name="${SUBJECT}-all-RL"
+apptainer run --nv -B /tmp/${SUBJECT}.sqfs:/input-data:image-src=/ ./../env_images/bbcpy_lightning_v5.sif python ./src/dnn_train.py experiment=Tsception +data.subject_sessions_dict="{$SUBJECT: "all"}" logger.mlflow.run_name="${SUBJECT}-all-RL"
 
 
