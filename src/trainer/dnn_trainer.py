@@ -1,12 +1,15 @@
 import json
 import os.path
+import sys
 import tempfile
 from typing import Any
+from torch.autograd import Variable
 
 import numpy as np
 import pyrootutils
 import sklearn
 import torch
+import torchsummary
 from lightning import LightningModule
 from sklearn.metrics import confusion_matrix
 from sklearn.metrics import f1_score
@@ -161,9 +164,26 @@ class DnnLitModule(LightningModule):
         # mlflow autologging
         self.mlflow_client = self.logger.experiment
         self.run_id = self.logger.run_id
+        model_name = self.hparams.net.__class__.__name__
+        # save model summary as a text file
+        with tempfile.TemporaryDirectory() as tmpdirname:
+            x_shape = (1, self.net.num_electrodes, self.net.chunk_size)
+            summary_path = os.path.join(tmpdirname, f"{model_name}_summary.txt")
+            with open(summary_path, "w") as f:
+                sys.stdout = f
+                torchsummary.summary(self.net, x_shape, device="cuda")
+                sys.stdout = sys.__stdout__
 
-        # mlflow.set_tracking_uri(self.mlflow_client.tracking_uri)
-        # mlflow.pytorch.autolog()
+            self.mlflow_client.log_artifacts(self.run_id,
+                                             local_dir=tmpdirname)
+        # save to onnx
+        with tempfile.TemporaryDirectory() as tmpdirname:
+            x_shape = (1, self.net.num_electrodes, self.net.chunk_size)
+            x_tmp = torch.randn(1, 1,self.net.num_electrodes, self.net.chunk_size).cuda()
+            onnx_path = os.path.join(tmpdirname, f"{model_name}.onnx")
+            torch.onnx.export(self.net,x_tmp, onnx_path, verbose=True, input_names=["input"], output_names=["output"])
+            self.mlflow_client.log_artifacts(self.run_id,
+                                             local_dir=tmpdirname)
 
         # --> HERE STEP 1 <--
         # ATTRIBUTES TO SAVE BATCH OUTPUTS
