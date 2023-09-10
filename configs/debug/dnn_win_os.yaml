@@ -9,8 +9,8 @@ tune: False
 
 defaults:
   - override /data: smr_datamodule.yaml
-#  - override /model: eegnet.yaml
-  - override /model: TSCeption.yaml
+  - override /model: eegnet.yaml
+#  - override /model: TSCeption.yaml
   - override /trainer: gpu.yaml
   - override /paths: default.yaml
   - override /extras: default.yaml
@@ -30,13 +30,13 @@ paths:
 logger:
   mlflow:
     experiment_name: DEBUG-DNN-TRAIN
-      #    run_name: EEGNet-v1
-    run_name: TSCeption-v1
+    run_name: EEGNet-v1
+#    run_name: TSCeption-v1
     tracking_uri: file:${paths.log_dir}/mlflow/mlruns
 
 model:
-#  net:
-#    chunk_size: 900
+  net:
+    chunk_size: 900
   plots_settings:
     plot_every_n_epoch: 1
 
@@ -50,7 +50,8 @@ data:
   loading_data_mode: "within_subject"
   subject_sessions_dict:
     S1: "all"
-  transform: "TSCeption"
+#  transform: "TSCeption"
+  transform: None
   norm_type: "std"
   num_workers: 4
   pin_memory: False
