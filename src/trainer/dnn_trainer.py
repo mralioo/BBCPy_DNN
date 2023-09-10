@@ -50,13 +50,12 @@ class DnnLitModule(LightningModule):
         # plots settings
         self.plots_settings = plots_settings
 
-        # Training metric objects for calculating and averaging accuracy across batches
-        self.train_acc = Accuracy(task="multiclass", num_classes=self.num_classes)
-        self.train_loss = MeanMetric()
-        # --> HERE STEP 1 <--
         # ATTRIBUTES TO SAVE BATCH OUTPUTS
         self.training_step_outputs = []  # save outputs in each batch to compute metric overall epoch
         self.training_step_targets = []  # save targets in each batch to compute metric overall epoch
+        # Training metric objects for calculating and averaging accuracy across batches
+        self.train_acc = Accuracy(task="multiclass", num_classes=self.num_classes)
+        self.train_loss = MeanMetric()
 
         # Validation metric objects for calculating and averaging accuracy across batches
         self.val_acc = Accuracy(task="multiclass", num_classes=self.num_classes)
@@ -64,6 +63,9 @@ class DnnLitModule(LightningModule):
         # for tracking best so far validation accuracy
         self.val_acc_best = MaxMetric()
 
+        # ATTRIBUTES TO SAVE BATCH OUTPUTS
+        self.test_step_outputs = []  # save outputs in each batch to compute metric overall epoch
+        self.test_step_targets = []  # save targets in each batch to compute metric overall epoch
         # Testing metric objects for calculating and averaging accuracy across batches
         self.test_loss = MeanMetric()
         self.test_acc = Accuracy(task="multiclass", num_classes=self.num_classes)
@@ -98,7 +100,6 @@ class DnnLitModule(LightningModule):
         hparams["valid_data_shape"] = state_dict["valid_data_shape"]
         hparams["test_data_shape"] = state_dict["test_data_shape"]
         hparams["subject_info_dict"] = state_dict["subject_info_dict"]
-
 
         self.mlflow_client.log_param(self.run_id, "pvc", state_dict["subject_info_dict"]["pvc"][task_name]["mean"])
 
@@ -217,6 +218,11 @@ class DnnLitModule(LightningModule):
     def test_step(self, batch: Any, batch_idx: int):
 
         loss, preds, targets = self.model_step(batch)
+        y_pred = preds.argmax(axis=1).cpu().numpy()
+        y_true = targets.argmax(axis=1).cpu().numpy()
+        # --> HERE STEP 2 <--
+        self.test_step_outputs.extend(y_pred)
+        self.test_step_targets.extend(y_true)
 
         # update and log metrics
         self.test_loss(loss)
@@ -224,15 +230,16 @@ class DnnLitModule(LightningModule):
         self.log("test/loss", self.test_loss, on_step=False, on_epoch=True, prog_bar=True)
         self.log("test/acc", self.test_acc, on_step=False, on_epoch=True, prog_bar=True)
 
-        y_pred = preds.argmax(axis=1).cpu().numpy()
-        y_true = targets.argmax(axis=1).cpu().numpy()
-
-        cm = confusion_matrix(y_true, y_pred)
-        title = f"Testing Confusion matrix, epoch {self.current_epoch}"
-        self.confusion_matrix_to_png(cm, title, f"test_cm_epo_{self.current_epoch}")
-
     def on_test_epoch_end(self):
-        pass
+        ## F1 Macro all epoch saving outputs and target per batch
+        test_all_outputs = self.test_step_outputs
+        test_all_targets = self.test_step_targets
+        test_f1_macro_epoch = f1_score(test_all_targets, test_all_outputs, average='macro')
+        self.log("test_f1_epoch", test_f1_macro_epoch, on_step=False, on_epoch=True, prog_bar=True)
+
+        cm = confusion_matrix(test_all_outputs, test_all_targets)
+        title = f"Testing Confusion matrix, forced trials"
+        self.confusion_matrix_to_png(cm, title, f"test_cm_forced_trials")
 
     def configure_optimizers(self):
         """Choose what optimizers and learning-rate schedulers to use in your optimization.

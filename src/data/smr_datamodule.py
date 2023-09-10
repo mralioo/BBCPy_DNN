@@ -404,7 +404,7 @@ class SMR_Data():
         if self.loading_data_mode == "within_subject":
             subject_name = list(self.subject_sessions_dict.keys())[0]
             valid_trials, forced_trials = self.load_subject_sessions(subject_name=subject_name,
-                                                                                    subject_dict=self.subject_sessions_dict)
+                                                                    subject_dict=self.subject_sessions_dict)
 
             # calculate subject pvc
             pvc_mean = np.mean(self.subject_pvcs)
