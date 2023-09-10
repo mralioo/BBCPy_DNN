@@ -23,11 +23,11 @@ plots_settings:
 
 net:
   _target_: torcheeg.models.cnn.EEGNet
-  chunk_size: 8000
+  chunk_size: 9000
   num_electrodes: 62
   dropout: 0.5
-  kernel_1: 64
-  kernel_2: 16
+  kernel_1: 1024
+  kernel_2: 256
   F1: 8
   F2: 16
   D: 2

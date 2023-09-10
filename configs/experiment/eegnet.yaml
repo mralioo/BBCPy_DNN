@@ -14,7 +14,7 @@ defaults:
 # all parameters below will be merged with parameters from default configurations set above
 # this allows you to overwrite only specified parameters
 
-tags: ["torcheeg", "EEGNET-v1","Within-Subject", "RL"]
+tags: [ "torcheeg", "EEGNET-v1","Within-Subject", "RL" ]
 
 seed: 12345
 
@@ -35,6 +35,14 @@ data:
 model:
   net:
     chunk_size: 9000
+    num_electrodes: 62
+    dropout: 0.5
+    kernel_1: 1024
+    kernel_2: 256
+    F1: 8
+    F2: 16
+    D: 2
+    num_classes: 2
   plots_settings:
     plot_every_n_epoch: 10
 
@@ -52,7 +60,7 @@ paths:
 
 logger:
   mlflow:
-#    tags: ${tags}
+    #    tags: ${tags}
     experiment_name: EEGNET-v1
     run_name: S6
 
