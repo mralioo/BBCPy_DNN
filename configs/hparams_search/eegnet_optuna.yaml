@@ -16,11 +16,6 @@ optimized_metric: "val/acc_best"
 # docs: https://hydra.cc/docs/next/plugins/optuna_sweeper
 hydra:
   mode: "MULTIRUN" # set hydra to multirun by default if this config is attached
-  logger:
-    mlflow:
-      experiment_name: "optuna-hpo-eegnet"
-      run_name: "example"
-
   sweeper:
     _target_: hydra_plugins.hydra_optuna_sweeper.optuna_sweeper.OptunaSweeper
 
