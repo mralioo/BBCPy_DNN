@@ -19,6 +19,7 @@ tags: [ "torcheeg", "TSCeption", "Within-Subject", "RL" ]
 seed: 12345
 
 data:
+  task_name: "LR"
   ival: 1s:10s:1ms
   chans: [ "*" ]
   classes:
@@ -31,8 +32,6 @@ data:
   pin_memory: False
 
 model:
-  net:
-    num_electrodes: 54
   plots_settings:
     plot_every_n_epoch: 10
 
