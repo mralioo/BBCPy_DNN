@@ -19,6 +19,7 @@ tags: ["torcheeg", "EEGNET-v1","Within-Subject", "RL"]
 seed: 12345
 
 data:
+  task_name: "LR"
   ival: 1s:10s:1ms
   chans: [ "*" ]
   classes:
@@ -26,6 +27,7 @@ data:
     - "L"
   loading_data_mode: "within_subject"
   transform: None
+  norm_type: "std"
   num_workers: 6
   pin_memory: False
 
@@ -36,7 +38,7 @@ model:
     plot_every_n_epoch: 10
 
 trainer:
-  min_epochs: 10
+  min_epochs: 20
   max_epochs: 50
   check_val_every_n_epoch: 1
 

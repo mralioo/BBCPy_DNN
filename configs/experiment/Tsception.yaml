@@ -26,6 +26,7 @@ data:
     - "L"
   loading_data_mode: "within_subject"
   transform: "TSCeption"
+  norm_type: "std"
   num_workers: 6
   pin_memory: False
 
@@ -37,7 +38,7 @@ model:
 
 
 trainer:
-  min_epochs: 10
+  min_epochs: 20
   max_epochs: 50
   check_val_every_n_epoch: 1
 

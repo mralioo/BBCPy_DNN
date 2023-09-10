@@ -1,6 +1,6 @@
 _target_: src.data.smr_dataloader.SRM_DataModule
 data_dir: ${paths.data_dir}
-task_name: "LR"
+
 ival: "all"
 bands:
   - 8
