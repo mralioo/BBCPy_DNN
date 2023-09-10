@@ -52,6 +52,7 @@ class SRM_DataModule(LightningDataModule):
                  fallback_neighbors,
                  transform,
                  norm_type,
+                 norm_axis,
                  concatenate_subjects,
                  train_val_split,
                  batch_size=32,
@@ -70,6 +71,7 @@ class SRM_DataModule(LightningDataModule):
         self.fallback_neighbors = fallback_neighbors
         self.transform = transform
         self.norm_type = norm_type
+        self.norm_axis = norm_axis
 
         self.subject_sessions_dict = subject_sessions_dict
         self.concatenate_subjects = concatenate_subjects
@@ -118,9 +120,9 @@ class SRM_DataModule(LightningDataModule):
 
             if self.norm_type is not None:
                 self.valid_trials, self.norm_params_valid = normalize(self.valid_trials, norm_type=self.norm_type,
-                                                                      axis=1)
+                                                                      axis=self.norm_axis)
                 self.forced_trials, self.norm_params_forced = normalize(self.forced_trials, norm_type=self.norm_type,
-                                                                        axis=1)
+                                                                        axis=self.norm_axis)
 
             # load and split datasets only if not loaded already
             if self.train_val_split is not None:

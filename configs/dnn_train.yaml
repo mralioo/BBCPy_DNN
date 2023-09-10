@@ -18,7 +18,8 @@ defaults:
   - experiment: null
 
   # config for hyperparameter optimization
-  - hparams_search: eegnet_optuna.yaml
+  - hparams_search: null
+#  - hparams_search: eegnet_optuna.yaml
 
   # optional local config for machine/user specific settings
   # it's optional since it doesn't need to exist and is excluded from version control
@@ -26,6 +27,7 @@ defaults:
 
   # debugging config (enable through command line, e.g. `python train.py debug=default)
   - debug: null
+#  - debug: dnn_win_os.yaml
 
 # task name, determines output directory path
 task_name: "train"
