@@ -49,7 +49,7 @@ data:
     - "L"
   loading_data_mode: "within_subject"
   subject_sessions_dict:
-    S3: "all"
+    S1: "all"
   transform: "TSCeption"
   norm_type: "std"
   num_workers: 4
