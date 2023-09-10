@@ -92,12 +92,15 @@ class DnnLitModule(LightningModule):
         hparams = {}
         # load successfull loaded data sessions dict
         state_dict = self.trainer.datamodule.state_dict()
-
+        task_name = state_dict["task_name"]
         # hparams["classes_weights"] = state_dict["classes_weights"]
         hparams["train_data_shape"] = state_dict["train_data_shape"]
         hparams["valid_data_shape"] = state_dict["valid_data_shape"]
         hparams["test_data_shape"] = state_dict["test_data_shape"]
         hparams["subject_info_dict"] = state_dict["subject_info_dict"]
+
+
+        self.mlflow_client.log_param(self.run_id, "pvc", state_dict["subject_info_dict"]["pvc"][task_name]["mean"])
 
         # Use a temporary directory to save
         with tempfile.TemporaryDirectory() as tmpdirname:
