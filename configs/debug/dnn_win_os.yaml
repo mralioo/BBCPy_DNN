@@ -41,6 +41,7 @@ model:
     plot_every_n_epoch: 1
 
 data:
+  task_name: "LR"
   ival: 1s:10s:10ms
   chans: [ "*" ]
   classes:
@@ -49,8 +50,8 @@ data:
   loading_data_mode: "within_subject"
   subject_sessions_dict:
     S3: "all"
-#  transform:
   transform: "TSCeption"
+  norm_type: "std"
   num_workers: 4
   pin_memory: False
 
