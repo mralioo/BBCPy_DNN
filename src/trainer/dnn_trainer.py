@@ -91,6 +91,7 @@ class DnnLitModule(LightningModule):
         # by default lightning executes validation step sanity checks before training starts,
         # so it's worth to make sure validation metrics don't store results from these checks
         self.class_names = self.trainer.datamodule.classes
+        model_name = self.hparams.net.__class__.__name__
 
         # log hyperparameters
         # self.log_haprams()
@@ -114,6 +115,28 @@ class DnnLitModule(LightningModule):
 
             self.mlflow_client.log_artifacts(self.run_id,
                                              local_dir=tmpdirname)
+
+        # save model summary as a text file
+        with tempfile.TemporaryDirectory() as tmpdirname:
+            x_shape = (1, self.net.num_electrodes, self.net.chunk_size)
+            summary_path = os.path.join(tmpdirname, f"{model_name}_summary.txt")
+            with open(summary_path, "w") as f:
+                sys.stdout = f
+                torchsummary.summary(self.net, x_shape, device="cuda")
+                sys.stdout = sys.__stdout__
+
+            self.mlflow_client.log_artifacts(self.run_id,
+                                             local_dir=tmpdirname)
+        # save to onnx
+        with tempfile.TemporaryDirectory() as tmpdirname:
+            x_shape = (1, self.net.num_electrodes, self.net.chunk_size)
+            x_tmp = torch.randn(1, 1, self.net.num_electrodes, self.net.chunk_size).cuda()
+            onnx_path = os.path.join(tmpdirname, f"{model_name}.onnx")
+            torch.onnx.export(self.net, x_tmp, onnx_path, verbose=True, input_names=["input"],
+                              output_names=["output"])
+            self.mlflow_client.log_artifacts(self.run_id,
+                                             local_dir=tmpdirname)
+
         self.val_loss.reset()
         self.val_acc.reset()
         self.val_acc_best.reset()
@@ -164,26 +187,6 @@ class DnnLitModule(LightningModule):
         # mlflow autologging
         self.mlflow_client = self.logger.experiment
         self.run_id = self.logger.run_id
-        model_name = self.hparams.net.__class__.__name__
-        # save model summary as a text file
-        with tempfile.TemporaryDirectory() as tmpdirname:
-            x_shape = (1, self.net.num_electrodes, self.net.chunk_size)
-            summary_path = os.path.join(tmpdirname, f"{model_name}_summary.txt")
-            with open(summary_path, "w") as f:
-                sys.stdout = f
-                torchsummary.summary(self.net, x_shape, device="cuda")
-                sys.stdout = sys.__stdout__
-
-            self.mlflow_client.log_artifacts(self.run_id,
-                                             local_dir=tmpdirname)
-        # save to onnx
-        with tempfile.TemporaryDirectory() as tmpdirname:
-            x_shape = (1, self.net.num_electrodes, self.net.chunk_size)
-            x_tmp = torch.randn(1, 1,self.net.num_electrodes, self.net.chunk_size).cuda()
-            onnx_path = os.path.join(tmpdirname, f"{model_name}.onnx")
-            torch.onnx.export(self.net,x_tmp, onnx_path, verbose=True, input_names=["input"], output_names=["output"])
-            self.mlflow_client.log_artifacts(self.run_id,
-                                             local_dir=tmpdirname)
 
         # --> HERE STEP 1 <--
         # ATTRIBUTES TO SAVE BATCH OUTPUTS
