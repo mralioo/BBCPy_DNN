@@ -30,6 +30,5 @@ net:
   emb_kernel_size_2:
     - 5
     - 1
-
   depth: 3
   n_classes: 2
