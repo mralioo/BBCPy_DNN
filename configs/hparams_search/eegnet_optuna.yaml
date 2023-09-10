@@ -47,8 +47,8 @@ hydra:
     params:
       model.optimizer.lr: interval(0.0001, 0.1)
       data.batch_size: choice(32, 64, 128, 256)
-      model.net.kernel_1: choice(64, 128, 256)
-      model.net.kernel_2: choice(64, 128, 256)
-      model.net.F1: choice(8, 16, 32, 64)
-      model.net.F2: choice(8, 16, 32, 64)
+      model.net.kernel_1: choice(32, 64, 128)
+      model.net.kernel_2: choice(32, 64, 128)
+      model.net.F1: choice(4, 8, 16)
+      model.net.F2: choice(4, 8, 16)
       model.net.D: choice(2, 4, 8)
