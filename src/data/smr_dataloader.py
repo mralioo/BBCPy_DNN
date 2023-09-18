@@ -5,6 +5,10 @@ from typing import Optional
 import torch
 from lightning import LightningDataModule
 from sklearn.model_selection import KFold
+import pyrootutils
+pyrootutils.setup_root(__file__, indicator=".project-root", pythonpath=True)
+from src.utils.cross_validation import TrialWiseKFold
+
 from torch.utils.data import DataLoader
 
 from src.data.smr_datamodule import SMR_Data
@@ -52,13 +56,12 @@ class SRM_DataModule(LightningDataModule):
                  threshold_distance,
                  fallback_neighbors,
                  transform,
-                 norm_type,
-                 norm_axis,
+                 normalize,
                  concatenate_subjects,
                  train_val_split,
                  cross_validation,
-                 batch_size=32,
-                 num_workers=0,
+                 batch_size,
+                 num_workers,
                  pin_memory=False):
         super().__init__()
 
@@ -74,8 +77,7 @@ class SRM_DataModule(LightningDataModule):
         self.threshold_distance = threshold_distance
         self.fallback_neighbors = fallback_neighbors
         self.transform = transform
-        self.norm_type = norm_type
-        self.norm_axis = norm_axis
+        self.normalize = normalize
         self.subject_sessions_dict = subject_sessions_dict
         self.concatenate_subjects = concatenate_subjects
 
@@ -94,7 +96,8 @@ class SRM_DataModule(LightningDataModule):
         # data transformations TODO
         # self.transforms = transforms.Compose(
         #     [transforms.ToTensor(), transforms.Normalize((0.1307,), (0.3081,))]
-        # )
+        # # )
+
         self.transforms = None
         self.batch_size = batch_size
         self.num_workers = num_workers
@@ -111,15 +114,14 @@ class SRM_DataModule(LightningDataModule):
                                        subject_sessions_dict=self.subject_sessions_dict,
                                        concatenate_subjects=self.concatenate_subjects,
                                        loading_data_mode=self.loading_data_mode,
-                                       norm_type=self.norm_type,
-                                       norm_axis=self.norm_axis,
                                        ival=self.ival,
                                        bands=self.bands,
                                        chans=self.chans,
                                        classes=self.classes,
                                        threshold_distance=self.threshold_distance,
                                        fallback_neighbors=self.fallback_neighbors,
-                                       transform=self.transform)
+                                       transform=self.transform,
+                                       normalize=self.normalize)
 
         self.smr_datamodule.prepare_dataloader()
 
@@ -141,21 +143,26 @@ class SRM_DataModule(LightningDataModule):
                                                                                    self.train_val_split, )
 
         if self.cross_validation:
-            logging.info("Cross validation strategy")
+            logging.info("Cross validation strategy; TrialWiseKFold")
             # choose fold to train on
-            kf = KFold(n_splits=self.cross_validation["num_splits"],
-                       shuffle=True,
-                       random_state=self.cross_validation["split_seed"])
+            trial_kf = TrialWiseKFold(n_splits=self.cross_validation["num_splits"],
+                                      shuffle=False,)
+                                      # random_state=self.cross_validation["split_seed"])
 
-            all_splits = [k for k in kf.split(self.smr_datamodule.valid_trials)]
-            train_indexes, val_indexes = all_splits[self.k]
+            # kf = KFold(n_splits=self.cross_validation["num_splits"],
+            #            shuffle=True,
+            #            random_state=self.cross_validation["split_seed"])
+
+            all_splits_trial_kf = [k for k in trial_kf.split(self.smr_datamodule.valid_trials)]
+            # all_splits = [k for k in kf.split(self.smr_datamodule.valid_trials)]
+
+
+            train_indexes, val_indexes = all_splits_trial_kf[self.k]
+
             train_indexes, val_indexes = train_indexes.tolist(), val_indexes.tolist()
 
             self.train_data, self.val_data = (self.smr_datamodule.valid_trials[train_indexes],
                                               self.smr_datamodule.valid_trials[val_indexes])
-        # else:
-        #     logging.info("No strategy chosen")
-        #     self.train_data, self.val_data  = self.smr_datamodule.prepare_dataloader()
 
     def setup(self, stage: Optional[str] = None):
         """Load data. Set variables: num_classes."""
@@ -226,4 +233,4 @@ class SRM_DataModule(LightningDataModule):
             "train_data_shape": self.training_set.data.shape,
             "valid_data_shape": self.validation_set.data.shape,
             "test_data_shape": self.testing_set.data.shape,
-            "subject_info_dict": self.smr_datamodule.subject_info_dict}
+            "subjects_info_dict": self.smr_datamodule.subjects_info_dict}

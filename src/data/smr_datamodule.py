@@ -2,7 +2,6 @@ import logging
 
 import numpy as np
 from omegaconf import OmegaConf
-from sklearn.model_selection import KFold
 
 import bbcpy
 
@@ -106,31 +105,17 @@ class SMR_Data():
                  subject_sessions_dict,
                  concatenate_subjects,
                  loading_data_mode,
-                 norm_type,
-                 norm_axis,
                  ival,
                  bands,
                  chans,
                  classes,
                  threshold_distance,
                  fallback_neighbors,
-                 transform
+                 transform,
+                 normalize,
                  ):
 
         """ Initialize the SMR datamodule
-
-        Parameters
-        ----------
-        data_dir: str
-            Path to the data directory
-        ival: list
-            Timepoints to be selected
-        bands: list
-            Frequency bands to be selected
-        chans: list
-            Channels to be selected
-        classes: list
-            Classes to be selected
         """
         # FIXME : parameter are in type  omegaconf
 
@@ -143,9 +128,6 @@ class SMR_Data():
         self.concatenate_subjects = concatenate_subjects
         self.loading_data_mode = loading_data_mode
 
-        self.norm_type = norm_type
-        self.norm_axis = norm_axis
-
         self.classes = OmegaConf.to_container(classes)
         self.select_chans = OmegaConf.to_container(chans)
         self.select_timepoints = ival
@@ -154,8 +136,17 @@ class SMR_Data():
         self.threshold_distance = threshold_distance
         self.fallback_neighbors = fallback_neighbors
 
-        self.transform = transform
+        if transform:
+            self.transform = OmegaConf.to_container(transform)
+        else:
+            self.transform = None
 
+        if normalize:
+            self.normalize = OmegaConf.to_container(normalize)
+        else:
+            self.normalize = None
+
+        self.subjects_info_dict = {}
         self.subject_info_dict = {"noisechan": {}, "pvc": {self.task_name: {}}}
         self.subject_pvcs = []
 
@@ -421,6 +412,12 @@ class SMR_Data():
             subject_data_valid_dict[subject_name] = valid_obj_new
             subject_data_forced_dict[subject_name] = forced_obj_new
 
+            # TODO : calculate subject pvc
+            # calculate subject pvc
+            pvc_mean = np.mean(self.subject_pvcs)
+            self.subject_info_dict["pvc"][self.task_name]["mean"] = pvc_mean
+            self.subjects_info_dict[subject_name] = self.subject_info_dict
+
         # concatenate all the subjects data
         if concatenate_subjects:
             init_subject_name = list(subject_data_valid_dict.keys())[0]
@@ -449,19 +446,21 @@ class SMR_Data():
 
             subject_name = list(self.subject_sessions_dict.keys())[0]
             self.valid_trials, self.forced_trials = self.load_subject_sessions(subject_name=subject_name,
-                                                                     subject_dict=self.subject_sessions_dict)
+                                                                               subject_dict=self.subject_sessions_dict)
 
-            if self.norm_type is not None:
+            if not self.normalize:
                 self.valid_trials, norm_params_valid = normalize(self.valid_trials,
-                                                            norm_type=self.norm_type,
-                                                            axis=self.norm_axis)
+                                                                 norm_type=self.normalize["norm_type"],
+                                                                 axis=self.normalize["norm_axis"])
+
                 self.forced_trials, norm_params_forced = normalize(self.forced_trials,
-                                                              norm_type=self.norm_type,
-                                                              axis=self.norm_axis)
+                                                                   norm_type=self.normalize["norm_type"],
+                                                                   axis=self.normalize["norm_axis"])
 
             # calculate subject pvc
             pvc_mean = np.mean(self.subject_pvcs)
             self.subject_info_dict["pvc"][self.task_name]["mean"] = pvc_mean
+            self.subjects_info_dict[subject_name] = self.subject_info_dict
 
 
         elif self.loading_data_mode == "cross_subject_hpo":
@@ -469,22 +468,21 @@ class SMR_Data():
             self.valid_trials, self.forced_trials = self.load_all_subjects_sessions(self.subject_sessions_dict,
                                                                                     concatenate_subjects=True)
 
-            if self.norm_type is not None:
+            if not self.normalize:
                 self.valid_trials, norm_params_valid = normalize(data=self.valid_trials,
-                                                                 norm_type=self.norm_type,
-                                                                 axis=self.norm_axis)
+                                                                 norm_type=self.normalize["norm_type"],
+                                                                 axis=self.normalize["norm_axis"])
 
                 self.forced_trials, norm_params_forced = normalize(data=self.forced_trials,
-                                                                   norm_type=self.norm_type,
-                                                                   axis=self.norm_axis)
+                                                                   norm_type=self.normalize["norm_type"],
+                                                                   axis=self.normalize["norm_axis"])
 
         elif self.loading_data_mode == "cross_subject":
             self.valid_trials, self.forced_trials = self.load_subject_sessions(self.subject_sessions_dict,
-                                                                     self.concatenate_subjects)
+                                                                               self.concatenate_subjects)
 
         else:
             raise Exception(f"Loading data mode {self.loading_data_mode} not supported")
-
 
     def train_valid_split(self, data, train_val_split):
         """ Split the data into train and validation sets """
@@ -506,6 +504,7 @@ class SMR_Data():
             start_idx = end_idx
 
         return splits[0], splits[1]
+
 
 def normalize(data, norm_type="std", axis=None, keepdims=True, eps=10 ** -5, norm_params=None):
     """Normalize data along a given axis.

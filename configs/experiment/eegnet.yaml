@@ -18,6 +18,8 @@ tags: [ "torcheeg", "EEGNET-v1","Within-Subject", "RL" ]
 
 seed: 12345
 
+optimized_metric: "avg_val/acc_best"
+
 data:
   task_name: "LR"
   ival: 1s:10s:1ms
@@ -28,10 +30,17 @@ data:
   classes:
     - "R"
     - "L"
-  loading_data_mode: "within_subject"
-  transform: None
-  norm_type: "std"
-  norm_axis: 0
+  loading_data_mode: "cross_subject_hpo"
+#  subject_sessions_dict:
+#    S2: "all"
+#    S3: "all"
+#    S7: "all"
+#    S8: "all"
+#    S9: "all"
+  train_val_split: False
+  cross_validation: { num_splits: 3, split_seed: 1234 }
+  transform: False
+  normalize: { norm_type: "std", norm_axis: 0}
   batch_size: 32
   num_workers: 6
   pin_memory: False

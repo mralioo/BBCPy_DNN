@@ -104,19 +104,29 @@ class DnnLitModule(LightningModule):
         hparams["train_data_shape"] = state_dict["train_data_shape"]
         hparams["valid_data_shape"] = state_dict["valid_data_shape"]
         hparams["test_data_shape"] = state_dict["test_data_shape"]
-        hparams["subject_info_dict"] = state_dict["subject_info_dict"]
 
-        # FIXME CV subject info dict
-        # self.mlflow_client.log_param(self.run_id, "pvc", state_dict["subject_info_dict"]["pvc"][task_name]["mean"])
 
         # Use a temporary directory to save
-        # with tempfile.TemporaryDirectory() as tmpdirname:
-        #     hparam_path = os.path.join(tmpdirname, "Subject_info.json")
-        #     with open(hparam_path, "w") as f:
-        #         json.dump(hparams, f, default=default)
-        #
-        #     self.mlflow_client.log_artifacts(self.run_id,
-        #                                      local_dir=tmpdirname)
+        with tempfile.TemporaryDirectory() as tmpdirname:
+            hparam_path = os.path.join(tmpdirname, "data_shapes.json")
+            with open(hparam_path, "w") as f:
+                json.dump(hparams, f, default=default)
+
+            self.mlflow_client.log_artifacts(self.run_id,
+                                             local_dir=tmpdirname)
+
+        # FIXME CV subject info dict
+        for subject_name, pvc_dict in state_dict["subjects_info_dict"].items():
+            self.mlflow_client.log_param(self.run_id, "pvc", pvc_dict["pvc"][task_name]["mean"])
+
+            # Use a temporary directory to save
+            with tempfile.TemporaryDirectory() as tmpdirname:
+                hparam_path = os.path.join(tmpdirname, f"{subject_name}_info.json")
+                with open(hparam_path, "w") as f:
+                    json.dump(pvc_dict, f, default=default)
+
+                self.mlflow_client.log_artifacts(self.run_id,
+                                                 local_dir=tmpdirname)
 
         # save model summary as a text file
         with tempfile.TemporaryDirectory() as tmpdirname:

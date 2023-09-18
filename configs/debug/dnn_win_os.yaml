@@ -55,10 +55,9 @@ data:
     S3: "all"
   #  transform: "TSCeption"
   transform: False
-  norm_type: "std"
+  normalize: { norm_type: "std", norm_axis: 0}
   train_val_split: False
   cross_validation: { num_splits: 3, split_seed: 1234 }
-  norm_axis: 0
   num_workers: 4
   pin_memory: False
 

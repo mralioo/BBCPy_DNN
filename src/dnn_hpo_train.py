@@ -111,7 +111,9 @@ def train(cfg: DictConfig) -> Tuple[dict, dict]:
         for key, value in avg_metrics.items():
             trainer.logger.log_metrics({f"avg_{key}": value})
 
-    return avg_metrics, object_dict
+        train_metrics = trainer.callback_metrics
+
+    return train_metrics, object_dict
 
 
 def print_gpu_info():
@@ -147,7 +149,10 @@ def main(cfg: DictConfig) -> Optional[float]:
     metric_value = utils.get_metric_value(
         metric_dict=metric_dict, metric_name=cfg.get("optimized_metric")
     )
-    print(metric_value)
+
+    # TODO calculate and plot boxplot for each trial (matplotlib)
+
+
 
     # return optimized metric
     return metric_value
