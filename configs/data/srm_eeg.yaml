@@ -4,7 +4,7 @@ task_name: "LR"
 ival: "all"
 bands:
   - 8
-  - 13
+  - 40
 chans: [ "*" ]
 classes:
   - "R"

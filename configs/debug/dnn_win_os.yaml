@@ -4,13 +4,13 @@
 task_name: "debug-dnn-win"
 
 # Train
-train: True
-tune: False
+train: False
+tune: True
 
 defaults:
   - override /data: smr_datamodule.yaml
   - override /model: eegnet.yaml
-#  - override /model: TSCeption.yaml
+  #  - override /model: TSCeption.yaml
   - override /trainer: gpu.yaml
   - override /paths: default.yaml
   - override /extras: default.yaml
@@ -31,28 +31,34 @@ logger:
   mlflow:
     experiment_name: DEBUG-DNN-TRAIN
     run_name: EEGNet-v1
-#    run_name: TSCeption-v1
+    #    run_name: TSCeption-v1
     tracking_uri: file:${paths.log_dir}/mlflow/mlruns
+#    tags: ${tags}
 
 model:
   net:
-    chunk_size: 900
+    chunk_size: 9000
   plots_settings:
     plot_every_n_epoch: 1
 
 data:
   task_name: "LR"
-  ival: 1s:10s:10ms
+  ival: 1s:10s:1ms
   chans: [ "*" ]
   classes:
     - "R"
     - "L"
-  loading_data_mode: "within_subject"
+  loading_data_mode: "cross_subject_hpo"
+  #  loading_data_mode: "within_subject"
   subject_sessions_dict:
-    S1: "all"
-#  transform: "TSCeption"
-  transform: None
+    S2: "all"
+    S3: "all"
+  #  transform: "TSCeption"
+  transform: False
   norm_type: "std"
+  train_val_split: False
+  cross_validation: { num_splits: 3, split_seed: 1234 }
+  norm_axis: 0
   num_workers: 4
   pin_memory: False
 
@@ -64,7 +70,7 @@ trainer:
 
 callbacks:
   early_stopping:
-    monitor: "val_f1_epoch"
+    monitor: "val/f1_epoch"
     patience: 20
     mode: "max"
 
