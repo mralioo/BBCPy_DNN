@@ -4,6 +4,7 @@ from typing import Optional
 
 import torch
 from lightning import LightningDataModule
+from sklearn.model_selection import KFold
 from torch.utils.data import DataLoader
 
 from src.data.smr_datamodule import SMR_Data
@@ -55,12 +56,15 @@ class SRM_DataModule(LightningDataModule):
                  norm_axis,
                  concatenate_subjects,
                  train_val_split,
+                 cross_validation,
                  batch_size=32,
                  num_workers=0,
                  pin_memory=False):
         super().__init__()
 
         self.data_dir = data_dir
+
+        # data params
         self.task_name = task_name
         self.ival = ival
         self.bands = bands
@@ -72,10 +76,16 @@ class SRM_DataModule(LightningDataModule):
         self.transform = transform
         self.norm_type = norm_type
         self.norm_axis = norm_axis
-
         self.subject_sessions_dict = subject_sessions_dict
         self.concatenate_subjects = concatenate_subjects
+
+        # data strategy params
         self.train_val_split = train_val_split
+
+        if cross_validation is not None:
+            self.cross_validation = dict(cross_validation)
+        else:
+            self.cross_validation = None
 
         # this line allows to access init params with 'self.hparams' attribute
         # also ensures init params will be stored in ckpt
@@ -85,23 +95,24 @@ class SRM_DataModule(LightningDataModule):
         # self.transforms = transforms.Compose(
         #     [transforms.ToTensor(), transforms.Normalize((0.1307,), (0.3081,))]
         # )
-
+        self.transforms = None
         self.batch_size = batch_size
         self.num_workers = num_workers
         self.pin_memory = pin_memory
 
-    @property
-    def num_classes(self):
-        return len(self.classes)
+        # num_splits = 10 means our dataset will be split to 10 parts
+        # so we train on 90% of the data and validate on 10%
+        # assert 1 <= self.k <= self.num_splits, "incorrect fold number"
 
-    def prepare_data(self):
-        """ instantiate srm object. This method is called only from a single GPU."""
+    def load_raw_data(self):
+        """Load raw data from files."""
         self.smr_datamodule = SMR_Data(data_dir=self.data_dir,
                                        task_name=self.task_name,
                                        subject_sessions_dict=self.subject_sessions_dict,
                                        concatenate_subjects=self.concatenate_subjects,
                                        loading_data_mode=self.loading_data_mode,
-                                       train_val_split=self.train_val_split,
+                                       norm_type=self.norm_type,
+                                       norm_axis=self.norm_axis,
                                        ival=self.ival,
                                        bands=self.bands,
                                        chans=self.chans,
@@ -110,35 +121,57 @@ class SRM_DataModule(LightningDataModule):
                                        fallback_neighbors=self.fallback_neighbors,
                                        transform=self.transform)
 
+        self.smr_datamodule.prepare_dataloader()
+
+    @property
+    def num_classes(self):
+        return len(self.classes)
+
+    def update_kfold_index(self, k):
+        self.k = k
+
+    def prepare_data(self):
+        """ instantiate srm object. This method is called only from a single GPU."""
+        # download, split, etc...
+        logging.info("Preparing data...")
+
+        if self.train_val_split:
+            logging.info("Train and validation split strategy")
+            self.train_data, self.val_data = self.smr_datamodule.train_valid_split(self.smr_datamodule.valid_trials,
+                                                                                   self.train_val_split, )
+
+        if self.cross_validation:
+            logging.info("Cross validation strategy")
+            # choose fold to train on
+            kf = KFold(n_splits=self.cross_validation["num_splits"],
+                       shuffle=True,
+                       random_state=self.cross_validation["split_seed"])
+
+            all_splits = [k for k in kf.split(self.smr_datamodule.valid_trials)]
+            train_indexes, val_indexes = all_splits[self.k]
+            train_indexes, val_indexes = train_indexes.tolist(), val_indexes.tolist()
+
+            self.train_data, self.val_data = (self.smr_datamodule.valid_trials[train_indexes],
+                                              self.smr_datamodule.valid_trials[val_indexes])
+        # else:
+        #     logging.info("No strategy chosen")
+        #     self.train_data, self.val_data  = self.smr_datamodule.prepare_dataloader()
+
     def setup(self, stage: Optional[str] = None):
         """Load data. Set variables: num_classes."""
         # FIXME: chose data strategy concatenation or train_val_split
         if stage == "fit":
             # loading data and splitting into train and test sets
             logging.info("Loading train data...")
-            self.valid_trials, self.forced_trials = self.smr_datamodule.prepare_dataloader()
-
-            if self.norm_type is not None:
-                self.valid_trials, self.norm_params_valid = normalize(self.valid_trials, norm_type=self.norm_type,
-                                                                      axis=self.norm_axis)
-                self.forced_trials, self.norm_params_forced = normalize(self.forced_trials, norm_type=self.norm_type,
-                                                                        axis=self.norm_axis)
-
             # load and split datasets only if not loaded already
-            if self.train_val_split is not None:
-                train_data, val_data = self.smr_datamodule.train_valid_split(self.valid_trials)
-                self.training_set = SRMDataset(data=train_data)
-                self.validation_set = SRMDataset(data=val_data)
-                self.testing_set = SRMDataset(data=self.forced_trials)
-            else:
-                self.training_set = SRMDataset(data=self.valid_trials)
-                self.validation_set = SRMDataset(data=self.forced_trials)
+            self.training_set = SRMDataset(data=self.train_data)
+            self.validation_set = SRMDataset(data=self.val_data)
+            self.testing_set = SRMDataset(data=self.smr_datamodule.forced_trials)
 
         if stage == "test":
             logging.info("Loading test data...")
-
             # FIXME : what is the right why to normlize data for test set?
-            self.testing_set = SRMDataset(data=self.forced_trials)
+            self.testing_set = SRMDataset(data=self.smr_datamodule.forced_trials)
 
     def train_dataloader(self):
         return DataLoader(self.training_set,
@@ -146,7 +179,6 @@ class SRM_DataModule(LightningDataModule):
                           num_workers=self.hparams.num_workers,
                           pin_memory=self.hparams.pin_memory,
                           shuffle=True)
-
     def val_dataloader(self):
         return DataLoader(self.validation_set,
                           batch_size=self.hparams.batch_size,
@@ -160,6 +192,7 @@ class SRM_DataModule(LightningDataModule):
                           num_workers=self.hparams.num_workers,
                           pin_memory=self.hparams.pin_memory,
                           shuffle=False)
+
 
     def teardown(self, stage: Optional[str] = None):
         """Clean up after fit or test."""
@@ -185,6 +218,7 @@ class SRM_DataModule(LightningDataModule):
             if torch.cuda.is_available():
                 torch.cuda.empty_cache()
 
+
     def state_dict(self):
         """Extra things to save to checkpoint."""
         return {
@@ -193,67 +227,3 @@ class SRM_DataModule(LightningDataModule):
             "valid_data_shape": self.validation_set.data.shape,
             "test_data_shape": self.testing_set.data.shape,
             "subject_info_dict": self.smr_datamodule.subject_info_dict}
-
-
-def normalize(data, norm_type="std", axis=None, keepdims=True, eps=10 ** -5, norm_params=None):
-    """Normalize data along a given axis.
-
-    Parameters
-    ----------
-    data : numpy.ndarray
-        Data to normalize.
-    norm_type : str
-        Type of normalization. Can be 'std' or 'minmax'.
-    axis : int
-        Axis along which to normalize.
-    keepdims : bool
-        Whether to keep the dimensions of the original data.
-    eps : float
-        Epsilon to avoid division by zero.
-    norm_params : dict
-        Dictionary containing normalization parameters. If None, they will be computed.
-
-    Returns
-    -------
-    data_norm : numpy.ndarray
-        Normalized data.
-    norm_params : dict
-        Dictionary containing normalization parameters.
-
-    """
-
-    if norm_params is not None:
-        if norm_params["norm_type"] == "std":
-            data_norm = (data - norm_params["mean"]) / norm_params["std"]
-        elif norm_params["norm_type"] == "minmax":
-            data_norm = (data - norm_params["min"]) / (norm_params["max"] - norm_params["min"])
-        else:
-            raise RuntimeError("norm type {:} does not exist".format(norm_params["norm_type"]))
-
-    else:
-        if norm_type == "std":
-            data_std = data.std(axis=axis, keepdims=keepdims)
-            data_std[data_std < eps] = eps
-            data_mean = data.mean(axis=axis, keepdims=keepdims)
-            data_norm = (data - data_mean) / data_std
-            norm_params = dict(mean=data_mean, std=data_std, norm_type=norm_type, axis=axis, keepdims=keepdims)
-        elif norm_type == "minmax":
-            data_min = data.min(axis=axis, keepdims=keepdims)
-            data_max = data.max(axis=axis, keepdims=keepdims)
-            data_max[data_max == data_min] = data_max[data_max == data_min] + eps
-            data_norm = (data - data_min) / (data_max - data_min)
-            norm_params = dict(min=data_min, max=data_max, norm_type=norm_type, axis=axis, keepdims=keepdims)
-        elif norm_type is None:
-            data_norm, norm_params = data, None
-        else:
-            data_norm, norm_params = None, None
-            ValueError("Only 'std' and 'minmax' are supported")
-    return data_norm, norm_params
-
-
-def unnormalize(data_norm, norm_params):
-    if norm_params["norm_type"] == "std":
-        data = data_norm * norm_params["std"] + norm_params["mean"]
-    elif norm_params["norm_type"] == "minmax":
-        data = data_norm * (norm_params["max"] - norm_params["min"]) + norm_params["min"]
-    return data

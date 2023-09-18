@@ -34,9 +34,10 @@ class DnnLitModule(LightningModule):
             self,
             net,
             optimizer: torch.optim.Optimizer,
-            criterion: torch.nn,
             scheduler: torch.optim.lr_scheduler,
+            criterion: torch.nn.Module,
             plots_settings: dict,
+
     ):
         super().__init__()
         # this line allows to access init params with 'self.hparams' attribute
@@ -105,16 +106,17 @@ class DnnLitModule(LightningModule):
         hparams["test_data_shape"] = state_dict["test_data_shape"]
         hparams["subject_info_dict"] = state_dict["subject_info_dict"]
 
-        self.mlflow_client.log_param(self.run_id, "pvc", state_dict["subject_info_dict"]["pvc"][task_name]["mean"])
+        # FIXME CV subject info dict
+        # self.mlflow_client.log_param(self.run_id, "pvc", state_dict["subject_info_dict"]["pvc"][task_name]["mean"])
 
         # Use a temporary directory to save
-        with tempfile.TemporaryDirectory() as tmpdirname:
-            hparam_path = os.path.join(tmpdirname, "Subject_info.json")
-            with open(hparam_path, "w") as f:
-                json.dump(hparams, f, default=default)
-
-            self.mlflow_client.log_artifacts(self.run_id,
-                                             local_dir=tmpdirname)
+        # with tempfile.TemporaryDirectory() as tmpdirname:
+        #     hparam_path = os.path.join(tmpdirname, "Subject_info.json")
+        #     with open(hparam_path, "w") as f:
+        #         json.dump(hparams, f, default=default)
+        #
+        #     self.mlflow_client.log_artifacts(self.run_id,
+        #                                      local_dir=tmpdirname)
 
         # save model summary as a text file
         with tempfile.TemporaryDirectory() as tmpdirname:
@@ -167,7 +169,7 @@ class DnnLitModule(LightningModule):
         train_all_outputs = self.training_step_outputs
         train_all_targets = self.training_step_targets
         f1_macro_epoch = f1_score(train_all_outputs, train_all_targets, average='macro')
-        self.log("train_f1_epoch", f1_macro_epoch, on_step=False, on_epoch=True, prog_bar=True)
+        self.log("train/f1_epoch", f1_macro_epoch, on_step=False, on_epoch=True, prog_bar=True)
 
         if (self.current_epoch + 1) % self.plots_settings["plot_every_n_epoch"] == 0:
             # Calculate the confusion matrix and log it to mlflow
@@ -218,7 +220,7 @@ class DnnLitModule(LightningModule):
         val_all_outputs = self.val_step_outputs
         val_all_targets = self.val_step_targets
         val_f1_macro_epoch = f1_score(val_all_outputs, val_all_targets, average='macro')
-        self.log("val_f1_epoch", val_f1_macro_epoch, on_step=False, on_epoch=True, prog_bar=True)
+        self.log("val/f1_epoch", val_f1_macro_epoch, on_step=False, on_epoch=True, prog_bar=True)
 
         if (self.current_epoch + 1) % self.plots_settings["plot_every_n_epoch"] == 0:
             # Calculate the confusion matrix and log it to mlflow
@@ -258,7 +260,7 @@ class DnnLitModule(LightningModule):
         test_all_outputs = self.test_step_outputs
         test_all_targets = self.test_step_targets
         test_f1_macro_epoch = f1_score(test_all_targets, test_all_outputs, average='macro')
-        self.log("test_f1_epoch", test_f1_macro_epoch, on_step=False, on_epoch=True, prog_bar=True)
+        self.log("test/f1_epoch", test_f1_macro_epoch, on_step=False, on_epoch=True, prog_bar=True)
 
         cm = confusion_matrix(test_all_outputs, test_all_targets)
         title = f"Testing Confusion matrix, forced trials"
@@ -375,50 +377,6 @@ class DnnLitModule(LightningModule):
                 self.mlflow_client.log_artifacts(self.run_id,
                                                  local_dir=tmpdirname)
                 plt.close(figure)
-
-    def roc_curve_to_png(self, fpr, tpr, roc_auc, title, figure_file_name=None):
-        """Compute and plot the roc curve. It calculates a standard roc curve or the mean and std of a list of roc curve
-                    used for cross validation folds. """
-
-        plt.rcParams["font.family"] = 'DejaVu Sans'
-        plt.figure(figsize=(10, 7))
-
-        # TODO: remove if not needed
-        if set_name == "vali":
-            for i, (fpr, tpr) in enumerate(self.val_roc_curve_list):
-                auc_val = sklearn.metrics.auc(fpr, tpr)
-                plt.plot(fpr, tpr, lw=2, alpha=0.3, label='ROC fold %d (AUC = %0.2f)' % (i, auc_val))
-        elif set_name == "test":
-            for i, (fpr, tpr) in enumerate(self.test_roc_curve_list):
-                auc_val = sklearn.metrics.auc(fpr, tpr)
-                plt.plot(fpr, tpr, lw=2, alpha=0.3, label='ROC fold %d (AUC = %0.2f)' % (i, auc_val))
-
-        # TODO : walkaround check shape of tprs
-        new_tprs = []
-        mean_fpr_len = len(mean_fpr)
-        for tpr in tprs:
-            if len(tpr) != mean_fpr_len:
-                tpr = tpr[:mean_fpr_len]
-            new_tprs.append(tpr)
-
-        mean_tpr = np.mean(new_tprs, axis=0)
-        mean_tpr[-1] = 1.0  # set last value to 1.0 to have a complete curve
-        mean_auc = sklearn.metrics.auc(mean_fpr, mean_tpr)
-        std_auc = np.std(aucs)
-        plt.plot(mean_fpr, mean_tpr, color='b', label=r'Mean ROC (AUC = %0.2f $\pm$ %0.2f)' % (mean_auc, std_auc))
-
-        plt.plot([0, 1], [0, 1], linestyle='--', lw=2, color='r', label='Chance', alpha=.8)
-        plt.xlabel('False Positive Rate')
-        plt.ylabel('True Positive Rate')
-
-        plt.title(title)
-        plt.legend(loc='lower right')
-
-        with tempfile.TemporaryDirectory() as tmpdirname:
-            plot_path = os.path.join(tmpdirname, f"{title}.png")
-
-            plt.savefig(plot_path)  # Save the plot to the temporary directory
-            mlflow.log_artifacts(tmpdirname)
 
     def log_haprams(self):
         """Log all hyperparameters to mlflow"""

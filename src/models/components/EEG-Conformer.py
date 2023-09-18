@@ -184,6 +184,11 @@ if __name__ == '__main__':
     print(model)
     x = torch.randn(200, 1, 22, 1000).cuda()
 
+    tensor_cpu = torch.rand(5, 5)  # This creates a 5x5 tensor with random values between 0 and 1.
+
+    # Move the tensor to the GPU and cast to torch.cuda.FloatTensor
+    tensor_cuda = tensor_cpu.type(torch.cuda.FloatTensor)
+
     summary(model, (1, 22, 1000))
 
     out = model(x)
