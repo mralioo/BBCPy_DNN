@@ -3,8 +3,10 @@
 #SBATCH --partition=gpu-test
 #SBATCH --gpus-per-node=1
 #SBATCH --ntasks-per-node=2
+#SBATCH --mem=10G   # Request 100 GB of RAM
 #SBATCH --output=../jobs_outputs/debug-hpo-eegnet/%x_%j.o
 #SBATCH --error=../jobs_outputs/debug-hpo-eegnet/%x_%j.e
+#SBATCH --array=0-2   # Creates 100 jobs. Adjust this number based on how many trials you want to run.
 
 echo "I am a job with ID $SLURM_JOB_ID"
 echo "current working directory is $(pwd)"
