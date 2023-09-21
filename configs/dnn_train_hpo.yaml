@@ -26,10 +26,10 @@ defaults:
 
   # debugging config (enable through command line, e.g. `python train.py debug=default)
 #  - debug: null
-  - debug: dnn_win_os.yaml
+#  - debug: dnn_win_os.yaml
 
 # task name, determines output directory path
-task_name: "train"
+task_name: "tune"
 
 # tags to help you identify your experiments
 # you can overwrite this in experiment configs

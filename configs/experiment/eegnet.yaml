@@ -31,12 +31,6 @@ data:
     - "R"
     - "L"
   loading_data_mode: "cross_subject_hpo"
-#  subject_sessions_dict:
-#    S2: "all"
-#    S3: "all"
-#    S7: "all"
-#    S8: "all"
-#    S9: "all"
   train_val_split: False
   cross_validation: { num_splits: 3, split_seed: 1234 }
   transform: False

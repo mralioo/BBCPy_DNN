@@ -33,7 +33,7 @@ hydra:
     direction: maximize
 
     # total number of runs that will be executed
-    n_trials: 2
+    n_trials: 20
 
     # choose Optuna hyperparameter sampler
     # you can choose bayesian sampler (tpe), random search (without optimization), grid sampler, and others
