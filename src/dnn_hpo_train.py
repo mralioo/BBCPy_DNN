@@ -74,16 +74,8 @@ def train(cfg: DictConfig) -> Tuple[dict, dict]:
     if cfg.get("tune"):
         log.info("Starting hyperparameter optimization!")
 
-        # get trial id
-        if "SLURM_ARRAY_TASK_ID" in os.environ:
-            print(f"SLURM_ARRAY_TASK_ID is set to {os.environ['SLURM_ARRAY_TASK_ID']}")
-            trial_id = int(os.environ["SLURM_ARRAY_TASK_ID"])
-        # elif "SLURM_JOB_ID" in os.environ:
-        #     print(f"SLURM_JOB_ID is set to {os.environ['SLURM_JOB_ID']}")
-        #     trial_id = int(os.environ["SLURM_JOB_ID"])
-        else:
-            trial_id = HydraConfig.get().job.id
-            print(f"Hydra Job ID: {trial_id}")
+        trial_id = HydraConfig.get().job.id
+        print(f"Hydra Job ID: {trial_id}")
 
         # load data
         datamodule.load_raw_data()
