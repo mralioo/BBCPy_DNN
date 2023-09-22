@@ -143,8 +143,9 @@ class SRM_DataModule(LightningDataModule):
                                                                                    self.train_val_split, )
 
         if self.cross_validation:
-            logging.info("Cross validation strategy; TrialWiseKFold")
+            logging.info("Cross validation strategy; k-fold")
             # choose fold to train on
+
             # trial_kf = TrialWiseKFold(n_splits=self.cross_validation["num_splits"],
             #                           shuffle=False,)
             #                           # random_state=self.cross_validation["split_seed"])

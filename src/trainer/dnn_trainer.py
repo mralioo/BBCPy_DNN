@@ -92,6 +92,11 @@ class DnnLitModule(LightningModule):
         # by default lightning executes validation step sanity checks before training starts,
         # so it's worth to make sure validation metrics don't store results from these checks
         self.class_names = self.trainer.datamodule.classes
+
+        # mlflow autologging
+        self.mlflow_client = self.logger.experiment
+        self.run_id = self.logger.run_id
+
         model_name = self.hparams.net.__class__.__name__
 
         # log hyperparameters

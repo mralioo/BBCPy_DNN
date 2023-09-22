@@ -3,10 +3,11 @@ from omegaconf import OmegaConf
 import hydra
 import lightning as L
 import pyrootutils
-import torch
 from lightning import Callback, LightningDataModule, LightningModule, Trainer
 from lightning.pytorch.loggers import Logger
 from omegaconf import DictConfig
+
+from src.utils.device import print_gpu_info
 
 pyrootutils.setup_root(__file__, indicator=".project-root", pythonpath=True)
 # ------------------------------------------------------------------------------------ #
@@ -71,7 +72,7 @@ def train(cfg: DictConfig) -> Tuple[dict, dict]:
         datamodule.load_raw_data()
 
         cv_score = []
-        nums_folds = 2
+        nums_folds = cfg.data.cross_validation["num_splits"]
         for k in range(nums_folds):
             print(f"Fold {k}...")
             datamodule.update_kfold_index(k)
@@ -82,7 +83,7 @@ def train(cfg: DictConfig) -> Tuple[dict, dict]:
             logger: List[Logger] = utils.instantiate_loggers(cfg.get("logger"))
 
             log.info(f"Instantiating trainer <{cfg.trainer._target_}>")
-            trainer: Trainer = hydra.utils.instantiate(cfg.trainer, callbacks=callbacks, logger=logger)
+            trainer: Trainer = hydra.utils.instantiate(cfg.trainer, callbacks=callbacks, logger=logger, num_sanity_val_steps=0)
 
             object_dict = {
                 "cfg": cfg,
@@ -111,26 +112,8 @@ def train(cfg: DictConfig) -> Tuple[dict, dict]:
         for key, value in avg_metrics.items():
             trainer.logger.log_metrics({f"avg_{key}": value})
 
-        train_metrics = trainer.callback_metrics
 
-    return train_metrics, object_dict
-
-
-def print_gpu_info():
-    # Check if CUDA is available
-    if not torch.cuda.is_available():
-        print("CUDA is not available.")
-        return
-
-    # Print PyTorch and CUDA version
-    print("PyTorch Version:", torch.__version__)
-    print("CUDA Version:", torch.version.cuda)
-
-    # Print available GPUs
-    num_gpus = torch.cuda.device_count()
-    print(f"Number of GPUs available: {num_gpus}")
-    for i in range(num_gpus):
-        print(f"GPU {i}: {torch.cuda.get_device_name(i)}")
+    return avg_metrics, object_dict
 
 
 @hydra.main(version_base="1.3", config_path="../configs", config_name="dnn_train_hpo.yaml")
@@ -145,19 +128,9 @@ def main(cfg: DictConfig) -> Optional[float]:
     # train the model
     metric_dict, _ = train(cfg)
 
-    return metric_dict
 
-    # # safely retrieve metric value for hydra-based hyperparameter optimization
-    # metric_value = utils.get_metric_value(
-    #     metric_dict=metric_dict, metric_name=cfg.get("optimized_metric")
-    # )
-    #
-    # # TODO calculate and plot boxplot for each trial (matplotlib)
-    #
-    #
-    #
-    # # return optimized metric
-    # return metric_value
+    return metric_dict[cfg.optimized_metric]
+
 
 
 if __name__ == "__main__":

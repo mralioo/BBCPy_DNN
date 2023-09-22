@@ -25,7 +25,7 @@ defaults:
 #  - optional local: default.yaml
 
   # debugging config (enable through command line, e.g. `python train.py debug=default)
-#  - debug: null
+  - debug: null
 #  - debug: dnn_win_os.yaml
 
 # task name, determines output directory path
