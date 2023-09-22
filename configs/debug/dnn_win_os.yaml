@@ -58,7 +58,7 @@ data:
   normalize: { norm_type: "std", norm_axis: 0}
   train_val_split: False
   cross_validation: { num_splits: 3, split_seed: 1234 }
-  num_workers: 4
+  num_workers: 2
   pin_memory: False
 
 trainer:
@@ -70,7 +70,7 @@ trainer:
 callbacks:
   early_stopping:
     monitor: "val/f1_epoch"
-    patience: 20
+    patience: 2
     mode: "max"
 
 extras:

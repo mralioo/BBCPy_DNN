@@ -145,15 +145,15 @@ class SRM_DataModule(LightningDataModule):
         if self.cross_validation:
             logging.info("Cross validation strategy; TrialWiseKFold")
             # choose fold to train on
-            trial_kf = TrialWiseKFold(n_splits=self.cross_validation["num_splits"],
-                                      shuffle=False,)
-                                      # random_state=self.cross_validation["split_seed"])
+            # trial_kf = TrialWiseKFold(n_splits=self.cross_validation["num_splits"],
+            #                           shuffle=False,)
+            #                           # random_state=self.cross_validation["split_seed"])
 
-            # kf = KFold(n_splits=self.cross_validation["num_splits"],
-            #            shuffle=True,
-            #            random_state=self.cross_validation["split_seed"])
+            kf = KFold(n_splits=self.cross_validation["num_splits"],
+                       shuffle=True,
+                       random_state=self.cross_validation["split_seed"])
 
-            all_splits_trial_kf = [k for k in trial_kf.split(self.smr_datamodule.valid_trials)]
+            all_splits_trial_kf = [k for k in kf.split(self.smr_datamodule.valid_trials)]
             # all_splits = [k for k in kf.split(self.smr_datamodule.valid_trials)]
 
             train_indexes, val_indexes = all_splits_trial_kf[self.k]
@@ -206,6 +206,7 @@ class SRM_DataModule(LightningDataModule):
         if stage == "fit":
             del self.training_set
             del self.validation_set
+
         if stage == "test":
             del self.testing_set
 

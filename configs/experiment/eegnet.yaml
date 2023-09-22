@@ -32,11 +32,11 @@ data:
     - "L"
   loading_data_mode: "cross_subject_hpo"
   train_val_split: False
-  cross_validation: { num_splits: 2, split_seed: 1234 }
+  cross_validation: { num_splits: 5, split_seed: 1234 }
   transform: False
-  normalize: { norm_type: "std", norm_axis: 0}
+  normalize: { norm_type: "std", norm_axis: 0 }
   batch_size: 32
-  num_workers: 2
+  num_workers: 1
   pin_memory: False
 
 model:
@@ -55,7 +55,7 @@ model:
 
 trainer:
   min_epochs: 30
-  max_epochs: 50
+  max_epochs: 60
   check_val_every_n_epoch: 1
 
 paths:
@@ -67,8 +67,19 @@ paths:
 
 logger:
   mlflow:
-#    tags: ${tags}
     experiment_name: EEGNET-HPO
     run_name: S6
 
+callbacks:
+  model_checkpoint:
+    dirpath: ${paths.output_dir}/checkpoints
+    filename: "epoch_{epoch:03d}"
+    monitor: "val/acc_best"
+    mode: "max"
+    save_last: True
+    auto_insert_metric_name: False
 
+  early_stopping:
+    monitor: "val/acc_best"
+    patience: 10
+    mode: "max"
