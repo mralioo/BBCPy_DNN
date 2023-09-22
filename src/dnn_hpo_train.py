@@ -7,7 +7,7 @@ from lightning import Callback, LightningDataModule, LightningModule, Trainer
 from lightning.pytorch.loggers import Logger
 from omegaconf import DictConfig
 
-from src.utils.device import print_gpu_info
+
 
 pyrootutils.setup_root(__file__, indicator=".project-root", pythonpath=True)
 # ------------------------------------------------------------------------------------ #
@@ -28,6 +28,7 @@ pyrootutils.setup_root(__file__, indicator=".project-root", pythonpath=True)
 # ------------------------------------------------------------------------------------ #
 
 from src import utils
+from utils.device import print_gpu_info
 
 log = utils.get_pylogger(__name__)
 
