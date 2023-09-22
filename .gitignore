@@ -139,6 +139,8 @@ logs/
 # local folder
 /local/
 
+configs/db/default.yaml
+
 # vscode ide
 
 
