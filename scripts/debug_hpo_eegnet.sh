@@ -1,7 +1,7 @@
 #!/bin/bash
 #SBATCH --job-name=debug-hpo-eegnet
 #SBATCH --partition=gpu-test
-#SBATCH --gpus-per-node=1
+#SBATCH --gpus-per-node=4
 #SBATCH --ntasks-per-node=1
 #SBATCH --mem=10G   # Request 100 GB of RAM
 #SBATCH --output=../jobs_outputs/debug-hpo-eegnet/%x_%j.o

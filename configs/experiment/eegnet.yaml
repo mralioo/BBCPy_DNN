@@ -68,7 +68,7 @@ paths:
 logger:
   mlflow:
 #    tags: ${tags}
-    experiment_name: EEGNET-v1
+    experiment_name: EEGNET-HPO
     run_name: S6
 
 
