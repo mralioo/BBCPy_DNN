@@ -28,7 +28,7 @@ pyrootutils.setup_root(__file__, indicator=".project-root", pythonpath=True)
 # ------------------------------------------------------------------------------------ #
 
 from src import utils
-from utils.device import print_gpu_info
+from utils.device import print_gpu_info, print_memory_usage, print_cpu_cores, print_gpu_memory
 
 log = utils.get_pylogger(__name__)
 
@@ -76,6 +76,14 @@ def train(cfg: DictConfig) -> Tuple[dict, dict]:
         nums_folds = cfg.data.cross_validation["num_splits"]
         for k in range(nums_folds):
             print(f"Fold {k}...")
+
+            # print memory usage
+            print_memory_usage()
+            # print cpu cores
+            print_cpu_cores()
+            # print gpu info
+            print_gpu_memory()
+
             datamodule.update_kfold_index(k)
             # here we train the model on given split...
             # inti trainer again

@@ -41,3 +41,4 @@ pytest          # tests
 pytest-cov
 docstr-coverage
 sh            # for running bash commands in some tests (linux/macos only)
+GPUtil        # for getting GPU info

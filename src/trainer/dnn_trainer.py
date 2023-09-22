@@ -22,7 +22,7 @@ pyrootutils.setup_root(__file__, indicator=".project-root", pythonpath=True)
 from src.utils.vis import calculate_cm_stats
 import matplotlib.pyplot as plt
 import itertools
-import mlflow
+from src.utils.device import print_memory_usage, print_cpu_cores, print_gpu_memory
 
 
 class DnnLitModule(LightningModule):
@@ -81,7 +81,7 @@ class DnnLitModule(LightningModule):
 
         x, y = batch
         logits = self.forward(x).double()
-        classes_weights_tensor = torch.tensor(self.calculate_sample_weights(y)).to(self.device)
+        classes_weights_tensor = torch.tensor(self.calculate_sample_weights(y)).cuda()
         loss = self.criterion(weight=classes_weights_tensor)(logits, y)
         preds_ie = torch.argmax(logits, dim=1)
         preds = torch.nn.functional.one_hot(preds_ie, num_classes=self.num_classes)
@@ -89,6 +89,13 @@ class DnnLitModule(LightningModule):
         return loss, preds, y
 
     def on_train_start(self):
+
+        # print resources info
+        print_memory_usage()
+        print_cpu_cores()
+        print_gpu_memory()
+
+
         # by default lightning executes validation step sanity checks before training starts,
         # so it's worth to make sure validation metrics don't store results from these checks
         self.class_names = self.trainer.datamodule.classes
