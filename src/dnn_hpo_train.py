@@ -108,7 +108,7 @@ def train(cfg: DictConfig) -> Tuple[dict, dict]:
             cv_score.append(train_metrics)
 
         for key in cv_score[0].keys():
-            avg_metrics[key] = sum([fold[key].item() for fold in cv_score]) / len(cv_score)
+            avg_metrics[f"avg_{key}"] = sum([fold[key].item() for fold in cv_score]) / len(cv_score)
 
         for key, value in avg_metrics.items():
             trainer.logger.log_metrics({f"avg_{key}": value})
@@ -128,7 +128,6 @@ def main(cfg: DictConfig) -> Optional[float]:
 
     # train the model
     metric_dict, _ = train(cfg)
-
 
     return metric_dict[cfg.optimized_metric]
 
