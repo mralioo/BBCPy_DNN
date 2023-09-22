@@ -1,11 +1,16 @@
+import os
 from typing import List, Optional, Tuple
-from omegaconf import OmegaConf
+
 import hydra
 import lightning as L
 import pyrootutils
 from lightning import Callback, LightningDataModule, LightningModule, Trainer
 from lightning.pytorch.loggers import Logger
 from omegaconf import DictConfig
+from omegaconf import OmegaConf
+
+from hydra.core.hydra_config import HydraConfig
+
 
 
 
@@ -69,6 +74,17 @@ def train(cfg: DictConfig) -> Tuple[dict, dict]:
     if cfg.get("tune"):
         log.info("Starting hyperparameter optimization!")
 
+        # get trial id
+        if "SLURM_ARRAY_TASK_ID" in os.environ:
+            print(f"SLURM_ARRAY_TASK_ID is set to {os.environ['SLURM_ARRAY_TASK_ID']}")
+            trial_id = int(os.environ["SLURM_ARRAY_TASK_ID"])
+        # elif "SLURM_JOB_ID" in os.environ:
+        #     print(f"SLURM_JOB_ID is set to {os.environ['SLURM_JOB_ID']}")
+        #     trial_id = int(os.environ["SLURM_JOB_ID"])
+        else:
+            trial_id = HydraConfig.get().job.id
+            print(f"Hydra Job ID: {trial_id}")
+
         # load data
         datamodule.load_raw_data()
 
@@ -88,11 +104,14 @@ def train(cfg: DictConfig) -> Tuple[dict, dict]:
             # here we train the model on given split...
             # inti trainer again
             log.info("Instantiating loggers...")
-            OmegaConf.update(cfg.get("logger").mlflow, "run_name", f"{run_name}_fold_{k}", merge=True)
+            OmegaConf.update(cfg.get("logger").mlflow, "run_name", f"T{trial_id}_CV_{k}_{run_name}", merge=True)
             logger: List[Logger] = utils.instantiate_loggers(cfg.get("logger"))
 
             log.info(f"Instantiating trainer <{cfg.trainer._target_}>")
-            trainer: Trainer = hydra.utils.instantiate(cfg.trainer, callbacks=callbacks, logger=logger, num_sanity_val_steps=0)
+            trainer: Trainer = hydra.utils.instantiate(cfg.trainer,
+                                                       callbacks=callbacks,
+                                                       logger=logger,
+                                                       num_sanity_val_steps=0)
 
             object_dict = {
                 "cfg": cfg,
@@ -121,7 +140,6 @@ def train(cfg: DictConfig) -> Tuple[dict, dict]:
         for key, value in avg_metrics.items():
             trainer.logger.log_metrics({f"avg_{key}": value})
 
-
     return avg_metrics, object_dict
 
 
@@ -138,7 +156,6 @@ def main(cfg: DictConfig) -> Optional[float]:
     metric_dict, _ = train(cfg)
 
     return metric_dict[cfg.optimized_metric]
-
 
 
 if __name__ == "__main__":
