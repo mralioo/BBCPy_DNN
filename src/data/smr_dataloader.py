@@ -156,7 +156,6 @@ class SRM_DataModule(LightningDataModule):
             all_splits_trial_kf = [k for k in trial_kf.split(self.smr_datamodule.valid_trials)]
             # all_splits = [k for k in kf.split(self.smr_datamodule.valid_trials)]
 
-
             train_indexes, val_indexes = all_splits_trial_kf[self.k]
 
             train_indexes, val_indexes = train_indexes.tolist(), val_indexes.tolist()

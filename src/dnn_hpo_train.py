@@ -71,7 +71,7 @@ def train(cfg: DictConfig) -> Tuple[dict, dict]:
         datamodule.load_raw_data()
 
         cv_score = []
-        nums_folds = 3
+        nums_folds = 2
         for k in range(nums_folds):
             print(f"Fold {k}...")
             datamodule.update_kfold_index(k)

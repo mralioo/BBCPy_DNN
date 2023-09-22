@@ -27,7 +27,7 @@ hydra:
     study_name: eegnet_hpo
 
     # number of parallel workers
-    n_jobs: 2
+    n_jobs: 1
 
     # 'minimize' or 'maximize' the objective
     direction: maximize
@@ -41,7 +41,7 @@ hydra:
     sampler:
       _target_: optuna.samplers.TPESampler
       seed: 1234
-      n_startup_trials: 10 # number of random sampling runs before optimization starts
+#      n_startup_trials: 2 # number of random sampling runs before optimization starts
 
     # define hyperparameter search space
     params:
