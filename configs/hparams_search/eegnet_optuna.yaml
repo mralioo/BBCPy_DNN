@@ -4,6 +4,7 @@
 # python train.py -m hparams_search=mnist_optuna experiment=example
 
 defaults:
+  - override /db: default.yaml
   - override /hydra/sweeper: optuna
 
 # choose metric which will be optimized by Optuna
@@ -21,7 +22,7 @@ hydra:
     # storage URL to persist optimization results
     # for example, you can use SQLite if you set 'sqlite:///example.db'
 #    storage: sqlite:///example.db
-    storage: null
+    storage: postgresql://${db.username}:${db.password}@${db.hostname}:${db.port}/${db.database}
 
     # name of the study to persist optimization results
     study_name: eegnet_hpo
@@ -33,7 +34,7 @@ hydra:
     direction: maximize
 
     # total number of runs that will be executed
-    n_trials: 5
+    n_trials: 2
 
     # choose Optuna hyperparameter sampler
     # you can choose bayesian sampler (tpe), random search (without optimization), grid sampler, and others
