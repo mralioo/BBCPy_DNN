@@ -23,7 +23,7 @@ from src.utils.vis import calculate_cm_stats
 import matplotlib.pyplot as plt
 import itertools
 from src.utils.device import print_memory_usage, print_cpu_cores, print_gpu_memory
-
+from torch.cuda.amp import autocast
 
 class DnnLitModule(LightningModule):
     """Pytorch Lightning module for deep neural network model.
@@ -80,9 +80,15 @@ class DnnLitModule(LightningModule):
     def model_step(self, batch: Any):
 
         x, y = batch
-        logits = self.forward(x).double()
-        classes_weights_tensor = torch.tensor(self.calculate_sample_weights(y)).cuda()
+
+        # TODO Runs the forward pass in mixed precision
+        # with autocast():
+
+        logits = self.forward(x)
+        classes_weights_tensor = torch.tensor(self.calculate_sample_weights(y)).to(self.device)
         loss = self.criterion(weight=classes_weights_tensor)(logits, y)
+        # loss = self.criterion()(logits, y)
+
         preds_ie = torch.argmax(logits, dim=1)
         preds = torch.nn.functional.one_hot(preds_ie, num_classes=self.num_classes)
 
@@ -408,11 +414,16 @@ class DnnLitModule(LightningModule):
     def calculate_sample_weights(self, y):
         """Calculate sample weights for unbalanced dataset"""
         y_np = np.argmax(y.cpu().numpy(), axis=1)
-        classes = np.unique(y_np)
-        if len(classes) == 1:
-            class_weights = np.array([1, 1])
-        else:
-            class_weights = sklearn.utils.class_weight.compute_class_weight(class_weight='balanced',
-                                                                            classes=classes,
-                                                                            y=y_np)
+
+        num_classes = y.shape[1]
+        # If the number of samples is small, just return equal weights for all classes
+        if len(y_np) < 10:  # Define SOME_THRESHOLD as per your needs
+            return np.ones(num_classes)
+
+        # All possible classes based on the shape of y
+        total_classes = np.arange(num_classes)
+
+        class_weights = sklearn.utils.class_weight.compute_class_weight(class_weight='balanced',
+                                                                        classes=total_classes,
+                                                                        y=y_np)
         return class_weights

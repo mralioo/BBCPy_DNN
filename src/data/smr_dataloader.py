@@ -6,13 +6,14 @@ import torch
 from lightning import LightningDataModule
 from sklearn.model_selection import KFold
 import pyrootutils
+from sklearn.preprocessing import OneHotEncoder
+
 pyrootutils.setup_root(__file__, indicator=".project-root", pythonpath=True)
 from src.utils.cross_validation import TrialWiseKFold
 
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, Dataset
 
 from src.data.smr_datamodule import SMR_Data
-from src.data.smr_dataset import SRMDataset
 
 logging.getLogger().setLevel(logging.INFO)
 
@@ -235,3 +236,25 @@ class SRM_DataModule(LightningDataModule):
             "valid_data_shape": self.validation_set.data.shape,
             "test_data_shape": self.testing_set.data.shape,
             "subjects_info_dict": self.smr_datamodule.subjects_info_dict}
+
+
+class SRMDataset(Dataset):
+    def __init__(self, data):
+        # Perform one-hot encoding on labels
+        y = data.y
+        onehot_encoder = OneHotEncoder(sparse_output=False)
+        integer_encoded = y.reshape(-1, 1)
+        onehot_encoded = onehot_encoder.fit_transform(integer_encoded)
+
+        self.data = torch.tensor(data).float()
+        self.y_oe = torch.tensor(onehot_encoded)
+
+    def __getitem__(self, index):
+        # fixme
+        x = self.data[index].unsqueeze(dim=0)
+        y = self.y_oe[index]
+
+        return x, y
+
+    def __len__(self):
+        return len(self.data)
