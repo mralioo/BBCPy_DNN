@@ -20,7 +20,8 @@ hydra:
 
     # storage URL to persist optimization results
     # for example, you can use SQLite if you set 'sqlite:///example.db'
-    storage: postgresql://${db.username}:${db.password}@${db.hostname}:${db.port}/${db.database}
+#    storage: postgresql://${db.username}:${db.password}@${db.hostname}:${db.port}/${db.database}
+    storage: null
 
     # name of the study to persist optimization results
     study_name: eegnet_hpo
