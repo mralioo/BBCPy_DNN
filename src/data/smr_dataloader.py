@@ -2,14 +2,13 @@ import gc
 import logging
 from typing import Optional
 
+import pyrootutils
 import torch
 from lightning import LightningDataModule
 from sklearn.model_selection import KFold
-import pyrootutils
 from sklearn.preprocessing import OneHotEncoder
 
 pyrootutils.setup_root(__file__, indicator=".project-root", pythonpath=True)
-from src.utils.cross_validation import TrialWiseKFold
 
 from torch.utils.data import DataLoader, Dataset
 
@@ -82,10 +81,12 @@ class SRM_DataModule(LightningDataModule):
         self.subject_sessions_dict = subject_sessions_dict
         self.concatenate_subjects = concatenate_subjects
 
-        # data strategy params
-        self.train_val_split = train_val_split
+        if train_val_split:
+            self.train_val_split = dict(train_val_split)
+        else:
+            self.train_val_split = None
 
-        if cross_validation is not None:
+        if cross_validation:
             self.cross_validation = dict(cross_validation)
         else:
             self.cross_validation = None
@@ -139,9 +140,12 @@ class SRM_DataModule(LightningDataModule):
         logging.info("Preparing data...")
 
         if self.train_val_split:
+            self.load_raw_data()
+
             logging.info("Train and validation split strategy")
+
             self.train_data, self.val_data = self.smr_datamodule.train_valid_split(self.smr_datamodule.valid_trials,
-                                                                                   self.train_val_split, )
+                                                                                   self.train_val_split)
 
         if self.cross_validation:
             logging.info("Cross validation strategy; k-fold")
@@ -174,7 +178,6 @@ class SRM_DataModule(LightningDataModule):
             # load and split datasets only if not loaded already
             self.training_set = SRMDataset(data=self.train_data)
             self.validation_set = SRMDataset(data=self.val_data)
-            self.testing_set = SRMDataset(data=self.smr_datamodule.forced_trials)
 
         if stage == "test":
             logging.info("Loading test data...")
@@ -187,6 +190,7 @@ class SRM_DataModule(LightningDataModule):
                           num_workers=self.hparams.num_workers,
                           pin_memory=self.hparams.pin_memory,
                           shuffle=True)
+
     def val_dataloader(self):
         return DataLoader(self.validation_set,
                           batch_size=self.hparams.batch_size,
@@ -200,7 +204,6 @@ class SRM_DataModule(LightningDataModule):
                           num_workers=self.hparams.num_workers,
                           pin_memory=self.hparams.pin_memory,
                           shuffle=False)
-
 
     def teardown(self, stage: Optional[str] = None):
         """Clean up after fit or test."""
@@ -226,7 +229,6 @@ class SRM_DataModule(LightningDataModule):
             # If using CUDA
             if torch.cuda.is_available():
                 torch.cuda.empty_cache()
-
 
     def state_dict(self):
         """Extra things to save to checkpoint."""

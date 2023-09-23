@@ -1,10 +1,11 @@
+import itertools
 import json
 import os.path
 import sys
 import tempfile
 from typing import Any
-from torch.autograd import Variable
 
+import matplotlib.pyplot as plt
 import numpy as np
 import pyrootutils
 import sklearn
@@ -16,14 +17,15 @@ from sklearn.metrics import f1_score
 from torchmetrics import MaxMetric, MeanMetric
 from torchmetrics.classification.accuracy import Accuracy
 
-from src.utils.file_mgmt import default
-
 pyrootutils.setup_root(__file__, indicator=".project-root", pythonpath=True)
+from src.utils.file_mgmt import default
 from src.utils.vis import calculate_cm_stats
-import matplotlib.pyplot as plt
-import itertools
+
 from src.utils.device import print_memory_usage, print_cpu_cores, print_gpu_memory
-from torch.cuda.amp import autocast
+from src import utils
+
+logging = utils.get_pylogger(__name__)
+
 
 class DnnLitModule(LightningModule):
     """Pytorch Lightning module for deep neural network model.
@@ -101,7 +103,6 @@ class DnnLitModule(LightningModule):
         print_cpu_cores()
         print_gpu_memory()
 
-
         # by default lightning executes validation step sanity checks before training starts,
         # so it's worth to make sure validation metrics don't store results from these checks
         self.class_names = self.trainer.datamodule.classes
@@ -122,7 +123,6 @@ class DnnLitModule(LightningModule):
         hparams["train_data_shape"] = state_dict["train_data_shape"]
         hparams["valid_data_shape"] = state_dict["valid_data_shape"]
         hparams["test_data_shape"] = state_dict["test_data_shape"]
-
 
         # Use a temporary directory to save
         with tempfile.TemporaryDirectory() as tmpdirname:
@@ -186,9 +186,6 @@ class DnnLitModule(LightningModule):
         # update and log metrics
         self.train_loss(loss)
         self.train_acc(preds, targets)
-        self.log("train/loss", self.train_loss, on_step=False, on_epoch=True, prog_bar=True)
-        self.log("train/acc", self.train_acc, on_step=False, on_epoch=True, prog_bar=True)
-
         # return loss or backpropagation will fail
         return loss
 
@@ -198,6 +195,8 @@ class DnnLitModule(LightningModule):
         train_all_targets = self.training_step_targets
         f1_macro_epoch = f1_score(train_all_outputs, train_all_targets, average='macro')
         self.log("train/f1_epoch", f1_macro_epoch, on_step=False, on_epoch=True, prog_bar=True)
+        self.log("train/loss", self.train_loss, on_step=False, on_epoch=True, prog_bar=True)
+        self.log("train/acc", self.train_acc, on_step=False, on_epoch=True, prog_bar=True)
 
         if (self.current_epoch + 1) % self.plots_settings["plot_every_n_epoch"] == 0:
             # Calculate the confusion matrix and log it to mlflow
@@ -237,8 +236,6 @@ class DnnLitModule(LightningModule):
         # update and log metrics
         self.val_loss(loss)
         self.val_acc(preds, targets)
-        self.log("val/loss", self.val_loss, on_step=False, on_epoch=True, prog_bar=True)
-        self.log("val/acc", self.val_acc, on_step=False, on_epoch=True, prog_bar=True)
 
         return loss
 
@@ -249,6 +246,8 @@ class DnnLitModule(LightningModule):
         val_all_targets = self.val_step_targets
         val_f1_macro_epoch = f1_score(val_all_outputs, val_all_targets, average='macro')
         self.log("val/f1_epoch", val_f1_macro_epoch, on_step=False, on_epoch=True, prog_bar=True)
+        self.log("val/loss", self.val_loss, on_step=False, on_epoch=True, prog_bar=True)
+        self.log("val/acc", self.val_acc, on_step=False, on_epoch=True, prog_bar=True)
 
         if (self.current_epoch + 1) % self.plots_settings["plot_every_n_epoch"] == 0:
             # Calculate the confusion matrix and log it to mlflow
@@ -280,8 +279,6 @@ class DnnLitModule(LightningModule):
         # update and log metrics
         self.test_loss(loss)
         self.test_acc(preds, targets)
-        self.log("test/loss", self.test_loss, on_step=False, on_epoch=True, prog_bar=True)
-        self.log("test/acc", self.test_acc, on_step=False, on_epoch=True, prog_bar=True)
 
     def on_test_epoch_end(self):
         ## F1 Macro all epoch saving outputs and target per batch
@@ -289,6 +286,8 @@ class DnnLitModule(LightningModule):
         test_all_targets = self.test_step_targets
         test_f1_macro_epoch = f1_score(test_all_targets, test_all_outputs, average='macro')
         self.log("test/f1_epoch", test_f1_macro_epoch, on_step=False, on_epoch=True, prog_bar=True)
+        self.log("test/loss", self.test_loss, on_step=False, on_epoch=True, prog_bar=True)
+        self.log("test/acc", self.test_acc, on_step=False, on_epoch=True, prog_bar=True)
 
         cm = confusion_matrix(test_all_outputs, test_all_targets)
         title = f"Testing Confusion matrix, forced trials"
@@ -411,19 +410,45 @@ class DnnLitModule(LightningModule):
         for k, v in self.hparams.items():
             self.mlflow_client.log_param(self.run_id, k, v)
 
-    def calculate_sample_weights(self, y):
+    def calculate_sample_weights(self, y, NUM_MIN_SAMPLES=10):
         """Calculate sample weights for unbalanced dataset"""
         y_np = np.argmax(y.cpu().numpy(), axis=1)
 
         num_classes = y.shape[1]
         # If the number of samples is small, just return equal weights for all classes
-        if len(y_np) < 10:  # Define SOME_THRESHOLD as per your needs
+        if len(y_np) < NUM_MIN_SAMPLES:  # Define SOME_THRESHOLD as per your needs
             return np.ones(num_classes)
 
+        # Classes present in y
+        present_classes = np.unique(y_np)
         # All possible classes based on the shape of y
-        total_classes = np.arange(num_classes)
 
-        class_weights = sklearn.utils.class_weight.compute_class_weight(class_weight='balanced',
-                                                                        classes=total_classes,
-                                                                        y=y_np)
-        return class_weights
+
+        if len(present_classes) < num_classes:
+            # Compute weights for present classes
+            present_class_weights = sklearn.utils.class_weight.compute_class_weight(class_weight='balanced',
+                                                                                    classes=present_classes,
+                                                                                    y=y_np)
+
+            # Initialize weights for all classes with a high value
+            all_class_weights = np.max(present_class_weights) * np.ones(num_classes)
+
+            # Set the computed weights for the classes present in y
+            for cls, weight in zip(present_classes, present_class_weights):
+                all_class_weights[cls] = weight
+
+
+
+            return all_class_weights
+
+        else:
+            total_classes = np.arange(num_classes)
+            class_weights = sklearn.utils.class_weight.compute_class_weight(class_weight='balanced',
+                                                                            classes=total_classes,
+                                                                            y=y_np)
+
+            return class_weights
+
+
+
+
