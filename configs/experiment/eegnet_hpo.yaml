@@ -38,7 +38,7 @@ data:
   transform: False
   normalize: { norm_type: "std", norm_axis: 0 }
   batch_size: 32
-  num_workers: 6
+  num_workers: 2
   pin_memory: True
 
 model:

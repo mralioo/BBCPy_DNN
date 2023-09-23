@@ -13,6 +13,7 @@ pyrootutils.setup_root(__file__, indicator=".project-root", pythonpath=True)
 from torch.utils.data import DataLoader, Dataset
 
 from src.data.smr_datamodule import SMR_Data
+from src.utils.device import print_memory_usage, print_cpu_cores, print_gpu_info
 
 logging.getLogger().setLevel(logging.INFO)
 
@@ -126,6 +127,13 @@ class SRM_DataModule(LightningDataModule):
                                        normalize=self.normalize)
 
         self.smr_datamodule.prepare_dataloader()
+        # Info about resources
+        print_memory_usage()
+        print_cpu_cores()
+        print_gpu_info()
+
+
+
 
     @property
     def num_classes(self):
@@ -178,6 +186,11 @@ class SRM_DataModule(LightningDataModule):
             # load and split datasets only if not loaded already
             self.training_set = SRMDataset(data=self.train_data)
             self.validation_set = SRMDataset(data=self.val_data)
+
+            # Info about resources
+            print_memory_usage()
+            print_cpu_cores()
+            print_gpu_info()
 
         if stage == "test":
             logging.info("Loading test data...")
