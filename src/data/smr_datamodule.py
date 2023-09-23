@@ -327,7 +327,6 @@ class SMR_Data():
         if not hasattr(self, "subjects_sessions_path_dict"):
             self.subjects_sessions_path_dict = self.collect_subject_sessions(subject_dict)
 
-
         self.loaded_subjects_sessions[subject_name] = {}
 
         # sessions_list = sessions_path_dict[subject_name]
@@ -340,7 +339,8 @@ class SMR_Data():
 
             # load the first session to init the object
             valid_obj_new, forced_obj_new = self.load_forced_valid_trials_data(session_name=init_session_name,
-                                                                               sessions_group_path=self.subjects_sessions_path_dict[
+                                                                               sessions_group_path=
+                                                                               self.subjects_sessions_path_dict[
                                                                                    subject_name])
 
             logging.info(f"Loading {init_session_name} finalized (1 from {str(len(sessions_list))})")
@@ -352,7 +352,8 @@ class SMR_Data():
 
                 try:
                     valid_obj, forced_obj = self.load_forced_valid_trials_data(session_name=session_name,
-                                                                               sessions_group_path=self.subjects_sessions_path_dict[
+                                                                               sessions_group_path=
+                                                                               self.subjects_sessions_path_dict[
                                                                                    subject_name])
                     # check if the valid data has the same datapoints
                     if valid_obj.shape[2] != valid_obj_new.shape[2]:
@@ -385,7 +386,8 @@ class SMR_Data():
             init_session_name = sessions_list[0]
 
             valid_obj_new, forced_obj_new = self.load_forced_valid_trials_data(session_name=init_session_name,
-                                                                               sessions_group_path=self.subjects_sessions_path_dict[
+                                                                               sessions_group_path=
+                                                                               self.subjects_sessions_path_dict[
                                                                                    subject_name])
 
             self.loaded_subjects_sessions[subject_name][init_session_name] = [valid_obj_new.shape, forced_obj_new.shape]
@@ -393,7 +395,7 @@ class SMR_Data():
 
         return valid_obj_new, forced_obj_new
 
-    def load_all_subjects_sessions(self, subject_dict, concatenate_subjects=False):
+    def load_all_subjects_sessions(self, subject_dict, concatenate_subjects=True):
         """ Load all the subjects sessions and concatenate them """
 
         # FIXME : not completed
@@ -401,17 +403,16 @@ class SMR_Data():
         self.subjects_sessions_path_dict = self.collect_subject_sessions(subject_dict)
 
         subject_data_valid_dict = {}
-        subject_data_forced_dict = {}
+        # subject_data_forced_dict = {}
 
         for subject_name, sessions_ids in self.subjects_sessions_path_dict.items():
             logging.info(f"Loading subject {subject_name} sessions")
-            valid_obj_new, forced_obj_new = self.load_subject_sessions(subject_name=subject_name,
-                                                                       subject_dict=subject_dict)
+            valid_obj_new, _ = self.load_subject_sessions(subject_name=subject_name,
+                                                          subject_dict=subject_dict)
 
             # TODO : calculate subject pvc
-
             subject_data_valid_dict[subject_name] = valid_obj_new
-            subject_data_forced_dict[subject_name] = forced_obj_new
+            # subject_data_forced_dict[subject_name] = forced_obj_new
 
             # TODO : calculate subject pvc
             # calculate subject pvc
@@ -423,22 +424,21 @@ class SMR_Data():
         if concatenate_subjects:
             init_subject_name = list(subject_data_valid_dict.keys())[0]
             valid_trials = subject_data_valid_dict[init_subject_name]
-            forced_trials = subject_data_forced_dict[init_subject_name]
+            # forced_trials = subject_data_forced_dict[init_subject_name]
 
             for subject_name in subject_data_valid_dict.keys():
                 if subject_name == init_subject_name:
                     continue
                 valid_trials = valid_trials.append(subject_data_valid_dict[subject_name], axis=0)
-                forced_trials = forced_trials.append(subject_data_forced_dict[subject_name], axis=0)
+                # forced_trials = forced_trials.append(subject_data_forced_dict[subject_name], axis=0)
 
             # delete the subject data dict
             del subject_data_valid_dict
-            del subject_data_forced_dict
+            # del subject_data_forced_dict
 
-            return valid_trials, forced_trials
-
+            return valid_trials
         else:
-            return subject_data_valid_dict, subject_data_forced_dict
+            return subject_data_valid_dict
 
     def prepare_dataloader(self):
         """ Prepare the data for the classification """
@@ -466,17 +466,14 @@ class SMR_Data():
 
         elif self.loading_data_mode == "cross_subject_hpo":
 
-            self.valid_trials, self.forced_trials = self.load_all_subjects_sessions(self.subject_sessions_dict,
-                                                                                    concatenate_subjects=True)
+            self.valid_trials = self.load_all_subjects_sessions(self.subject_sessions_dict,
+                                                                concatenate_subjects=True)
 
             if not self.normalize:
                 self.valid_trials, norm_params_valid = normalize(data=self.valid_trials,
                                                                  norm_type=self.normalize["norm_type"],
                                                                  axis=self.normalize["norm_axis"])
 
-                self.forced_trials, norm_params_forced = normalize(data=self.forced_trials,
-                                                                   norm_type=self.normalize["norm_type"],
-                                                                   axis=self.normalize["norm_axis"])
 
         elif self.loading_data_mode == "cross_subject":
             self.valid_trials, self.forced_trials = self.load_subject_sessions(self.subject_sessions_dict,
@@ -485,26 +482,29 @@ class SMR_Data():
         else:
             raise Exception(f"Loading data mode {self.loading_data_mode} not supported")
 
-    def train_valid_split(self, data, train_val_split):
+    def train_valid_split(self, data, train_val_split_dict):
         """ Split the data into train and validation sets """
 
-        # Shuffle the data
-        assert np.isclose(sum(train_val_split), 1.0), "Split ratios should sum up to 1.0"
+        random_seed = train_val_split_dict["random_seed"]
+        val_ratio = train_val_split_dict["val_size"]
 
+        # Set the random seed for reproducibility
+        np.random.seed(random_seed)
+
+        # Shuffle the data
         # TODO : Shuffle the SMR data object
         indices = np.random.permutation(len(data))
         data = data[indices]
         data.y = data.y[indices]
 
-        splits = []
-        start_idx = 0
+        # Compute the index where the validation set starts
+        val_start_idx = int(len(data) * (1 - val_ratio))
 
-        for ratio in train_val_split:
-            end_idx = start_idx + int(len(data) * ratio)
-            splits.append(data[start_idx:end_idx])
-            start_idx = end_idx
+        # Split the data into training and validation sets
+        train_data = data[:val_start_idx]
+        val_data = data[val_start_idx:]
 
-        return splits[0], splits[1]
+        return train_data, val_data
 
 
 def normalize(data, norm_type="std", axis=None, keepdims=True, eps=10 ** -5, norm_params=None):
