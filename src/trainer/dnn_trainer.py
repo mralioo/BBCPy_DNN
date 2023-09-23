@@ -123,7 +123,7 @@ class DnnLitModule(LightningModule):
         # hparams["classes_weights"] = state_dict["classes_weights"]
         hparams["train_data_shape"] = state_dict["train_data_shape"]
         hparams["valid_data_shape"] = state_dict["valid_data_shape"]
-        hparams["test_data_shape"] = state_dict["test_data_shape"]
+        # hparams["test_data_shape"] = state_dict["test_data_shape"]
 
         # Use a temporary directory to save
         with tempfile.TemporaryDirectory() as tmpdirname:

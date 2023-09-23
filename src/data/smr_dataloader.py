@@ -249,7 +249,7 @@ class SRM_DataModule(LightningDataModule):
             "task_name": self.task_name,
             "train_data_shape": self.training_set.data.shape,
             "valid_data_shape": self.validation_set.data.shape,
-            "test_data_shape": self.testing_set.data.shape,
+            # "test_data_shape": self.testing_set.data.shape,
             "subjects_info_dict": self.smr_datamodule.subjects_info_dict}
 
 

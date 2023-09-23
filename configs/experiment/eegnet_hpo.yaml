@@ -34,7 +34,7 @@ data:
     - "D"
   loading_data_mode: "cross_subject_hpo"
   train_val_split: False
-  cross_validation: { num_splits: 3, split_seed: 1234 }
+  cross_validation: { num_splits: 5, split_seed: 1234 }
   transform: False
   normalize: { norm_type: "std", norm_axis: 0 }
   batch_size: 32
