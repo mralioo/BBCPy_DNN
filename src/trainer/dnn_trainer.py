@@ -87,6 +87,7 @@ class DnnLitModule(LightningModule):
         # with autocast():
 
         logits = self.forward(x)
+        # FIXME : add class weights
         classes_weights_tensor = torch.tensor(self.calculate_sample_weights(y)).to(self.device)
         loss = self.criterion(weight=classes_weights_tensor)(logits, y)
         # loss = self.criterion()(logits, y)
@@ -423,7 +424,6 @@ class DnnLitModule(LightningModule):
         present_classes = np.unique(y_np)
         # All possible classes based on the shape of y
 
-
         if len(present_classes) < num_classes:
             # Compute weights for present classes
             present_class_weights = sklearn.utils.class_weight.compute_class_weight(class_weight='balanced',
@@ -437,8 +437,6 @@ class DnnLitModule(LightningModule):
             for cls, weight in zip(present_classes, present_class_weights):
                 all_class_weights[cls] = weight
 
-
-
             return all_class_weights
 
         else:
@@ -448,7 +446,3 @@ class DnnLitModule(LightningModule):
                                                                             y=y_np)
 
             return class_weights
-
-
-
-
