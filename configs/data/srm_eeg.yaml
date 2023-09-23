@@ -14,5 +14,4 @@ classes:
 threshold_distance: 0.05
 fallback_neighbors: 4
 loading_data_mode: within_subject
-train_val_split: [ 0.8, 0.2 ]
 concatenate_subjects: True

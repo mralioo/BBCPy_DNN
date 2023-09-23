@@ -3,9 +3,6 @@ data_dir: ${paths.data_dir}
 ival: "all"
 chans: [ "*" ]
 concatenate_subjects: True
-train_val_split:
-  - 0.7
-  - 0.3
 threshold_distance: 0.05
 fallback_neighbors: 4
 loading_data_mode: within_subject
