@@ -2,9 +2,9 @@
 #SBATCH --job-name=eegnet-hpo-best-pvc
 #SBATCH --partition=gpu-2d
 #SBATCH --gpus-per-node=1
-#SBATCH --mem=200G
-#SBATCH --ntasks-per-node=5
-#SBATCH --cpus-per-task=5
+#SBATCH --mem=400GB
+#SBATCH --ntasks-per-node=1
+#SBATCH --cpus-per-task=8
 #SBATCH --output=../jobs_outputs/eegnet-hpo-best-pvc/%x_%j.o
 #SBATCH --error=../jobs_outputs/eegnet-hpo-best-pvc/%x_%j.e
 
