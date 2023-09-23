@@ -75,7 +75,7 @@ def train(cfg: DictConfig) -> Tuple[dict, dict]:
         log.info("Starting hyperparameter optimization!")
 
         trial_id = HydraConfig.get().job.id
-        print(f"Hydra Job ID: {trial_id}")
+        log.info(f"Hydra Job ID: {trial_id}")
 
         # load data
         datamodule.load_raw_data()
@@ -83,7 +83,8 @@ def train(cfg: DictConfig) -> Tuple[dict, dict]:
         cv_score = []
         nums_folds = cfg.data.cross_validation["num_splits"]
         for k in range(nums_folds):
-            print(f"Fold {k}...")
+
+            log.info(f"Fold {k}...")
 
             # print memory usage
             print_memory_usage()
@@ -102,8 +103,7 @@ def train(cfg: DictConfig) -> Tuple[dict, dict]:
             log.info(f"Instantiating trainer <{cfg.trainer._target_}>")
             trainer: Trainer = hydra.utils.instantiate(cfg.trainer,
                                                        callbacks=callbacks,
-                                                       logger=logger,
-                                                       num_sanity_val_steps=0)
+                                                       logger=logger)
 
             object_dict = {
                 "cfg": cfg,

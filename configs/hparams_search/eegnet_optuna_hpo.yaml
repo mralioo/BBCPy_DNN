@@ -3,9 +3,9 @@ _target_: optuna.integration.OptunaSearch
 # storage URL to persist optimization results
 # for example, you can use SQLite if you set 'sqlite:///example.db'
 
+storage: ${oc.env:PROJECT_ROOT}\logs\sqlite:\\\eegnet_hpo.db
 #storage: ${oc.env:PROJECT_ROOT}\logs\sqlite:\\\eegnet_hpo.db
-#storage: ${oc.env:PROJECT_ROOT}\logs\sqlite:\\\eegnet_hpo.db
-storage: null
+#storage: null
 
 # name of the study to persist optimization results
 study_name: eegnet_hpo

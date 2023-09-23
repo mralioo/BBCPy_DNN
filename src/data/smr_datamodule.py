@@ -162,8 +162,6 @@ class SMR_Data():
 
         subjects_sessions_path_dict = {}
         for subject_name, sessions_ids in subjects_dict.items():
-            logging.info(f"Collecting subject {subject_name} sessions from:  {self.srm_data_path}")
-
             sessions_group_path = bbcpy.load.srm_eeg.list_all_files(self.srm_data_path,
                                                                     pattern=f"{subject_name}_*.mat")[subject_name]
 
@@ -171,7 +169,7 @@ class SMR_Data():
 
             if sessions_ids == "all":
                 # select all sessions
-                logging.info(f"Found sessions: {list(sessions_group_path.keys())}")
+                logging.info(f"Found sessions: {list(sessions_group_path.keys())} for subject {subject_name}")
 
                 subjects_sessions_path_dict[subject_name] = sessions_group_path
             else:
@@ -326,11 +324,14 @@ class SMR_Data():
         """ Create a subject object from the SRM data sessions , concatenating the sessions over trails"""
         # FIXME : not completed
 
-        sessions_path_dict = self.collect_subject_sessions(subject_dict)
+        if not hasattr(self, "subjects_sessions_path_dict"):
+            self.subjects_sessions_path_dict = self.collect_subject_sessions(subject_dict)
+
+
         self.loaded_subjects_sessions[subject_name] = {}
 
         # sessions_list = sessions_path_dict[subject_name]
-        sessions_list = list(sessions_path_dict[subject_name].keys())
+        sessions_list = list(self.subjects_sessions_path_dict[subject_name].keys())
 
         logging.info(f"Prepare to Load : {sessions_list} sessions")
 
@@ -339,7 +340,7 @@ class SMR_Data():
 
             # load the first session to init the object
             valid_obj_new, forced_obj_new = self.load_forced_valid_trials_data(session_name=init_session_name,
-                                                                               sessions_group_path=sessions_path_dict[
+                                                                               sessions_group_path=self.subjects_sessions_path_dict[
                                                                                    subject_name])
 
             logging.info(f"Loading {init_session_name} finalized (1 from {str(len(sessions_list))})")
@@ -351,7 +352,7 @@ class SMR_Data():
 
                 try:
                     valid_obj, forced_obj = self.load_forced_valid_trials_data(session_name=session_name,
-                                                                               sessions_group_path=sessions_path_dict[
+                                                                               sessions_group_path=self.subjects_sessions_path_dict[
                                                                                    subject_name])
                     # check if the valid data has the same datapoints
                     if valid_obj.shape[2] != valid_obj_new.shape[2]:
@@ -384,7 +385,7 @@ class SMR_Data():
             init_session_name = sessions_list[0]
 
             valid_obj_new, forced_obj_new = self.load_forced_valid_trials_data(session_name=init_session_name,
-                                                                               sessions_group_path=sessions_path_dict[
+                                                                               sessions_group_path=self.subjects_sessions_path_dict[
                                                                                    subject_name])
 
             self.loaded_subjects_sessions[subject_name][init_session_name] = [valid_obj_new.shape, forced_obj_new.shape]
@@ -397,12 +398,12 @@ class SMR_Data():
 
         # FIXME : not completed
 
-        subjects_sessions_path_dict = self.collect_subject_sessions(subject_dict)
+        self.subjects_sessions_path_dict = self.collect_subject_sessions(subject_dict)
 
         subject_data_valid_dict = {}
         subject_data_forced_dict = {}
 
-        for subject_name, sessions_ids in subjects_sessions_path_dict.items():
+        for subject_name, sessions_ids in self.subjects_sessions_path_dict.items():
             logging.info(f"Loading subject {subject_name} sessions")
             valid_obj_new, forced_obj_new = self.load_subject_sessions(subject_name=subject_name,
                                                                        subject_dict=subject_dict)
