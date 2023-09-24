@@ -14,7 +14,7 @@ defaults:
 # all parameters below will be merged with parameters from default configurations set above
 # this allows you to overwrite only specified parameters
 
-tags: [ "torcheeg", "EEGNET-v1","Cross-Subjects"]
+tags: [ "torcheeg", "EEGNET-v1", "Cross-Subjects", "HPO", "2D"]
 
 seed: 12345
 
@@ -30,6 +30,8 @@ data:
   classes:
     - "R"
     - "L"
+    - "U"
+    - "D"
   loading_data_mode: "cross_subject_hpo"
   train_val_split: False
   cross_validation: { num_splits: 5, split_seed: 1234 }
@@ -42,7 +44,7 @@ data:
 model:
   net:
     chunk_size: 9000
-    num_classes: 2
+    num_classes: 4
     num_electrodes: 62
     dropout: 0.5
     kernel_1: 1024
@@ -56,7 +58,7 @@ model:
 trainer:
   min_epochs: 30
   max_epochs: 60
-  check_val_every_n_epoch: 1
+  check_val_every_n_epoch: 3
 #  precision: 16
 
 paths:
@@ -70,6 +72,7 @@ logger:
   mlflow:
     experiment_name: EEGNET-HPO-LR
     run_name: S6
+    tags: ${tags}
 
 callbacks:
   model_checkpoint:
