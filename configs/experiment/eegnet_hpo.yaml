@@ -30,8 +30,6 @@ data:
   classes:
     - "R"
     - "L"
-    - "U"
-    - "D"
   loading_data_mode: "cross_subject_hpo"
   train_val_split: False
   cross_validation: { num_splits: 5, split_seed: 1234 }
@@ -44,7 +42,7 @@ data:
 model:
   net:
     chunk_size: 9000
-    num_classes: 4
+    num_classes: 2
     num_electrodes: 62
     dropout: 0.5
     kernel_1: 1024
@@ -70,7 +68,7 @@ paths:
 
 logger:
   mlflow:
-    experiment_name: EEGNET-HPO-2D
+    experiment_name: EEGNET-HPO-LR
     run_name: S6
 
 callbacks:
