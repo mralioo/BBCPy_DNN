@@ -88,9 +88,9 @@ class DnnLitModule(LightningModule):
 
         logits = self.forward(x)
         # FIXME : add class weights
-        classes_weights_tensor = torch.tensor(self.calculate_sample_weights(y)).to(self.device)
-        loss = self.criterion(weight=classes_weights_tensor)(logits, y)
-        # loss = self.criterion()(logits, y)
+        # classes_weights_tensor = torch.tensor(self.calculate_sample_weights(y)).to(self.device)
+        # loss = self.criterion(weight=classes_weights_tensor)(logits, y)
+        loss = self.criterion()(logits, y)
 
         preds_ie = torch.argmax(logits, dim=1)
         preds = torch.nn.functional.one_hot(preds_ie, num_classes=self.num_classes)
@@ -187,6 +187,9 @@ class DnnLitModule(LightningModule):
         # update and log metrics
         self.train_loss(loss)
         self.train_acc(preds, targets)
+        self.log("train/loss", self.train_loss, on_step=False, on_epoch=True, prog_bar=True)
+        self.log("train/acc", self.train_acc, on_step=False, on_epoch=True, prog_bar=True)
+
         # return loss or backpropagation will fail
         return loss
 
@@ -196,8 +199,7 @@ class DnnLitModule(LightningModule):
         train_all_targets = self.training_step_targets
         f1_macro_epoch = f1_score(train_all_outputs, train_all_targets, average='macro')
         self.log("train/f1_epoch", f1_macro_epoch, on_step=False, on_epoch=True, prog_bar=True)
-        self.log("train/loss", self.train_loss, on_step=False, on_epoch=True, prog_bar=True)
-        self.log("train/acc", self.train_acc, on_step=False, on_epoch=True, prog_bar=True)
+
 
         if (self.current_epoch + 1) % self.plots_settings["plot_every_n_epoch"] == 0:
             # Calculate the confusion matrix and log it to mlflow
@@ -237,7 +239,8 @@ class DnnLitModule(LightningModule):
         # update and log metrics
         self.val_loss(loss)
         self.val_acc(preds, targets)
-
+        self.log("val/loss", self.val_loss, on_step=False, on_epoch=True, prog_bar=True)
+        self.log("val/acc", self.val_acc, on_step=False, on_epoch=True, prog_bar=True)
         return loss
 
     def on_validation_epoch_end(self):
@@ -247,8 +250,7 @@ class DnnLitModule(LightningModule):
         val_all_targets = self.val_step_targets
         val_f1_macro_epoch = f1_score(val_all_outputs, val_all_targets, average='macro')
         self.log("val/f1_epoch", val_f1_macro_epoch, on_step=False, on_epoch=True, prog_bar=True)
-        self.log("val/loss", self.val_loss, on_step=False, on_epoch=True, prog_bar=True)
-        self.log("val/acc", self.val_acc, on_step=False, on_epoch=True, prog_bar=True)
+
 
         if (self.current_epoch + 1) % self.plots_settings["plot_every_n_epoch"] == 0:
             # Calculate the confusion matrix and log it to mlflow
@@ -280,15 +282,15 @@ class DnnLitModule(LightningModule):
         # update and log metrics
         self.test_loss(loss)
         self.test_acc(preds, targets)
-
+        self.log("test/loss", self.test_loss, on_step=False, on_epoch=True, prog_bar=True)
+        self.log("test/acc", self.test_acc, on_step=False, on_epoch=True, prog_bar=True)
     def on_test_epoch_end(self):
         ## F1 Macro all epoch saving outputs and target per batch
         test_all_outputs = self.test_step_outputs
         test_all_targets = self.test_step_targets
         test_f1_macro_epoch = f1_score(test_all_targets, test_all_outputs, average='macro')
         self.log("test/f1_epoch", test_f1_macro_epoch, on_step=False, on_epoch=True, prog_bar=True)
-        self.log("test/loss", self.test_loss, on_step=False, on_epoch=True, prog_bar=True)
-        self.log("test/acc", self.test_acc, on_step=False, on_epoch=True, prog_bar=True)
+
 
         cm = confusion_matrix(test_all_outputs, test_all_targets)
         title = f"Testing Confusion matrix, forced trials"
