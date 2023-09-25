@@ -235,21 +235,40 @@ class SRM_DataModule(LightningDataModule):
             if torch.cuda.is_available():
                 torch.cuda.empty_cache()
 
-    def state_dict(self):
+    def state_dict(self, stage: Optional[str] = None):
         """Extra things to save to checkpoint."""
-        return {
-            "task_name": self.task_name,
-            "subjects_info_dict": self.smr_datamodule.subjects_info_dict,
-            "train_data_shape": self.training_set.data.shape,
-            "valid_data_shape": self.validation_set.data.shape,
-            # "test_data_shape": self.testing_set.data.shape,
-            "train_classes_weights": self.training_set.classes_weights(),
-            "valid_classes_weights": self.validation_set.classes_weights(),
-            # "test_classes_weights": self.testing_set.classes_weights(),
-            "train_stats": self.training_set.statistical_info(),
-            "valid_stats": self.validation_set.statistical_info(),
-            # "test_stats": self.testing_set.statistical_info(),
-        }
+
+        if self.train_val_split:
+            state_dict = {}
+            if stage == "fit":
+                state_dict = {"task_name": self.task_name,
+                              "subjects_info_dict": self.smr_datamodule.subjects_info_dict,
+                              "train_data_shape": self.training_set.data.shape,
+                              "valid_data_shape": self.validation_set.data.shape,
+                              "train_classes_weights": self.training_set.classes_weights(),
+                              "valid_classes_weights": self.validation_set.classes_weights(),
+                              "train_stats": self.training_set.statistical_info(),
+                              "valid_stats": self.validation_set.statistical_info()}
+            if stage == "test":
+                state_dict = {"task_name": self.task_name,
+                              "subjects_info_dict": self.smr_datamodule.subjects_info_dict,
+                              "test_data_shape": self.testing_set.data.shape,
+                              "test_classes_weights": self.testing_set.classes_weights(),
+                              "test_stats": self.testing_set.statistical_info()}
+
+            return state_dict
+
+        if self.cross_validation:
+            return {
+                "task_name": self.task_name,
+                "subjects_info_dict": self.smr_datamodule.subjects_info_dict,
+                "train_data_shape": self.training_set.data.shape,
+                "valid_data_shape": self.validation_set.data.shape,
+                "train_classes_weights": self.training_set.classes_weights(),
+                "valid_classes_weights": self.validation_set.classes_weights(),
+                "train_stats": self.training_set.statistical_info(),
+                "valid_stats": self.validation_set.statistical_info(),
+            }
 
 
 class SRMDataset(Dataset):

@@ -25,7 +25,6 @@ from src.utils.device import print_memory_usage, print_cpu_cores, print_gpu_memo
 from src import utils
 from src.models.components.layers_init import xavier_initialize_weights
 
-
 logging = utils.get_pylogger(__name__)
 
 
@@ -71,6 +70,10 @@ class DnnLitModule(LightningModule):
         # for tracking best so far validation accuracy
         self.val_acc_best = MaxMetric()
 
+        # Testing metric objects for calculating and averaging accuracy across batches
+        self.test_loss = MeanMetric()
+        self.test_acc = Accuracy(task="multiclass", num_classes=self.num_classes)
+
     def forward(self, x: torch.Tensor):
         return self.net(x)
 
@@ -113,7 +116,8 @@ class DnnLitModule(LightningModule):
         # self.log_haprams()
         hparams = {}
         # load successfull loaded data sessions dict
-        state_dict = self.trainer.datamodule.state_dict()
+        # stage = self.trainer.state.fn.value
+        state_dict = self.trainer.datamodule.state_dict(stage="fit")
         self.mlflow_client.log_param(self.run_id, "task", state_dict["task_name"])
 
         hparams["train_data_shape"] = state_dict["train_data_shape"]
@@ -132,7 +136,6 @@ class DnnLitModule(LightningModule):
             self.mlflow_client.log_artifacts(self.run_id,
                                              local_dir=tmpdirname)
 
-        # FIXME CV subject info dict
         for subject_name, pvc_dict in state_dict["subjects_info_dict"].items():
             if self.trainer.datamodule.loading_data_mode != "cross_subject_hpo":
                 self.mlflow_client.log_param(self.run_id, "pvc", pvc_dict["pvc"])
@@ -201,12 +204,15 @@ class DnnLitModule(LightningModule):
         f1_macro_epoch = f1_score(train_all_outputs, train_all_targets, average='macro')
         self.log("train/f1_epoch", f1_macro_epoch, on_step=False, on_epoch=True, prog_bar=True)
 
-
         if (self.current_epoch + 1) % self.plots_settings["plot_every_n_epoch"] == 0:
             # Calculate the confusion matrix and log it to mlflow
             cm = confusion_matrix(train_all_targets, train_all_outputs)
             title = f"Training Confusion matrix epoch_{self.current_epoch}"
             self.confusion_matrix_to_png(cm, title, f"train_cm_epo_{self.current_epoch}")
+
+        for name, param in self.named_parameters():
+            if param.grad is not None:
+                self.log(f"grad_{name}_norm", param.grad.norm().item(), on_step=False, on_epoch=True, prog_bar=True)
 
         # free up the memory
         # --> HERE STEP 3 <--
@@ -244,11 +250,10 @@ class DnnLitModule(LightningModule):
         self.log("val/acc", self.val_acc, on_step=False, on_epoch=True, prog_bar=True)
         return loss
 
-
     def on_test_start(self):
         # log hyperparameters
         hparams = {}
-        state_dict = self.trainer.datamodule.state_dict()
+        state_dict = self.trainer.datamodule.state_dict(stage="test")
         # FIXME
         hparams["data_type"] = "forced_trials"
         hparams["test_data_shape"] = state_dict["test_data_shape"]
@@ -267,9 +272,7 @@ class DnnLitModule(LightningModule):
         # ATTRIBUTES TO SAVE BATCH OUTPUTS
         self.test_step_outputs = []  # save outputs in each batch to compute metric overall epoch
         self.test_step_targets = []  # save targets in each batch to compute metric overall epoch
-        # Testing metric objects for calculating and averaging accuracy across batches
-        self.test_loss = MeanMetric()
-        self.test_acc = Accuracy(task="multiclass", num_classes=self.num_classes)
+
 
     def on_validation_epoch_end(self):
 
@@ -278,7 +281,6 @@ class DnnLitModule(LightningModule):
         val_all_targets = self.val_step_targets
         val_f1_macro_epoch = f1_score(val_all_outputs, val_all_targets, average='macro')
         self.log("val/f1_epoch", val_f1_macro_epoch, on_step=False, on_epoch=True, prog_bar=True)
-
 
         if (self.current_epoch + 1) % self.plots_settings["plot_every_n_epoch"] == 0:
             # Calculate the confusion matrix and log it to mlflow
@@ -312,13 +314,13 @@ class DnnLitModule(LightningModule):
         self.test_acc(preds, targets)
         self.log("test/loss", self.test_loss, on_step=False, on_epoch=True, prog_bar=True)
         self.log("test/acc", self.test_acc, on_step=False, on_epoch=True, prog_bar=True)
+
     def on_test_epoch_end(self):
         ## F1 Macro all epoch saving outputs and target per batch
         test_all_outputs = self.test_step_outputs
         test_all_targets = self.test_step_targets
         test_f1_macro_epoch = f1_score(test_all_targets, test_all_outputs, average='macro')
         self.log("test/f1_epoch", test_f1_macro_epoch, on_step=False, on_epoch=True, prog_bar=True)
-
 
         cm = confusion_matrix(test_all_outputs, test_all_targets)
         title = f"Testing Confusion matrix, forced trials"
