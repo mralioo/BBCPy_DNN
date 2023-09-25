@@ -96,6 +96,11 @@ def calculate_pvc_metrics(trial_info, taskname="LR"):
     pvc = res_dict["hits"] / (res_dict["hits"] + res_dict["misses"])
     return pvc
 
+def print_data_info(srm_obj):
+    print("max timepoints: ", np.max(srm_obj))
+    print("min timepoints: ", np.min(srm_obj))
+    print("mean timepoints: ", np.mean(srm_obj))
+    print("std timepoints: ", np.std(srm_obj))
 
 class SMR_Data():
 
@@ -108,8 +113,6 @@ class SMR_Data():
                  ival,
                  bands,
                  chans,
-                 classes,
-                 threshold_distance,
                  fallback_neighbors,
                  transform,
                  normalize,
@@ -121,6 +124,12 @@ class SMR_Data():
 
         self.srm_data_path = data_dir
         self.task_name = task_name
+
+        if self.task_name == "RL":
+            self.classes = ["R", "L"]
+        elif self.task_name == "2D":
+            self.classes = ["R", "L", "U", "D"]
+
         self.subject_sessions_dict = subject_sessions_dict
         self.loaded_subjects_sessions = {}
         self.founded_subjects_sessions = {}
@@ -128,12 +137,10 @@ class SMR_Data():
         self.concatenate_subjects = concatenate_subjects
         self.loading_data_mode = loading_data_mode
 
-        self.classes = OmegaConf.to_container(classes)
         self.select_chans = OmegaConf.to_container(chans)
         self.select_timepoints = ival
         self.bands = OmegaConf.to_container(bands)
 
-        self.threshold_distance = threshold_distance
         self.fallback_neighbors = fallback_neighbors
 
         if transform:
@@ -146,9 +153,9 @@ class SMR_Data():
         else:
             self.normalize = None
 
+
         self.subjects_info_dict = {}
-        self.subject_info_dict = {"noisechan": {}, "pvc": {self.task_name: {}}}
-        self.subject_pvcs = []
+
 
     @property
     def num_classes(self):
@@ -201,48 +208,55 @@ class SMR_Data():
         else:
             obj = srm_obj
 
-        if self.bands is not None:
-            obj = obj.lfilter(self.bands)
-
         return obj
 
-    def interpolate_noisy_channels(self, srm_obj, noisy_chans_idx, session_name):
-        """ Interpolate noisy channels of 62-channel EEG cap (10-10 system), take the average of the neighboring channels
+
+    def referencing(self, srm_obj, noisy_channel_index, noisy_channels_indices, mode="average"):
+        """Apply Laplacian referencing to a noisy channel.
 
         Parameters
         ----------
         srm_obj: bbcpy.datatypes.srm_eeg.SRM_Data
             SRM data object
-        noisy_chans_idx: int
-            Index of the noisy channel
+        noisy_channel_index: int
+            Index of the noisy channel currently being processed
+        noisy_channels_indices: list
+            List of indices of all noisy channels
 
         Returns
         -------
         srm_obj: bbcpy.datatypes.srm_eeg.SRM_Data
-            SRM data object with interpolated noisy channel
-
-
+            SRM data object with the Laplacian referenced noisy channel
+        chan_dict_info: dict
+            Information about the neighbors used for Laplacian referencing
         """
 
-        # Calculate distances from the noisy channel to all other channels
-        distances = np.linalg.norm(srm_obj.chans.mnt - srm_obj.chans.mnt[noisy_chans_idx], axis=1)
+        # Calculate distances from the current noisy channel to all other channels
+        distances = np.linalg.norm(srm_obj.chans.mnt - srm_obj.chans.mnt[noisy_channel_index], axis=1)
+
+        # Set the distances of all noisy channels to a high value so they are not chosen as neighbors
+        for idx in noisy_channels_indices:
+            distances[idx] = np.inf
 
         # Identify neighboring channels
-        # neighbors = np.where(distances < self.threshold_distance)[0]
-
-        # If no neighbors found within threshold, take the closest fallback_neighbors channels
         neighbors = np.argsort(distances)[1:self.fallback_neighbors + 1]  # Excluding the channel itself
-
-        noise_chans_name = str(srm_obj.chans[noisy_chans_idx])
-        self.subject_info_dict["noisechan"][session_name][noise_chans_name] = {"neighbors": srm_obj.chans[neighbors]}
-
         # Calculate the average signal of neighboring channels
         average_signal = np.mean(srm_obj[:, neighbors, :], axis=1)
 
-        # Replace the noisy channel's signal with the average signal
-        srm_obj[:, noisy_chans_idx, :] = np.expand_dims(average_signal, axis=1)
+        if mode == "average":
+            # Replace the noisy channel's signal with the average signal
+            srm_obj[:, noisy_channel_index, :] = np.expand_dims(average_signal, axis=1)
+        elif mode == "laplacian":
+            # Compute Laplacian: subtract the average of neighbors from the channel
+            laplacian_signal = srm_obj[:, noisy_channel_index, :] - np.expand_dims(average_signal, axis=1)
+            # Replace the noisy channel's signal with the Laplacian signal
+            srm_obj[:, noisy_channel_index, :] = laplacian_signal
 
-        return srm_obj
+        # Save the neighbors info
+        chan_dict_info = {"neighbors": srm_obj.chans[neighbors]}
+
+        return srm_obj, chan_dict_info
+
 
     def load_forced_valid_trials_data(self, session_name, sessions_group_path):
         session_path = sessions_group_path[session_name]
@@ -250,16 +264,15 @@ class SMR_Data():
         srm_data, timepoints, srm_fs, clab, mnt, trial_info, subject_info = \
             bbcpy.load.srm_eeg.load_single_mat_session(file_path=session_path)
 
-        # save subject info
-        self.subject_info_dict["subject_info"] = subject_info
-        self.subject_info_dict["noisechan"][session_name] = {}
+        # FIXME: pass if data has noisy channels for hyperparameter optimization HPO
+        if self.loading_data_mode == "cross_subject_hpo":
+            if subject_info["noisechan"] is not None:
+                logging.info(f"Session {session_name} has noisy channels, the data will be skipped")
+                return None, None, None
 
-        # save pvc
 
-        sessions_pvc = calculate_pvc_metrics(trial_info, taskname=self.task_name)
-        self.subject_pvcs.append(sessions_pvc)
-
-        self.subject_info_dict["pvc"][self.task_name][session_name] = sessions_pvc
+        session_info_dict = {}
+        session_info_dict["subject_info"] = subject_info
 
         # set the EEG channels object, and remove the reference channel if exists
         chans = remove_reference_channel(clab, mnt)
@@ -289,12 +302,32 @@ class SMR_Data():
                                                     mrk=mrk,
                                                     chans=chans)
 
-        # remove noisy channels
+        print("before bandpass filter")
+        print_data_info(epo_data)
+
+        # FIXME bandpass filter the data bte 8-30 Hz in liter
+        if self.bands is not None:
+            epo_data = epo_data.lfilter(self.bands)
+
+        print("after bandpass filter")
+        print_data_info(epo_data)
+
         # if noisy channels are present, remove them from the data
         if subject_info["noisechan"] is not None:
-            noisy_chans_id_list = [int(chan) for chan in subject_info["noisechan"]]
+            # shift to left becasue of REF. channel removal
+            noisy_chans_id_list = [int(chan)-1 for chan in subject_info["noisechan"]]
+            session_info_dict["noisechans"] = {}
             for noisy_chans_id in noisy_chans_id_list:
-                epo_data = self.interpolate_noisy_channels(epo_data, noisy_chans_id, session_name)
+                epo_data, chan_dict_info = self.referencing(epo_data,
+                                                            noisy_chans_id,
+                                                            noisy_chans_id_list,
+                                                            mode="average")
+
+                noise_chans_name = str(epo_data.chans[noisy_chans_id])
+                session_info_dict["noisechans"][noise_chans_name] = chan_dict_info
+
+        print("after referencing")
+        print_data_info(epo_data)
 
         if self.transform == "TSCeption":
             epo_data = transform_electrodes_configurations(epo_data)
@@ -317,7 +350,15 @@ class SMR_Data():
         logging.info(f"{session_name} loaded;"
                      f" valid trails shape: {valid_trials.shape},"
                      f" forced trials shape: {forced_trials.shape}")
-        return valid_trials, forced_trials
+
+        # save subject info
+        session_info_dict["shapes"] = {"valid_trials": valid_trials.shape,
+                                       "forced_trials": forced_trials.shape}
+
+        # calculate pvc
+        session_info_dict["pvc"] = calculate_pvc_metrics(trial_info, taskname=self.task_name)
+
+        return valid_trials, forced_trials, session_info_dict
 
     def load_subject_sessions(self, subject_name, subject_dict, distributed_mode=False):
 
@@ -336,12 +377,15 @@ class SMR_Data():
 
         if len(sessions_list) > 1:
             init_session_name = sessions_list[0]
-
             # load the first session to init the object
-            valid_obj_new, forced_obj_new = self.load_forced_valid_trials_data(session_name=init_session_name,
-                                                                               sessions_group_path=
-                                                                               self.subjects_sessions_path_dict[
-                                                                                   subject_name])
+            valid_obj_new, forced_obj_new, session_info_dict = self.load_forced_valid_trials_data(
+                session_name=init_session_name,
+                sessions_group_path=
+                self.subjects_sessions_path_dict[
+                    subject_name])
+
+            # save the subject info
+            subject_info_dict = {init_session_name: session_info_dict}
 
             logging.info(f"Loading {init_session_name} finalized (1 from {str(len(sessions_list))})")
             self.loaded_subjects_sessions[subject_name][init_session_name] = [valid_obj_new.shape, forced_obj_new.shape]
@@ -349,12 +393,16 @@ class SMR_Data():
             for i, session_name in enumerate(sessions_list[1:]):
                 logging.info(
                     f"Loading {session_name} finalized ({str(i + 2)} from {str(len(sessions_list))})")
-
                 try:
-                    valid_obj, forced_obj = self.load_forced_valid_trials_data(session_name=session_name,
-                                                                               sessions_group_path=
-                                                                               self.subjects_sessions_path_dict[
-                                                                                   subject_name])
+                    valid_obj, forced_obj, session_info_dict = self.load_forced_valid_trials_data(
+                        session_name=session_name,
+                        sessions_group_path=
+                        self.subjects_sessions_path_dict[
+                            subject_name])
+
+                    # save the subject info
+                    subject_info_dict = {session_name: session_info_dict}
+
                     # check if the valid data has the same datapoints
                     if valid_obj.shape[2] != valid_obj_new.shape[2]:
                         # reshape the data
@@ -384,16 +432,17 @@ class SMR_Data():
                     continue
         else:
             init_session_name = sessions_list[0]
+            valid_obj_new, forced_obj_new, session_info_dict = self.load_forced_valid_trials_data(
+                session_name=init_session_name,
+                sessions_group_path=self.subjects_sessions_path_dict[subject_name])
 
-            valid_obj_new, forced_obj_new = self.load_forced_valid_trials_data(session_name=init_session_name,
-                                                                               sessions_group_path=
-                                                                               self.subjects_sessions_path_dict[
-                                                                                   subject_name])
+            # save the subject info
+            subject_info_dict = {init_session_name: session_info_dict}
 
             self.loaded_subjects_sessions[subject_name][init_session_name] = [valid_obj_new.shape, forced_obj_new.shape]
             logging.info(f"Loading sessions: {init_session_name} finalized (1 from 1)")
 
-        return valid_obj_new, forced_obj_new
+        return valid_obj_new, forced_obj_new, subject_info_dict
 
     def load_all_subjects_sessions(self, subject_dict, concatenate_subjects=True):
         """ Load all the subjects sessions and concatenate them """
@@ -407,18 +456,21 @@ class SMR_Data():
 
         for subject_name, sessions_ids in self.subjects_sessions_path_dict.items():
             logging.info(f"Loading subject {subject_name} sessions")
-            valid_obj_new, _ = self.load_subject_sessions(subject_name=subject_name,
-                                                          subject_dict=subject_dict)
+            valid_obj_new, _, subject_info_dict = self.load_subject_sessions(subject_name=subject_name,
+                                                                             subject_dict=subject_dict)
 
-            # TODO : calculate subject pvc
             subject_data_valid_dict[subject_name] = valid_obj_new
             # subject_data_forced_dict[subject_name] = forced_obj_new
 
-            # TODO : calculate subject pvc
-            # calculate subject pvc
-            pvc_mean = np.mean(self.subject_pvcs)
-            self.subject_info_dict["pvc"][self.task_name]["mean"] = pvc_mean
-            self.subjects_info_dict[subject_name] = self.subject_info_dict
+            self.subjects_info_dict[subject_name] = {"info": subject_info_dict, "pvc": None}
+
+        # calculate the mean pvc for all the subjects
+        for subject_name, subject_info_dict in self.subjects_info_dict.items():
+            pvc_list = []
+            for sessions_ids, session_info_dict in subject_info_dict["info"].items():
+                pvc_list.append(session_info_dict["pvc"])
+            pvc_mean = np.mean(pvc_list)
+            self.subjects_info_dict[subject_name]["pvc"] = pvc_mean
 
         # concatenate all the subjects data
         if concatenate_subjects:
@@ -446,8 +498,9 @@ class SMR_Data():
         if self.loading_data_mode == "within_subject":
 
             subject_name = list(self.subject_sessions_dict.keys())[0]
-            self.valid_trials, self.forced_trials = self.load_subject_sessions(subject_name=subject_name,
-                                                                               subject_dict=self.subject_sessions_dict)
+            self.valid_trials, self.forced_trials, subject_info_dict = self.load_subject_sessions(
+                subject_name=subject_name,
+                subject_dict=self.subject_sessions_dict)
 
             if not self.normalize:
                 self.valid_trials, norm_params_valid = normalize(self.valid_trials,
@@ -459,9 +512,12 @@ class SMR_Data():
                                                                    axis=self.normalize["norm_axis"])
 
             # calculate subject pvc
-            pvc_mean = np.mean(self.subject_pvcs)
-            self.subject_info_dict["pvc"][self.task_name]["mean"] = pvc_mean
-            self.subjects_info_dict[subject_name] = self.subject_info_dict
+            pvc_list = []
+            for sessions_ids, session_info_dict in subject_info_dict.items():
+                pvc_list.append(session_info_dict["pvc"])
+            pvc_mean = np.mean(pvc_list)
+
+            self.subjects_info_dict[subject_name] = {"info": subject_info_dict, "pvc": pvc_mean}
 
 
         elif self.loading_data_mode == "cross_subject_hpo":
@@ -476,8 +532,8 @@ class SMR_Data():
 
 
         elif self.loading_data_mode == "cross_subject":
-            self.valid_trials, self.forced_trials = self.load_subject_sessions(self.subject_sessions_dict,
-                                                                               self.concatenate_subjects)
+
+            pass  # TODO : not implemented yet
 
         else:
             raise Exception(f"Loading data mode {self.loading_data_mode} not supported")
@@ -569,3 +625,6 @@ def unnormalize(data_norm, norm_params):
     elif norm_params["norm_type"] == "minmax":
         data = data_norm * (norm_params["max"] - norm_params["min"]) + norm_params["min"]
     return data
+
+
+
