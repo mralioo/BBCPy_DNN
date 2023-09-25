@@ -54,7 +54,7 @@ trainer:
   min_epochs: 30
   max_epochs: 60
   check_val_every_n_epoch: 1
-  gradient_clip_val: 0.5
+#  gradient_clip_val: 0.5
 #  precision: 16
 
 paths:
@@ -66,7 +66,7 @@ paths:
 
 logger:
   mlflow:
-    experiment_name: EEGNET-HPO-2D-CLEANED
+    experiment_name: EEGNET-HPO-2D-NORM
     run_name: S6
 
 callbacks:
