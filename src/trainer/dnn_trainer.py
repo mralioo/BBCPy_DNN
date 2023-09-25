@@ -23,6 +23,8 @@ from src.utils.vis import calculate_cm_stats
 
 from src.utils.device import print_memory_usage, print_cpu_cores, print_gpu_memory
 from src import utils
+from src.models.components.layers_init import xavier_initialize_weights
+
 
 logging = utils.get_pylogger(__name__)
 
@@ -59,9 +61,9 @@ class DnnLitModule(LightningModule):
         # ATTRIBUTES TO SAVE BATCH OUTPUTS
         self.training_step_outputs = []  # save outputs in each batch to compute metric overall epoch
         self.training_step_targets = []  # save targets in each batch to compute metric overall epoch
-        # Training metric objects for calculating and averaging accuracy across batches
-        self.train_acc = Accuracy(task="multiclass", num_classes=self.num_classes)
+
         self.train_loss = MeanMetric()
+        self.train_acc = Accuracy(task="multiclass", num_classes=self.num_classes)
 
         # Validation metric objects for calculating and averaging accuracy across batches
         self.val_acc = Accuracy(task="multiclass", num_classes=self.num_classes)
@@ -119,15 +121,22 @@ class DnnLitModule(LightningModule):
         hparams = {}
         # load successfull loaded data sessions dict
         state_dict = self.trainer.datamodule.state_dict()
-        task_name = state_dict["task_name"]
-        # hparams["classes_weights"] = state_dict["classes_weights"]
+        self.mlflow_client.log_param(self.run_id, "task", state_dict["task_name"])
+
+
         hparams["train_data_shape"] = state_dict["train_data_shape"]
         hparams["valid_data_shape"] = state_dict["valid_data_shape"]
         # hparams["test_data_shape"] = state_dict["test_data_shape"]
+        hparams["train_classes_weights"] = state_dict["train_classes_weights"]
+        hparams["valid_classes_weights"] = state_dict["valid_classes_weights"]
+        # hparams["test_classes_weights"] = state_dict["test_classes_weights"]
+        hparams["train_stats"] = state_dict["train_stats"]
+        hparams["valid_stats"] = state_dict["valid_stats"]
+        # hparams["test_stats"] = state_dict["test_stats"]
 
         # Use a temporary directory to save
         with tempfile.TemporaryDirectory() as tmpdirname:
-            hparam_path = os.path.join(tmpdirname, "data_shapes.json")
+            hparam_path = os.path.join(tmpdirname, "dataset_info.json")
             with open(hparam_path, "w") as f:
                 json.dump(hparams, f, default=default)
 
@@ -136,13 +145,12 @@ class DnnLitModule(LightningModule):
 
         # FIXME CV subject info dict
         for subject_name, pvc_dict in state_dict["subjects_info_dict"].items():
-            self.mlflow_client.log_param(self.run_id, "pvc", pvc_dict["pvc"][task_name]["mean"])
-
+            self.mlflow_client.log_param(self.run_id, "pvc", pvc_dict["pvc"])
             # Use a temporary directory to save
             with tempfile.TemporaryDirectory() as tmpdirname:
                 hparam_path = os.path.join(tmpdirname, f"{subject_name}_info.json")
                 with open(hparam_path, "w") as f:
-                    json.dump(pvc_dict, f, default=default)
+                    json.dump(pvc_dict["info"], f, default=default)
 
                 self.mlflow_client.log_artifacts(self.run_id,
                                                  local_dir=tmpdirname)
@@ -167,6 +175,9 @@ class DnnLitModule(LightningModule):
                               output_names=["output"])
             self.mlflow_client.log_artifacts(self.run_id,
                                              local_dir=tmpdirname)
+
+        # weight initialization
+        self.net.apply(xavier_initialize_weights)
 
         self.val_loss.reset()
         self.val_acc.reset()
