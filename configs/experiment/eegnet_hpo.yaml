@@ -33,7 +33,7 @@ data:
   transform: False
   normalize: { norm_type: "std", norm_axis: 0 }
   batch_size: 32
-  num_workers: 4
+  num_workers: 2
   pin_memory: True
 
 model:
@@ -53,7 +53,8 @@ model:
 trainer:
   min_epochs: 30
   max_epochs: 60
-  check_val_every_n_epoch: 3
+  check_val_every_n_epoch: 1
+  gradient_clip_val: 0.5
 #  precision: 16
 
 paths:
