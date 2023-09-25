@@ -26,12 +26,7 @@ data:
   chans: [ "*" ]
   bands:
     - 8
-    - 40
-  classes:
-    - "R"
-    - "L"
-    - "U"
-    - "D"
+    - 30
   loading_data_mode: "cross_subject_hpo"
   train_val_split: False
   cross_validation: { num_splits: 5, split_seed: 1234 }
@@ -72,7 +67,6 @@ logger:
   mlflow:
     experiment_name: EEGNET-HPO-LR
     run_name: S6
-    tags: ${tags}
 
 callbacks:
   model_checkpoint:

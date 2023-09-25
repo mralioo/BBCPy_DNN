@@ -47,16 +47,11 @@ data:
   task_name: "2D"
   ival: 1s:10s:10ms
   chans: [ "*" ]
-  classes:
-    - "R"
-    - "L"
-    - "U"
-    - "D"
   loading_data_mode: "cross_subject_hpo"
   #  loading_data_mode: "within_subject"
   subject_sessions_dict:
-    S2: "all"
-  #    S3: "all"
+    S4: "all"
+    S3: "all"
   #  transform: "TSCeption"
   transform: False
   normalize: { norm_type: "std", norm_axis: 0 }

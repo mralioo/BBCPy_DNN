@@ -14,7 +14,7 @@ defaults:
 # all parameters below will be merged with parameters from default configurations set above
 # this allows you to overwrite only specified parameters
 
-tags: [ "torcheeg", "EEGNET-v1","Within-Subject"]
+tags: [ "torcheeg", "EEGNET-v1","Within-Subject", "2D"]
 
 seed: 12345
 
@@ -26,24 +26,20 @@ data:
   chans: [ "*" ]
   bands:
     - 8
-    - 40
-  classes:
-    - "R"
-    - "L"
-    - "U"
-    - "D"
+    - 30
   loading_data_mode: "cross_subject_hpo"
-  train_val_split: { val_size: 0.2, random_seed: 42 }
-  cross_validation: False
+  train_val_split: False
+  cross_validation: { num_splits: 5, split_seed: 1234 }
   transform: False
   normalize: { norm_type: "std", norm_axis: 0 }
   batch_size: 32
-  num_workers: 6
+  num_workers: 4
   pin_memory: True
 
 model:
   net:
     chunk_size: 9000
+    num_classes: 4
     num_electrodes: 62
     dropout: 0.5
     kernel_1: 1024
@@ -51,7 +47,6 @@ model:
     F1: 8
     F2: 16
     D: 2
-    num_classes: 2
   plots_settings:
     plot_every_n_epoch: 10
 

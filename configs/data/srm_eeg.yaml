@@ -1,17 +1,8 @@
 _target_: src.data.smr_datamodule.SMR_Data
 data_dir: ${paths.data_dir}
-task_name: "LR"
+task_name: "RL"
 ival: "all"
-bands:
-  - 8
-  - 40
 chans: [ "*" ]
-classes:
-  - "R"
-  - "L"
-  - "U"
-  - "D"
-threshold_distance: 0.05
-fallback_neighbors: 4
+fallback_neighbors: 3
 loading_data_mode: within_subject
 concatenate_subjects: True

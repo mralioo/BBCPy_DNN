@@ -21,9 +21,6 @@ seed: 12345
 data:
   ival: 1s:10s:1ms
   chans: [ "*" ]
-  classes:
-    - "R"
-    - "L"
   loading_data_mode: "within_subject"
   transform: None
   num_workers: 6
