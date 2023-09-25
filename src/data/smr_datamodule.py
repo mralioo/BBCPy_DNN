@@ -388,12 +388,12 @@ class SMR_Data():
 
             logging.info(f"Loading {init_session_name} finalized (1 from {str(len(sessions_list))})")
 
-            self.loaded_subjects_sessions[subject_name][init_session_name] = [valid_obj_new.shape, forced_obj_new.shape]
-
             # check if the sessions has noisy channels
             if valid_obj_new is None:
                 logging.info(f"Session {init_session_name} has noisy channels, the data will be skipped")
                 return None, None, subject_info_dict
+
+            self.loaded_subjects_sessions[subject_name][init_session_name] = [valid_obj_new.shape, forced_obj_new.shape]
 
             for i, session_name in enumerate(sessions_list[1:]):
                 logging.info(
@@ -433,13 +433,14 @@ class SMR_Data():
 
                     forced_obj_new = forced_obj_new.append(forced_obj, axis=0)
 
-                    # append successfully loaded session
-                    self.loaded_subjects_sessions[subject_name][session_name] = [valid_obj.shape, forced_obj.shape]
+
 
                 except Exception as e:
                     logging.info(f"Session {session_name} not loaded")
                     logging.warning(f"Exception occurred: {e}")
                     continue
+                # append successfully loaded session
+                self.loaded_subjects_sessions[subject_name][session_name] = [valid_obj.shape, forced_obj.shape]
         else:
             init_session_name = sessions_list[0]
             valid_obj_new, forced_obj_new, session_info_dict = self.load_forced_valid_trials_data(
@@ -448,12 +449,13 @@ class SMR_Data():
 
             # save the subject info
             subject_info_dict = {init_session_name: session_info_dict}
-            self.loaded_subjects_sessions[subject_name][init_session_name] = [valid_obj_new.shape, forced_obj_new.shape]
+
             # check if the sessions has noisy channels
             if valid_obj_new is None:
                 logging.info(f"Session {init_session_name} has noisy channels, the data will be skipped")
                 return None, None, subject_info_dict
 
+            self.loaded_subjects_sessions[subject_name][init_session_name] = [valid_obj_new.shape, forced_obj_new.shape]
 
             logging.info(f"Loading sessions: {init_session_name} finalized (1 from 1)")
 
