@@ -51,8 +51,8 @@ data:
   chans: [ "*" ]
   loading_data_mode: "within_subject"
   subject_sessions_dict:
-#    S4: "all"
-    S3: "all"
+    S4: "all"
+    S5: "all"
   #  transform: "TSCeption"
   transform: False
   normalize: { norm_type: "std", norm_axis: 0 }
