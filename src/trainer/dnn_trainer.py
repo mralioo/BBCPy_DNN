@@ -134,7 +134,8 @@ class DnnLitModule(LightningModule):
 
         # FIXME CV subject info dict
         for subject_name, pvc_dict in state_dict["subjects_info_dict"].items():
-            self.mlflow_client.log_param(self.run_id, "pvc", pvc_dict["pvc"])
+            if self.trainer.datamodule.loading_data_mode != "cross_subject_hpo":
+                self.mlflow_client.log_param(self.run_id, "pvc", pvc_dict["pvc"])
             # Use a temporary directory to save
             with tempfile.TemporaryDirectory() as tmpdirname:
                 hparam_path = os.path.join(tmpdirname, f"{subject_name}_info.json")

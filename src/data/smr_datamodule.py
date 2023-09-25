@@ -266,6 +266,8 @@ class SMR_Data():
 
         session_info_dict = {}
         session_info_dict["subject_info"] = subject_info
+        # calculate pvc
+        session_info_dict["pvc"] = calculate_pvc_metrics(trial_info, taskname=self.task_name)
 
         # FIXME: pass if data has noisy channels for hyperparameter optimization HPO
         if self.loading_data_mode == "cross_subject_hpo":
@@ -354,8 +356,7 @@ class SMR_Data():
         session_info_dict["shapes"] = {"valid_trials": valid_trials.shape,
                                        "forced_trials": forced_trials.shape}
 
-        # calculate pvc
-        session_info_dict["pvc"] = calculate_pvc_metrics(trial_info, taskname=self.task_name)
+
 
         return valid_trials, forced_trials, session_info_dict
 
@@ -477,7 +478,9 @@ class SMR_Data():
                                                                              subject_dict=subject_dict)
 
             self.subjects_info_dict[subject_name] = {"info": subject_info_dict, "pvc": None}
+
             # check if the sessions has noisy channels
+
             if valid_obj_new is None:
                 logging.info(f"Subject {subject_name} has noisy channels, the data will be skipped")
                 continue
