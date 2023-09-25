@@ -1,3 +1,4 @@
+import gc
 import logging
 
 import numpy as np
@@ -96,11 +97,13 @@ def calculate_pvc_metrics(trial_info, taskname="LR"):
     pvc = res_dict["hits"] / (res_dict["hits"] + res_dict["misses"])
     return pvc
 
+
 def print_data_info(srm_obj):
     print("max timepoints: ", np.max(srm_obj))
     print("min timepoints: ", np.min(srm_obj))
     print("mean timepoints: ", np.mean(srm_obj))
     print("std timepoints: ", np.std(srm_obj))
+
 
 class SMR_Data():
 
@@ -108,7 +111,6 @@ class SMR_Data():
                  data_dir,
                  task_name,
                  subject_sessions_dict,
-                 concatenate_subjects,
                  loading_data_mode,
                  ival,
                  bands,
@@ -134,7 +136,6 @@ class SMR_Data():
         self.loaded_subjects_sessions = {}
         self.founded_subjects_sessions = {}
 
-        self.concatenate_subjects = concatenate_subjects
         self.loading_data_mode = loading_data_mode
 
         self.select_chans = OmegaConf.to_container(chans)
@@ -153,9 +154,7 @@ class SMR_Data():
         else:
             self.normalize = None
 
-
         self.subjects_info_dict = {}
-
 
     @property
     def num_classes(self):
@@ -210,7 +209,6 @@ class SMR_Data():
 
         return obj
 
-
     def referencing(self, srm_obj, noisy_channel_index, noisy_channels_indices, mode="average"):
         """Apply Laplacian referencing to a noisy channel.
 
@@ -257,9 +255,7 @@ class SMR_Data():
 
         return srm_obj, chan_dict_info
 
-
-    def load_forced_valid_trials_data(self, session_name, sessions_group_path):
-        session_path = sessions_group_path[session_name]
+    def load_forced_valid_trials_data(self, session_path):
 
         srm_data, timepoints, srm_fs, clab, mnt, trial_info, subject_info = \
             bbcpy.load.srm_eeg.load_single_mat_session(file_path=session_path)
@@ -289,7 +285,9 @@ class SMR_Data():
         # all trials
         # FIXME : not sure what to pass for mrk_pos
         # mrk pos here is the results of all trials
-        trialresult = trial_info["result"]
+        trialresult = trial_info[
+            "result"]  # 1 =correct target selected, 0=incorrect target selected,NaN=no target selected; timeout
+
         mrk = bbcpy.datatypes.eeg.Marker(mrk_pos=trialresult,
                                          mrk_class=mrk_class,
                                          mrk_class_name=class_names,
@@ -302,7 +300,6 @@ class SMR_Data():
                                                     fs=srm_fs,
                                                     mrk=mrk,
                                                     chans=chans)
-
         print("before bandpass filter")
         print_data_info(epo_data)
 
@@ -316,16 +313,18 @@ class SMR_Data():
         # if noisy channels are present, remove them from the data
         if subject_info["noisechan"] is not None:
             # shift to left becasue of REF. channel removal
-            noisy_chans_id_list = [int(chan)-1 for chan in subject_info["noisechan"]]
+            noisy_chans_id_list = [int(chan) - 1 for chan in subject_info["noisechan"]]
             session_info_dict["noisechans"] = {}
             for noisy_chans_id in noisy_chans_id_list:
-                epo_data, chan_dict_info = self.referencing(epo_data,
+                epo_data, chan_dict_info = self.referencing(epo_data.copy(),
                                                             noisy_chans_id,
                                                             noisy_chans_id_list,
                                                             mode="average")
 
                 noise_chans_name = str(epo_data.chans[noisy_chans_id])
                 session_info_dict["noisechans"][noise_chans_name] = chan_dict_info
+        else:
+            session_info_dict["noisechans"] = None
 
         print("after referencing")
         print_data_info(epo_data)
@@ -336,21 +335,20 @@ class SMR_Data():
         # valid trials are defined as the trials where labeles are correct (true) in trialresult
 
         valid_trials_idx = np.where(epo_data.mrk == np.bool_(True))[0]
-        valid_trials = epo_data[valid_trials_idx]
+        valid_trials = epo_data[valid_trials_idx].copy()
 
         # forced trials are defined as the trials where labeles are correct (true) in forcedresult
         # and not in valid trials
         forced_trials = trial_info["forcedresult"]
+
         forced_trials_idx = np.setdiff1d(np.where(forced_trials == np.bool_(True))[0], valid_trials_idx)
-        forced_trials = epo_data[forced_trials_idx]
+
+        # TODO IMPORTANT repalce y to forced y trials
+        forced_trials = epo_data[forced_trials_idx].copy()
 
         # preprocess the data
         valid_trials = self.preprocess_data(valid_trials)
         forced_trials = self.preprocess_data(forced_trials)
-
-        logging.info(f"{session_name} loaded;"
-                     f" valid trails shape: {valid_trials.shape},"
-                     f" forced trials shape: {forced_trials.shape}")
 
         # save subject info
         session_info_dict["shapes"] = {"valid_trials": valid_trials.shape,
@@ -358,197 +356,161 @@ class SMR_Data():
 
         return valid_trials, forced_trials, session_info_dict
 
-    def load_subject_sessions(self, subject_name, subject_dict, distributed_mode=False):
+    def load_sessions(self, subject_path_dict):
 
-        """ Create a subject object from the SRM data sessions , concatenating the sessions over trails"""
+        """ Create a subject object from the SRM data sessions"""
         # FIXME : not completed
 
-        if not hasattr(self, "subjects_sessions_path_dict"):
-            self.subjects_sessions_path_dict = self.collect_subject_sessions(subject_dict)
+        loaded_subject_sessions = {}
+        subject_info = {"sessions_info": {}}
+        for i, (session_name, session_path) in enumerate(subject_path_dict.items()):
+            # load data
+            logging.info(f"Loading session {session_name} ...")
+            valid_obj_new, forced_obj_new, session_info_dict = \
+                self.load_forced_valid_trials_data(session_path)
 
-        self.loaded_subjects_sessions[subject_name] = {}
+            logging.info(f"valid trials shape: {valid_obj_new.shape},"
+                         f"forced trials shape: {forced_obj_new.shape}")
+            logging.info(f"{i + 1}/{len(subject_path_dict)} sessions loaded")
 
-        # sessions_list = sessions_path_dict[subject_name]
-        sessions_list = list(self.subjects_sessions_path_dict[subject_name].keys())
+            loaded_subject_sessions[session_name] = [valid_obj_new, forced_obj_new]
+            # add to the subject info dict
 
-        logging.info(f"Prepare to Load : {sessions_list} sessions")
+            # add to the loaded sessions dict
+            subject_info["sessions_info"][session_name] = {}
+            subject_info["sessions_info"][session_name]["shapes"] = session_info_dict["shapes"]
+            subject_info["sessions_info"][session_name]["pvc"] = session_info_dict["pvc"]
+            subject_info["sessions_info"][session_name]["NoisyChannels"] = session_info_dict["noisechans"]
+            subject_info["subject_info"] = session_info_dict["subject_info"]
 
-        if len(sessions_list) > 1:
-            init_session_name = sessions_list[0]
-            # load the first session to init the object
-            valid_obj_new, forced_obj_new, session_info_dict = self.load_forced_valid_trials_data(
-                session_name=init_session_name,
-                sessions_group_path=
-                self.subjects_sessions_path_dict[
-                    subject_name])
+        return loaded_subject_sessions, subject_info
 
-            # save the subject info
-            subject_info_dict = {init_session_name: session_info_dict}
-
-            logging.info(f"Loading {init_session_name} finalized (1 from {str(len(sessions_list))})")
-
-            # # check if the sessions has noisy channels
-            # if valid_obj_new is None:
-            #     logging.info(f"Session {init_session_name} has noisy channels, the data will be skipped")
-            #     return None, None, subject_info_dict
-
-            self.loaded_subjects_sessions[subject_name][init_session_name] = [valid_obj_new.shape, forced_obj_new.shape]
-
-            for i, session_name in enumerate(sessions_list[1:]):
-                logging.info(
-                    f"Loading {session_name} finalized ({str(i + 2)} from {str(len(sessions_list))})")
-                try:
-                    valid_obj, forced_obj, session_info_dict = self.load_forced_valid_trials_data(
-                        session_name=session_name,
-                        sessions_group_path=
-                        self.subjects_sessions_path_dict[
-                            subject_name])
-
-                    # save the subject info
-                    subject_info_dict = {session_name: session_info_dict}
-
-                    # # check if the sessions has noisy channels
-                    # if valid_obj_new is None:
-                    #     logging.info(f"Session {session_name} has noisy channels, the data will be skipped")
-                    #     return None, None, subject_info_dict
-
-                    # check if the valid data has the same datapoints
-                    if valid_obj.shape[2] != valid_obj_new.shape[2]:
-                        # reshape the data
-                        valid_obj_len = valid_obj_new.shape[2]
-                        valid_obj = valid_obj[:, :, :valid_obj_len]
-                    valid_obj_new = valid_obj_new.append(valid_obj, axis=0)
-
-                    # check if the forced data has the same datapoints
-                    if forced_obj.shape[2] != forced_obj_new.shape[2]:
-                        # reshape the data
-                        forced_obj_len = forced_obj_new.shape[2]
-                        forced_obj = forced_obj[:, :, :forced_obj_len]
-
-                    # check if the forced data exists
-                    if forced_obj.shape[0] == 0:
-                        logging.info(f"Session {session_name} has no forced trials")
-                        continue
-
-                    forced_obj_new = forced_obj_new.append(forced_obj, axis=0)
-
-                except Exception as e:
-                    logging.info(f"Session {session_name} not loaded")
-                    logging.warning(f"Exception occurred: {e}")
-                    continue
-                # append successfully loaded session
-                self.loaded_subjects_sessions[subject_name][session_name] = [valid_obj.shape, forced_obj.shape]
-        else:
-            init_session_name = sessions_list[0]
-            valid_obj_new, forced_obj_new, session_info_dict = self.load_forced_valid_trials_data(
-                session_name=init_session_name,
-                sessions_group_path=self.subjects_sessions_path_dict[subject_name])
-
-            # save the subject info
-            subject_info_dict = {init_session_name: session_info_dict}
-
-            # # check if the sessions has noisy channels
-            # if valid_obj_new is None:
-            #     logging.info(f"Session {init_session_name} has noisy channels, the data will be skipped")
-            #     return None, None, subject_info_dict
-
-            self.loaded_subjects_sessions[subject_name][init_session_name] = [valid_obj_new.shape, forced_obj_new.shape]
-
-            logging.info(f"Loading sessions: {init_session_name} finalized (1 from 1)")
-
-        return valid_obj_new, forced_obj_new, subject_info_dict
-
-    def load_all_subjects_sessions(self, subject_dict, concatenate_subjects=True):
+    def load_subjects_sessions(self, subject_sessions_path_dict):
         """ Load all the subjects sessions and concatenate them """
+        subject_data_dict = {}
+        subjects_info_dict = {}
 
-        # FIXME : not completed
+        for subject_name, subject_path_dict in subject_sessions_path_dict.items():
 
-        self.subjects_sessions_path_dict = self.collect_subject_sessions(subject_dict)
+            subject_data_dict[subject_name] = {}
+            subjects_info_dict[subject_name] = {}
 
-        subject_data_valid_dict = {}
-        # subject_data_forced_dict = {}
+            logging.info(f"Subject {subject_name} loading...")
 
-        for subject_name, sessions_ids in self.subjects_sessions_path_dict.items():
-            logging.info(f"Loading subject {subject_name} sessions")
-            valid_obj_new, _, subject_info_dict = self.load_subject_sessions(subject_name=subject_name,
-                                                                             subject_dict=subject_dict)
+            subject_data_dict[subject_name], subject_info = \
+                self.load_sessions(subject_path_dict)
 
-            self.subjects_info_dict[subject_name] = {"info": subject_info_dict, "pvc": None}
-
-            # # check if the sessions has noisy channels
-            # if valid_obj_new is None:
-            #     logging.info(f"Subject {subject_name} has noisy channels, the data will be skipped")
-            #     continue
-
-            subject_data_valid_dict[subject_name] = valid_obj_new
-            # subject_data_forced_dict[subject_name] = forced_obj_new
-
-        # calculate the mean pvc for all the subjects
-        for subject_name, subject_info_dict in self.subjects_info_dict.items():
+            # calculate the mean pvc for all the sessions
             pvc_list = []
-            for sessions_ids, session_info_dict in subject_info_dict["info"].items():
+            # ratio of noisy sessions are there with total number of sessions
+            noisy_sessions = 0
+            for session_name, session_info_dict in subject_info["sessions_info"].items():
                 pvc_list.append(session_info_dict["pvc"])
-            pvc_mean = np.mean(pvc_list)
-            self.subjects_info_dict[subject_name]["pvc"] = pvc_mean
+                if session_info_dict["NoisyChannels"] is not None:
+                    noisy_sessions += 1
 
-        # concatenate all the subjects data
-        if concatenate_subjects:
-            init_subject_name = list(subject_data_valid_dict.keys())[0]
-            valid_trials = subject_data_valid_dict[init_subject_name]
-            # forced_trials = subject_data_forced_dict[init_subject_name]
+            subjects_info_dict[subject_name]["pvc"] = np.mean(pvc_list)
+            subjects_info_dict[subject_name]["ratio_noisy_sessions"] = noisy_sessions / len(
+                subject_info["sessions_info"])
+            subjects_info_dict[subject_name].update(subject_info)
 
-            for subject_name in subject_data_valid_dict.keys():
-                if subject_name == init_subject_name:
-                    continue
-                valid_trials = valid_trials.append(subject_data_valid_dict[subject_name], axis=0)
-                # forced_trials = forced_trials.append(subject_data_forced_dict[subject_name], axis=0)
+        return subject_data_dict, subjects_info_dict
 
-            # delete the subject data dict
-            del subject_data_valid_dict
-            # del subject_data_forced_dict
+    def append_sessions(self, sessions_data_dict, sessions_info_dict, ignore_noisy_sessions=False):
+        """ Append all the subjects sessions """
 
-            return valid_trials
-        else:
-            return subject_data_valid_dict
+        valid_trials = None
+        for session_name, session_data in sessions_data_dict.items():
+            # check if the session has noisy channels
+            if ignore_noisy_sessions and sessions_info_dict[session_name]["NoisyChannels"] is not None:
+                logging.info(f"Session {session_name} has noisy channels, the data will be skipped")
+                continue
+            else:
+                if valid_trials is None:
+                    valid_trials = session_data[0].copy()
+                    # forced_trials = session_data[1].copy()
+                else:
+                    valid_trials = valid_trials.append(session_data[0], axis=0)
+                    # forced_trials = forced_trials.append(session_data[1], axis=0)
+
+        return valid_trials
+        # return valid_trials, forced_trials
+
+    def append_subjects(self, subjects_sessions_path_dict):
+        """ Append all the subjects sessions """
+
+        subjects_data_dict, subjects_info_dict = self.load_subjects_sessions(subjects_sessions_path_dict)
+
+        valid_trials_list = []
+
+        for subject_name, subject_data in subjects_data_dict.items():
+            loaded_subject_sessions_info = subjects_info_dict[subject_name]["sessions_info"]
+            # append the sessions
+            valid_trials = self.append_sessions(subject_data,
+                                                loaded_subject_sessions_info,
+                                                ignore_noisy_sessions=True)
+
+            if valid_trials is not None:
+                valid_trials_list.append(valid_trials)
+
+        valid_trials = valid_trials_list[0]
+        for valid_trials_i in valid_trials_list[1:]:
+            valid_trials = valid_trials.append(valid_trials_i, axis=0)
+
+        return valid_trials, subjects_info_dict
 
     def prepare_dataloader(self):
         """ Prepare the data for the classification """
 
+        # load subject paths
+        subjects_sessions_path_dict = self.collect_subject_sessions(self.subject_sessions_dict)
+
         if self.loading_data_mode == "within_subject":
+            # load the subject sessions dict
+            subject_data_dict, subjects_info_dict = self.load_subjects_sessions(subjects_sessions_path_dict)
 
-            subject_name = list(self.subject_sessions_dict.keys())[0]
-            self.valid_trials, self.forced_trials, subject_info_dict = self.load_subject_sessions(
-                subject_name=subject_name,
-                subject_dict=self.subject_sessions_dict)
+            subject_name = list(subject_data_dict.keys())[0]
 
-            if not self.normalize:
+            loaded_subject_sessions = subject_data_dict[subject_name]
+            loaded_subject_sessions_info = subjects_info_dict[subject_name]["sessions_info"]
+
+            # append the sessions (FIXME : forced trials are not used)
+            self.valid_trials = self.append_sessions(loaded_subject_sessions,
+                                                     loaded_subject_sessions_info)
+            print("valid trials")
+            print_data_info(self.valid_trials)
+
+            if self.normalize:
                 self.valid_trials, norm_params_valid = normalize(self.valid_trials,
                                                                  norm_type=self.normalize["norm_type"],
                                                                  axis=self.normalize["norm_axis"])
 
-                self.forced_trials, norm_params_forced = normalize(self.forced_trials,
-                                                                   norm_type=self.normalize["norm_type"],
-                                                                   axis=self.normalize["norm_axis"])
+                print("Normliazed valid trials")
+                print_data_info(self.valid_trials)
 
-            # calculate subject pvc
-            pvc_list = []
-            for sessions_ids, session_info_dict in subject_info_dict.items():
-                pvc_list.append(session_info_dict["pvc"])
-            pvc_mean = np.mean(pvc_list)
+            # subject info dict
+            self.subjects_info_dict[subject_name] = subjects_info_dict[subject_name]
 
-            self.subjects_info_dict[subject_name] = {"info": subject_info_dict, "pvc": pvc_mean}
+            del subject_data_dict, subjects_info_dict
+            gc.collect()
 
 
         elif self.loading_data_mode == "cross_subject_hpo":
 
-            self.valid_trials = self.load_all_subjects_sessions(self.subject_sessions_dict,
-                                                                concatenate_subjects=True)
+            # append subjects data
+            self.valid_trials, self.subjects_info_dict = self.append_subjects(subjects_sessions_path_dict)
 
-            if not self.normalize:
-                self.valid_trials, norm_params_valid = normalize(data=self.valid_trials,
+            print("valid trials")
+            print_data_info(self.valid_trials)
+
+            if self.normalize:
+                self.valid_trials, norm_params_valid = normalize(self.valid_trials,
                                                                  norm_type=self.normalize["norm_type"],
                                                                  axis=self.normalize["norm_axis"])
+                print("Normliazed valid trials")
+                print_data_info(self.valid_trials)
 
+            gc.collect()
 
         elif self.loading_data_mode == "cross_subject":
 
@@ -635,6 +597,7 @@ def normalize(data, norm_type="std", axis=None, keepdims=True, eps=10 ** -5, nor
         else:
             data_norm, norm_params = None, None
             ValueError("Only 'std' and 'minmax' are supported")
+
     return data_norm, norm_params
 
 
@@ -644,6 +607,3 @@ def unnormalize(data_norm, norm_params):
     elif norm_params["norm_type"] == "minmax":
         data = data_norm * (norm_params["max"] - norm_params["min"]) + norm_params["min"]
     return data
-
-
-

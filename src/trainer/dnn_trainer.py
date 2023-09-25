@@ -136,14 +136,14 @@ class DnnLitModule(LightningModule):
             self.mlflow_client.log_artifacts(self.run_id,
                                              local_dir=tmpdirname)
 
-        for subject_name, pvc_dict in state_dict["subjects_info_dict"].items():
+        for subject_name, subject_info_dict in state_dict["subjects_info_dict"].items():
             if self.trainer.datamodule.loading_data_mode != "cross_subject_hpo":
-                self.mlflow_client.log_param(self.run_id, "pvc", pvc_dict["pvc"])
+                self.mlflow_client.log_param(self.run_id, "pvc", subject_info_dict["pvc"])
             # Use a temporary directory to save
             with tempfile.TemporaryDirectory() as tmpdirname:
                 hparam_path = os.path.join(tmpdirname, f"{subject_name}_info.json")
                 with open(hparam_path, "w") as f:
-                    json.dump(pvc_dict["info"], f, default=default)
+                    json.dump(subject_info_dict, f, default=default)
 
                 self.mlflow_client.log_artifacts(self.run_id,
                                                  local_dir=tmpdirname)

@@ -56,7 +56,6 @@ class SRM_DataModule(LightningDataModule):
                  fallback_neighbors,
                  transform,
                  normalize,
-                 concatenate_subjects,
                  train_val_split,
                  cross_validation,
                  batch_size,
@@ -82,7 +81,6 @@ class SRM_DataModule(LightningDataModule):
         self.transform = transform
         self.normalize = normalize
         self.subject_sessions_dict = subject_sessions_dict
-        self.concatenate_subjects = concatenate_subjects
 
         if train_val_split:
             self.train_val_split = dict(train_val_split)
@@ -117,7 +115,6 @@ class SRM_DataModule(LightningDataModule):
         self.smr_datamodule = SMR_Data(data_dir=self.data_dir,
                                        task_name=self.task_name,
                                        subject_sessions_dict=self.subject_sessions_dict,
-                                       concatenate_subjects=self.concatenate_subjects,
                                        loading_data_mode=self.loading_data_mode,
                                        ival=self.ival,
                                        bands=self.bands,
@@ -191,8 +188,8 @@ class SRM_DataModule(LightningDataModule):
         if stage == "test":
             logging.info("Loading test data...")
             # FIXME : what is the right why to normlize data for test set?
-            self.testing_set = SRMDataset(data=self.smr_datamodule.forced_trials)
-
+            # self.testing_set = SRMDataset(data=self.smr_datamodule.forced_trials)
+            self.testing_set = SRMDataset(data=self.smr_datamodule.valid_trials)
     def train_dataloader(self):
         return DataLoader(self.training_set,
                           batch_size=self.hparams.batch_size,
@@ -251,10 +248,10 @@ class SRM_DataModule(LightningDataModule):
                               "valid_stats": self.validation_set.statistical_info()}
             if stage == "test":
                 state_dict = {"task_name": self.task_name,
-                              "subjects_info_dict": self.smr_datamodule.subjects_info_dict,
-                              "test_data_shape": self.testing_set.data.shape,
-                              "test_classes_weights": self.testing_set.classes_weights(),
-                              "test_stats": self.testing_set.statistical_info()}
+                              "subjects_info_dict": self.smr_datamodule.subjects_info_dict,}
+                              # "test_data_shape": self.testing_set.data.shape,
+                              # "test_classes_weights": self.testing_set.classes_weights(),
+                              # "test_stats": self.testing_set.statistical_info()}
 
             return state_dict
 
