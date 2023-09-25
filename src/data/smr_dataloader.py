@@ -51,10 +51,8 @@ class SRM_DataModule(LightningDataModule):
                  ival,
                  bands,
                  chans,
-                 classes,
                  subject_sessions_dict,
                  loading_data_mode,
-                 threshold_distance,
                  fallback_neighbors,
                  transform,
                  normalize,
@@ -70,12 +68,16 @@ class SRM_DataModule(LightningDataModule):
 
         # data params
         self.task_name = task_name
+
+        if self.task_name == "RL":
+            self.classes = ["R", "L"]
+        elif self.task_name == "2D":
+            self.classes = ["R", "L", "U", "D"]
+
         self.ival = ival
         self.bands = bands
         self.chans = chans
-        self.classes = classes
         self.loading_data_mode = loading_data_mode
-        self.threshold_distance = threshold_distance
         self.fallback_neighbors = fallback_neighbors
         self.transform = transform
         self.normalize = normalize
@@ -120,8 +122,6 @@ class SRM_DataModule(LightningDataModule):
                                        ival=self.ival,
                                        bands=self.bands,
                                        chans=self.chans,
-                                       classes=self.classes,
-                                       threshold_distance=self.threshold_distance,
                                        fallback_neighbors=self.fallback_neighbors,
                                        transform=self.transform,
                                        normalize=self.normalize)
@@ -131,9 +131,6 @@ class SRM_DataModule(LightningDataModule):
         print_memory_usage()
         print_cpu_cores()
         print_gpu_info()
-
-
-
 
     @property
     def num_classes(self):
@@ -149,7 +146,6 @@ class SRM_DataModule(LightningDataModule):
 
         if self.train_val_split:
             self.load_raw_data()
-
             logging.info("Train and validation split strategy")
 
             self.train_data, self.val_data = self.smr_datamodule.train_valid_split(self.smr_datamodule.valid_trials,
@@ -229,13 +225,9 @@ class SRM_DataModule(LightningDataModule):
             del self.testing_set
 
             # Delete large objects
-            if hasattr(self, 'valid_trials'):
-                del self.valid_trials
-            self.valid_trials = None
-
-            if hasattr(self, 'forced_trials'):
-                del self.forced_trials
-            self.forced_trials = None
+            if hasattr(self, 'smr_datamodule'):
+                del self.smr_datamodule
+            self.smr_datamodule = None
 
             # Explicitly run garbage collection
             gc.collect()
@@ -247,10 +239,17 @@ class SRM_DataModule(LightningDataModule):
         """Extra things to save to checkpoint."""
         return {
             "task_name": self.task_name,
+            "subjects_info_dict": self.smr_datamodule.subjects_info_dict,
             "train_data_shape": self.training_set.data.shape,
             "valid_data_shape": self.validation_set.data.shape,
             # "test_data_shape": self.testing_set.data.shape,
-            "subjects_info_dict": self.smr_datamodule.subjects_info_dict}
+            "train_classes_weights": self.training_set.classes_weights(),
+            "valid_classes_weights": self.validation_set.classes_weights(),
+            # "test_classes_weights": self.testing_set.classes_weights(),
+            "train_stats": self.training_set.statistical_info(),
+            "valid_stats": self.validation_set.statistical_info(),
+            # "test_stats": self.testing_set.statistical_info(),
+        }
 
 
 class SRMDataset(Dataset):
@@ -273,3 +272,34 @@ class SRMDataset(Dataset):
 
     def __len__(self):
         return len(self.data)
+
+    def classes_weights(self):
+        """Compute classes weights for imbalanced dataset."""
+        target_map_dict = {0: "R", 1: "L", 2: "U", 3: "D"}
+        dist = self.y_oe.sum(dim=0) / len(self.data)
+        classess_weights = {}
+
+        for i, w in enumerate(list(dist.numpy())):
+            task_name = target_map_dict[i]
+            classess_weights[task_name] = w
+
+        return classess_weights
+
+    def statistical_info(self):
+        """Compute statistical info for dataset."""
+        # Compute statistics
+        min_val = float(torch.min(self.data).item())
+        max_val = float(torch.max(self.data).item())
+        std_val = float(torch.std(self.data).item())
+        var_val = float(torch.var(self.data).item())
+        mean_val = float(torch.mean(self.data).item())
+
+        stats = {
+            "min": min_val,
+            "max": max_val,
+            "mean": mean_val,
+            "std": std_val,
+            "var": var_val
+        }
+
+        return stats
