@@ -130,7 +130,7 @@ def train(cfg: DictConfig) -> Tuple[dict, dict]:
             avg_metrics[f"avg_{key}"] = sum([fold[key].item() for fold in cv_score]) / len(cv_score)
 
         for key, value in avg_metrics.items():
-            trainer.logger.log_metrics({f"avg_{key}": value})
+            trainer.logger.log_metrics({f"{key}": value})
 
     return avg_metrics, object_dict
 

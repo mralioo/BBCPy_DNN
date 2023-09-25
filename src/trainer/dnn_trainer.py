@@ -71,13 +71,6 @@ class DnnLitModule(LightningModule):
         # for tracking best so far validation accuracy
         self.val_acc_best = MaxMetric()
 
-        # ATTRIBUTES TO SAVE BATCH OUTPUTS
-        self.test_step_outputs = []  # save outputs in each batch to compute metric overall epoch
-        self.test_step_targets = []  # save targets in each batch to compute metric overall epoch
-        # Testing metric objects for calculating and averaging accuracy across batches
-        self.test_loss = MeanMetric()
-        self.test_acc = Accuracy(task="multiclass", num_classes=self.num_classes)
-
     def forward(self, x: torch.Tensor):
         return self.net(x)
 
@@ -123,16 +116,12 @@ class DnnLitModule(LightningModule):
         state_dict = self.trainer.datamodule.state_dict()
         self.mlflow_client.log_param(self.run_id, "task", state_dict["task_name"])
 
-
         hparams["train_data_shape"] = state_dict["train_data_shape"]
         hparams["valid_data_shape"] = state_dict["valid_data_shape"]
-        # hparams["test_data_shape"] = state_dict["test_data_shape"]
         hparams["train_classes_weights"] = state_dict["train_classes_weights"]
         hparams["valid_classes_weights"] = state_dict["valid_classes_weights"]
-        # hparams["test_classes_weights"] = state_dict["test_classes_weights"]
         hparams["train_stats"] = state_dict["train_stats"]
         hparams["valid_stats"] = state_dict["valid_stats"]
-        # hparams["test_stats"] = state_dict["test_stats"]
 
         # Use a temporary directory to save
         with tempfile.TemporaryDirectory() as tmpdirname:
@@ -253,6 +242,33 @@ class DnnLitModule(LightningModule):
         self.log("val/loss", self.val_loss, on_step=False, on_epoch=True, prog_bar=True)
         self.log("val/acc", self.val_acc, on_step=False, on_epoch=True, prog_bar=True)
         return loss
+
+
+    def on_test_start(self):
+        # log hyperparameters
+        hparams = {}
+        state_dict = self.trainer.datamodule.state_dict()
+        # FIXME
+        hparams["data_type"] = "forced_trials"
+        hparams["test_data_shape"] = state_dict["test_data_shape"]
+        hparams["test_classes_weights"] = state_dict["test_classes_weights"]
+        hparams["test_stats"] = state_dict["test_stats"]
+
+        # Use a temporary directory to save
+        with tempfile.TemporaryDirectory() as tmpdirname:
+            hparam_path = os.path.join(tmpdirname, "test_dataset_info.json")
+            with open(hparam_path, "w") as f:
+                json.dump(hparams, f, default=default)
+            self.mlflow_client.log_artifacts(self.run_id,
+                                             local_dir=tmpdirname)
+
+        # --> HERE STEP 1 <--
+        # ATTRIBUTES TO SAVE BATCH OUTPUTS
+        self.test_step_outputs = []  # save outputs in each batch to compute metric overall epoch
+        self.test_step_targets = []  # save targets in each batch to compute metric overall epoch
+        # Testing metric objects for calculating and averaging accuracy across batches
+        self.test_loss = MeanMetric()
+        self.test_acc = Accuracy(task="multiclass", num_classes=self.num_classes)
 
     def on_validation_epoch_end(self):
 

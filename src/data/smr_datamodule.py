@@ -264,15 +264,14 @@ class SMR_Data():
         srm_data, timepoints, srm_fs, clab, mnt, trial_info, subject_info = \
             bbcpy.load.srm_eeg.load_single_mat_session(file_path=session_path)
 
+        session_info_dict = {}
+        session_info_dict["subject_info"] = subject_info
+
         # FIXME: pass if data has noisy channels for hyperparameter optimization HPO
         if self.loading_data_mode == "cross_subject_hpo":
             if subject_info["noisechan"] is not None:
                 logging.info(f"Session {session_name} has noisy channels, the data will be skipped")
-                return None, None, None
-
-
-        session_info_dict = {}
-        session_info_dict["subject_info"] = subject_info
+                return None, None, session_info_dict
 
         # set the EEG channels object, and remove the reference channel if exists
         chans = remove_reference_channel(clab, mnt)
@@ -388,7 +387,13 @@ class SMR_Data():
             subject_info_dict = {init_session_name: session_info_dict}
 
             logging.info(f"Loading {init_session_name} finalized (1 from {str(len(sessions_list))})")
+
             self.loaded_subjects_sessions[subject_name][init_session_name] = [valid_obj_new.shape, forced_obj_new.shape]
+
+            # check if the sessions has noisy channels
+            if valid_obj_new is None:
+                logging.info(f"Session {init_session_name} has noisy channels, the data will be skipped")
+                return None, None, subject_info_dict
 
             for i, session_name in enumerate(sessions_list[1:]):
                 logging.info(
@@ -402,6 +407,11 @@ class SMR_Data():
 
                     # save the subject info
                     subject_info_dict = {session_name: session_info_dict}
+
+                    # check if the sessions has noisy channels
+                    if valid_obj_new is None:
+                        logging.info(f"Session {session_name} has noisy channels, the data will be skipped")
+                        return None, None, subject_info_dict
 
                     # check if the valid data has the same datapoints
                     if valid_obj.shape[2] != valid_obj_new.shape[2]:
@@ -438,8 +448,13 @@ class SMR_Data():
 
             # save the subject info
             subject_info_dict = {init_session_name: session_info_dict}
-
             self.loaded_subjects_sessions[subject_name][init_session_name] = [valid_obj_new.shape, forced_obj_new.shape]
+            # check if the sessions has noisy channels
+            if valid_obj_new is None:
+                logging.info(f"Session {init_session_name} has noisy channels, the data will be skipped")
+                return None, None, subject_info_dict
+
+
             logging.info(f"Loading sessions: {init_session_name} finalized (1 from 1)")
 
         return valid_obj_new, forced_obj_new, subject_info_dict
@@ -459,10 +474,14 @@ class SMR_Data():
             valid_obj_new, _, subject_info_dict = self.load_subject_sessions(subject_name=subject_name,
                                                                              subject_dict=subject_dict)
 
+            self.subjects_info_dict[subject_name] = {"info": subject_info_dict, "pvc": None}
+            # check if the sessions has noisy channels
+            if valid_obj_new is None:
+                logging.info(f"Subject {subject_name} has noisy channels, the data will be skipped")
+                continue
+
             subject_data_valid_dict[subject_name] = valid_obj_new
             # subject_data_forced_dict[subject_name] = forced_obj_new
-
-            self.subjects_info_dict[subject_name] = {"info": subject_info_dict, "pvc": None}
 
         # calculate the mean pvc for all the subjects
         for subject_name, subject_info_dict in self.subjects_info_dict.items():
