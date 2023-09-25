@@ -7,6 +7,7 @@ task_name: "debug-dnn-win"
 train: True
 Test: True
 
+
 defaults:
   - override /data: smr_datamodule.yaml
   - override /model: eegnet.yaml
@@ -17,6 +18,7 @@ defaults:
   - override /hydra: default.yaml
   - override /callbacks: default.yaml
 
+optimized_metric: "val/acc_best"
 
 paths:
   root_dir: ${oc.env:PROJECT_ROOT}

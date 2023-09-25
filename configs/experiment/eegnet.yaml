@@ -18,7 +18,7 @@ tags: [ "torcheeg", "EEGNET-v1","Within-Subject", "2D"]
 
 seed: 12345
 
-optimized_metric: "avg_val/acc_best"
+optimized_metric: "val/acc_best"
 
 data:
   task_name: "2D"

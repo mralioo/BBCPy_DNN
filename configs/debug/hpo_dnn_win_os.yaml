@@ -94,7 +94,7 @@ hydra:
     storage: postgresql://${db.username}:${db.password}@${db.hostname}:${db.port}/${db.database}
     study_name: eegnet_hpo
     n_jobs: 1
-    n_trials: 1
+    n_trials: 2
     params:
       model.optimizer.lr: interval(0.0001, 0.1)
       model.net.F1: choice(4, 6, 8)
