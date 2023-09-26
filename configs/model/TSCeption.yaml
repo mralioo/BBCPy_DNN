@@ -23,7 +23,7 @@ plots_settings:
 
 net:
   _target_: torcheeg.models.cnn.TSCeption
-  num_classes: 2
+  num_classes: 4
   num_electrodes: 54
   sampling_rate: 1000
   num_T: 15

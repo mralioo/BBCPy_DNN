@@ -40,13 +40,6 @@ model:
   net:
     chunk_size: 9000
     num_classes: 4
-    num_electrodes: 62
-    dropout: 0.5
-    kernel_1: 1024
-    kernel_2: 256
-    F1: 8
-    F2: 16
-    D: 2
   plots_settings:
     plot_every_n_epoch: 10
 
