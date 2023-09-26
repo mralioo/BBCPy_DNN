@@ -1,10 +1,12 @@
 #!/bin/bash
-#SBATCH --job-name=TSCeption-hpo
+#SBATCH --job-name=TSCeption-debug-hpo
 #SBATCH --partition=gpu-2d
 #SBATCH --gpus-per-node=1
-#SBATCH --ntasks-per-node=2
-#SBATCH --output=../jobs_outputs/TSCeption-hpo/%x_%j.o
-#SBATCH --error=../jobs_outputs/TSCeption-hpo/%x_%j.e
+#SBATCH --mem=400G        # Some buffer above 30GB
+#SBATCH --ntasks-per-node=1   # One main task that runs the trial and manages CV
+#SBATCH --cpus-per-task=5 # Assuming you want to run each CV fold in parallel
+#SBATCH --output=../jobs_outputs/TSCeption-debug-hpo/%x_%j.o
+#SBATCH --error=../jobs_outputs/TSCeption-debug-hpo/%x_%j.e
 
 echo "I am a job with ID $SLURM_JOB_ID"
 echo "current working directory is $(pwd)"
