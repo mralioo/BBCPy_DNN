@@ -1,0 +1,89 @@
+# @package _global_
+
+# overwrite task name so debugging logs are stored in separate folder
+task_name: "debug-dnn-win"
+
+defaults:
+  - override /data: smr_datamodule.yaml
+#  - override /model: eegnet.yaml
+  - override /model: TSCeption.yaml
+  - override /trainer: gpu.yaml
+  - override /paths: default.yaml
+  - override /extras: default.yaml
+  - override /hydra: default.yaml
+  - override /callbacks: default.yaml
+
+optimized_metric: "val/acc_best"
+
+paths:
+  root_dir: ${oc.env:PROJECT_ROOT}
+  data_dir: D:\SMR\
+  log_dir: ${oc.env:PROJECT_ROOT}\logs
+  output_dir: ${hydra:runtime.output_dir}
+  work_dir: ${hydra:runtime.cwd}
+
+# disable callbacks and loggers during debugging
+#callbacks: null
+
+logger:
+  mlflow:
+    experiment_name: DEBUG-DNN-TRAIN
+#    run_name: EEGNet-v1
+    run_name: TSCeption-v1
+    tracking_uri: file:${paths.log_dir}/mlflow/mlruns
+#    tags: ${tags}
+
+model:
+  net:
+#    chunk_size: 900
+    num_classes: 4
+  plots_settings:
+    plot_every_n_epoch: 1
+
+data:
+  task_name: "2D"
+  ival: 1s:10s:10ms
+  chans: [ "*" ]
+  loading_data_mode: "within_subject"
+  subject_sessions_dict:
+    S4: "all"
+#    S5: "all"
+  transform: "TSCeption"
+  normalize: { norm_type: "std", norm_axis: 0 }
+  train_val_split: { val_size: 0.2, random_seed: 42 }
+  cross_validation: False
+  batch_size: 32
+  num_workers: 6
+  pin_memory: False
+
+trainer:
+  min_epochs: 1 # prevents early stopping
+  max_epochs: 10
+  check_val_every_n_epoch: 1  # perform a validation loop every N training epochs
+  #  precision: 16
+  num_sanity_val_steps: 1
+  deterministic: False
+  accumulate_grad_batches: 1
+#  gradient_clip_val: 1.0
+
+callbacks:
+  early_stopping:
+    monitor: "val/f1_best"
+    patience: 10
+    mode: "max"
+
+extras:
+  ignore_warnings: False
+  enforce_tags: False
+
+# sets level of all command line loggers to 'DEBUG'
+# https://hydra.cc/docs/tutorials/basic/running_your_app/logging/
+hydra:
+  job_logging:
+    root:
+      level: DEBUG
+  # use this to also set hydra loggers to 'DEBUG'
+  verbose: True
+
+
+

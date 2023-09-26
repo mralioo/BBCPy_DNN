@@ -19,16 +19,14 @@ criterion:
 
 plots_settings:
   # plots each n epochs
-  plot_every_n_epoch: 5
+  plot_every_n_epoch: 10
 
 net:
-  _target_: torcheeg.models.cnn.EEGNet
-  chunk_size: 9000
-  num_electrodes: 62
+  _target_: torcheeg.models.cnn.TSCeption
+  num_classes: 4
+  num_electrodes: 54
+  sampling_rate: 1000
+  num_T: 15
+  num_S: 15
+  hid_channels: 32
   dropout: 0.5
-  kernel_1: 1024
-  kernel_2: 256
-  F1: 8
-  F2: 16
-  D: 2
-  num_classes: 2

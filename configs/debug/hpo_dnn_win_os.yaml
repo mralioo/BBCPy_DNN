@@ -1,0 +1,101 @@
+# @package _global_
+
+# overwrite task name so debugging logs are stored in separate folder
+task_name: "debug-dnn-win"
+
+defaults:
+  - override /data: smr_datamodule.yaml
+#  - override /model: eegnet.yaml
+  - override /model: TSCeption.yaml
+  - override /trainer: gpu.yaml
+  - override /paths: default.yaml
+  - override /extras: default.yaml
+  - override /hydra: default.yaml
+  - override /callbacks: default.yaml
+
+
+paths:
+  root_dir: ${oc.env:PROJECT_ROOT}
+  data_dir: D:\SMR\
+  log_dir: ${oc.env:PROJECT_ROOT}\logs
+  output_dir: ${hydra:runtime.output_dir}
+  work_dir: ${hydra:runtime.cwd}
+
+# disable callbacks and loggers during debugging
+#callbacks: null
+
+logger:
+  mlflow:
+    experiment_name: DEBUG-DNN-TRAIN
+#    run_name: EEGNet-v1
+    run_name: TSCeption-v1
+    tracking_uri: file:${paths.log_dir}/mlflow/mlruns
+
+model:
+  net:
+#    chunk_size: 900
+    num_classes: 4
+  plots_settings:
+    plot_every_n_epoch: 1
+
+data:
+  task_name: "2D"
+  ival: 1s:10s:10ms
+  chans: [ "*" ]
+  loading_data_mode: "cross_subject_hpo"
+  #  loading_data_mode: "within_subject"
+  subject_sessions_dict:
+#    S4: "all"
+#    S3: "all"
+    S5: "all"
+  transform: "TSCeption"
+#  transform: False
+  normalize: { norm_type: "std", norm_axis: 0 }
+  train_val_split: False
+  cross_validation: { num_splits: 3, split_seed: 1234 }
+  batch_size: 15
+  num_workers: 1
+  pin_memory: False
+
+trainer:
+  min_epochs: 1 # prevents early stopping
+  max_epochs: 2
+  check_val_every_n_epoch: 1 # perform a validation loop every N training epochs
+  precision: 16
+  num_sanity_val_steps: 1
+  deterministic: False
+  accumulate_grad_batches: 1
+
+callbacks:
+  early_stopping:
+    monitor: "val/f1_best"
+    patience: 2
+    mode: "max"
+
+extras:
+  ignore_warnings: False
+  enforce_tags: False
+
+# sets level of all command line loggers to 'DEBUG'
+# https://hydra.cc/docs/tutorials/basic/running_your_app/logging/
+hydra:
+  job_logging:
+    root:
+      level: DEBUG
+  # use this to also set hydra loggers to 'DEBUG'
+  verbose: True
+  # sweep over these parameters
+  sweeper:
+    storage: postgresql://${db.username}:${db.password}@${db.hostname}:${db.port}/${db.database}
+    study_name: tsception_hpo
+    n_jobs: 1
+    n_trials: 2
+    params:
+      model.optimizer.lr: interval(0.0001, 0.1)
+      data.batch_size: choice(32, 64, 128)
+      model.net.sampling_rate: choice(1000, 2000, 4000)
+      model.net.num_T: choice(10, 15, 20)
+      model.net.num_S: choice(10, 15, 20)
+      model.net.hid_channels: choice(32, 64, 128)
+
+

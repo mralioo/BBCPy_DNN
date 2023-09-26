@@ -1,0 +1,6 @@
+# Credentials for optuna posgres database
+hostname: localhost
+port: 5432
+username: postgres
+password: Fida2002
+database: optuna
