@@ -51,7 +51,7 @@ trainer:
 paths:
   root_dir: ${oc.env:PROJECT_ROOT}
   data_dir: /input-data
-  log_dir: ${oc.env:PROJECT_ROOT}/logs
+  log_dir: ${oc.env:PROJECT_ROOT}/logs/dnn
   output_dir: ${hydra:runtime.output_dir}
   work_dir: ${hydra:runtime.cwd}
 
