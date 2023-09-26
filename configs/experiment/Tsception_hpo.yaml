@@ -26,21 +26,23 @@ data:
   chans: [ "*" ]
   bands:
     - 8
-    - 40
-  loading_data_mode: "within_subject"
+    - 30
+  loading_data_mode: "cross_subject_hpo"
   transform: "TSCeption"
   normalize: { norm_type: "std", norm_axis: 0 }
+  train_val_split: False
+  cross_validation: { num_splits: 3, split_seed: 1234 }
   batch_size: 32
-  num_workers: 6
-  pin_memory: False
+  num_workers: 4
+  pin_memory: True
 
 model:
   plots_settings:
     plot_every_n_epoch: 10
 
 trainer:
-  min_epochs: 20
-  max_epochs: 50
+  min_epochs: 30
+  max_epochs: 60
   check_val_every_n_epoch: 1
 
 paths:
@@ -54,3 +56,17 @@ logger:
   mlflow:
     experiment_name: TSception-HPO-NORM
     run_name: S1
+
+callbacks:
+  model_checkpoint:
+    dirpath: ${paths.output_dir}/checkpoints
+    filename: "epoch_{epoch:03d}"
+    monitor: "val/acc_best"
+    mode: "max"
+    save_last: True
+    auto_insert_metric_name: False
+
+  early_stopping:
+    monitor: "val/acc_best"
+    patience: 10
+    mode: "max"
