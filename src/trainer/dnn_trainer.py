@@ -1,7 +1,6 @@
 import itertools
 import json
 import os.path
-import sys
 import tempfile
 from typing import Any
 
@@ -11,7 +10,6 @@ import pyrootutils
 import sklearn
 import torch
 import torchmetrics
-import torchsummary
 from lightning import LightningModule
 from sklearn.metrics import confusion_matrix
 from torchmetrics import MaxMetric, MeanMetric, F1Score
@@ -60,29 +58,8 @@ class DnnLitModule(LightningModule):
         # weight initialization
         self.net.apply(xavier_initialize_weights)
 
-        # ATTRIBUTES TO SAVE BATCH OUTPUTS
-        self.training_step_outputs = []  # save outputs in each batch to compute metric overall epoch
-        self.training_step_targets = []  # save targets in each batch to compute metric overall epoch
-
-        self.train_loss = MeanMetric()
-        self.train_acc = Accuracy(task="multiclass", num_classes=self.num_classes)
-        self.train_f1 = F1Score(task="multiclass", num_classes=self.num_classes, average="macro")
-
-        self.train_f1_best = MaxMetric()
-
-        # Validation metric objects for calculating and averaging accuracy across batches
-        self.val_loss = MeanMetric()
-        self.val_acc = Accuracy(task="multiclass", num_classes=self.num_classes)
-        self.val_f1 = F1Score(task="multiclass", num_classes=self.num_classes, average="macro")
-
-        # for tracking best so far validation accuracy (used for checkpointing/ early stopping / HPO)
-        self.val_acc_best = MaxMetric()
-        self.val_f1_best = MaxMetric()
-
-        # Testing metric objects for calculating and averaging accuracy across batches
-        self.test_loss = MeanMetric()
-        self.test_acc = Accuracy(task="multiclass", num_classes=self.num_classes)
-        self.test_f1 = F1Score(task="multiclass", num_classes=self.num_classes)
+        # metrics
+        self.init_metrics()
 
     def forward(self, x: torch.Tensor):
         return self.net(x)
@@ -90,9 +67,6 @@ class DnnLitModule(LightningModule):
     def model_step(self, batch: Any):
 
         x, y = batch
-
-        # TODO Runs the forward pass in mixed precision
-        # with autocast():
 
         logits = self.forward(x)
         # FIXME : add class weights
@@ -185,37 +159,10 @@ class DnnLitModule(LightningModule):
         self.training_step_targets.clear()
 
     def on_validation_start(self):
-
         self.class_names = self.trainer.datamodule.classes
-
         # mlflow autologging
         self.mlflow_client = self.logger.experiment
         self.run_id = self.logger.run_id
-
-        # --> HERE STEP 1 <--
-        # ATTRIBUTES TO SAVE BATCH OUTPUTS
-        self.val_step_outputs = []  # save outputs in each batch to compute metric overall epoch
-        self.val_step_targets = []  # save targets in each batch to compute metric overall epoch
-
-        # Summary plot for val # FIXME multiclass
-        # Define collection that is a mix of metrics that return a scalar tensors and not
-        self.confmat = torchmetrics.classification.MulticlassConfusionMatrix(num_classes=self.num_classes)
-        self.roc = torchmetrics.classification.MulticlassROC(num_classes=self.num_classes)
-        self.mean_roc = MeanMetric()
-
-        # ATTRIBUTES TO SAVE BATCH OUTPUTS
-        self.val_step_outputs_ie = []  # save outputs in each batch to compute metric overall epoch
-        self.val_step_targets_ie = []  # save targets in each batch to compute metric overall epoch
-
-
-        self.collection = torchmetrics.MetricCollection(
-            torchmetrics.Accuracy(task="multiclass", num_classes=self.num_classes).to(self.device),
-            torchmetrics.Recall(task="multiclass", num_classes=self.num_classes).to(self.device),
-            torchmetrics.Precision(task="multiclass", num_classes=self.num_classes).to(self.device),
-            self.confmat.to(self.device),
-        )
-        # Define tracker over the collection to easy keep track of the metrics over multiple steps
-        self.tracker = torchmetrics.wrappers.MetricTracker(self.collection)
 
     def validation_step(self, batch: Any, batch_idx: int):
 
@@ -239,13 +186,11 @@ class DnnLitModule(LightningModule):
 
         # Log metrics from the collection
 
-
         _, logits, targets_ie = self.model_step_logits(batch)
         self.roc(logits, targets_ie)
         # --> HERE STEP 2 <--
         self.val_step_outputs_ie.extend(logits)
         self.val_step_targets_ie.extend(targets_ie)
-
 
         self.tracker.increment()  # Notify the tracker of a new step
         self.tracker.update(preds, targets)
@@ -277,9 +222,6 @@ class DnnLitModule(LightningModule):
         # log `val_f1_best` as a value through `.compute()` method, instead of as a metric object
         # otherwise metric would be reset by lightning after each epoch
         self.log("val/f1_best", self.val_f1_best.compute(), sync_dist=True, prog_bar=True)
-
-
-
 
         # Log metrics from the collection
         if (self.current_epoch + 1) % self.plots_settings["plot_every_n_epoch"] == 0:
@@ -567,7 +509,6 @@ class DnnLitModule(LightningModule):
 
     def plot_summary_advanced(self, all_results, task_name="2D", image_name=None):
 
-
         # Constuct a single figure with appropriate layout for all metrics
         fig = plt.figure(layout="constrained")
         ax1 = plt.subplot(2, 2, 1)
@@ -575,7 +516,6 @@ class DnnLitModule(LightningModule):
         ax3 = plt.subplot(2, 2, (3, 4))
 
         if task_name == "2D":
-
             # ConfusionMatrix and ROC we just plot the last step, notice how we call the plot method of those metrics
             # self.confmat.plot(val=all_results['MulticlassConfusionMatrix'], ax=ax1)
             self.roc.plot(ax=ax2)
@@ -599,3 +539,63 @@ class DnnLitModule(LightningModule):
             plt.savefig(plot_path)  # Save the plot to the temporary directory
             self.mlflow_client.log_artifacts(self.run_id, local_dir=tmpdirname)
             plt.close(fig)
+
+    def init_metrics(self):
+
+        # ATTRIBUTES TO SAVE BATCH OUTPUTS
+        self.training_step_outputs = []  # save outputs in each batch to compute metric overall epoch
+        self.training_step_targets = []  # save targets in each batch to compute metric overall epoch
+
+        # ATTRIBUTES TO SAVE BATCH OUTPUTS
+        self.val_step_outputs = []  # save outputs in each batch to compute metric overall epoch
+        self.val_step_targets = []  # save targets in each batch to compute metric overall epoch
+
+        # ATTRIBUTES TO SAVE BATCH OUTPUTS
+        self.val_step_outputs_ie = []  # save outputs in each batch to compute metric overall epoch
+        self.val_step_targets_ie = []  # save targets in each batch to compute metric overall epoch
+
+        self.train_loss = MeanMetric()
+        self.train_f1_best = MaxMetric()
+        # Validation metric objects for calculating and averaging accuracy across batches
+        self.val_loss = MeanMetric()
+        # for tracking best so far validation accuracy (used for checkpointing/ early stopping / HPO)
+        self.val_acc_best = MaxMetric()
+        self.val_f1_best = MaxMetric()
+
+        self.test_loss = MeanMetric()
+
+        if self.num_classes == 4:
+            self.train_acc = Accuracy(task="multiclass", num_classes=self.num_classes)
+            self.train_f1 = F1Score(task="multiclass", num_classes=self.num_classes, average="macro")
+
+            # Validation metric objects for calculating and averaging accuracy across batches
+            self.val_acc = Accuracy(task="multiclass", num_classes=self.num_classes)
+            self.val_f1 = F1Score(task="multiclass", num_classes=self.num_classes, average="macro")
+
+            # Testing metric objects for calculating and averaging accuracy across batches
+            self.test_acc = Accuracy(task="multiclass", num_classes=self.num_classes)
+            self.test_f1 = F1Score(task="multiclass", num_classes=self.num_classes)
+
+            # Define collection that is a mix of metrics that return a scalar tensors and not
+            self.confmat = torchmetrics.classification.MulticlassConfusionMatrix(num_classes=self.num_classes)
+            self.roc = torchmetrics.classification.MulticlassROC(num_classes=self.num_classes)
+            self.mean_roc = MeanMetric()
+
+            self.collection = torchmetrics.MetricCollection(
+                torchmetrics.Accuracy(task="multiclass", num_classes=self.num_classes),
+                torchmetrics.Recall(task="multiclass", num_classes=self.num_classes),
+                torchmetrics.Precision(task="multiclass", num_classes=self.num_classes),
+                self.confmat,
+            )
+            # Define tracker over the collection to easy keep track of the metrics over multiple steps
+            self.tracker = torchmetrics.wrappers.MetricTracker(self.collection)
+
+        if self.num_classes == 2:
+            self.train_acc = Accuracy(task="binary", num_classes=self.num_classes)
+            self.train_f1 = F1Score(task="binary", num_classes=self.num_classes, average="macro")
+
+            self.val_acc = Accuracy(task="binary", num_classes=self.num_classes)
+            self.val_f1 = F1Score(task="binary", num_classes=self.num_classes, average="macro")
+
+            self.test_acc = Accuracy(task="binary", num_classes=self.num_classes)
+            self.test_f1 = F1Score(task="binary", num_classes=self.num_classes)
