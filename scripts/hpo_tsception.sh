@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH --job-name=TSCeption-hpo
-#SBATCH --partition=gpu-2h
+#SBATCH --partition=gpu-2d
 #SBATCH --gpus-per-node=1
 #SBATCH --ntasks-per-node=2
 #SBATCH --output=../jobs_outputs/TSCeption-hpo/%x_%j.o
