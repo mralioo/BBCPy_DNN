@@ -101,7 +101,6 @@ class SRM_DataModule(LightningDataModule):
         #     [transforms.ToTensor(), transforms.Normalize((0.1307,), (0.3081,))]
         # # )
 
-        self.transforms = None
         self.batch_size = batch_size
         self.num_workers = num_workers
         self.pin_memory = pin_memory
@@ -142,7 +141,7 @@ class SRM_DataModule(LightningDataModule):
         logging.info("Preparing data...")
 
         if self.train_val_split:
-            self.load_raw_data()
+
             logging.info("Train and validation split strategy")
 
             self.train_data, self.val_data = self.smr_datamodule.train_valid_split(self.smr_datamodule.valid_trials,
@@ -150,18 +149,12 @@ class SRM_DataModule(LightningDataModule):
 
         if self.cross_validation:
             logging.info("Cross validation strategy; k-fold")
-            # choose fold to train on
-
-            # trial_kf = TrialWiseKFold(n_splits=self.cross_validation["num_splits"],
-            #                           shuffle=False,)
-            #                           # random_state=self.cross_validation["split_seed"])
 
             kf = KFold(n_splits=self.cross_validation["num_splits"],
                        shuffle=True,
                        random_state=self.cross_validation["split_seed"])
 
             all_splits_trial_kf = [k for k in kf.split(self.smr_datamodule.valid_trials)]
-            # all_splits = [k for k in kf.split(self.smr_datamodule.valid_trials)]
 
             train_indexes, val_indexes = all_splits_trial_kf[self.k]
 

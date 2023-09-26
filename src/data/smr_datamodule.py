@@ -144,10 +144,7 @@ class SMR_Data():
 
         self.fallback_neighbors = fallback_neighbors
 
-        if transform:
-            self.transform = OmegaConf.to_container(transform)
-        else:
-            self.transform = None
+        self.transform = transform
 
         if normalize:
             self.normalize = OmegaConf.to_container(normalize)
@@ -265,28 +262,20 @@ class SMR_Data():
         # calculate pvc
         session_info_dict["pvc"] = calculate_pvc_metrics(trial_info, taskname=self.task_name)
 
-        # # FIXME: pass if data has noisy channels for hyperparameter optimization HPO
-        # if self.loading_data_mode == "cross_subject_hpo":
-        #     if subject_info["noisechan"] is not None:
-        #         logging.info(f"Session {session_name} has noisy channels, the data will be skipped")
-        #         return None, None, session_info_dict
-
         # set the EEG channels object, and remove the reference channel if exists
         chans = remove_reference_channel(clab, mnt)
-        # transform the channels order
 
         # true labels
         target_map_dict = {1: "R", 2: "L", 3: "U", 4: "D"}
         mrk_class = np.array(trial_info["targetnumber"])
         mrk_class = mrk_class.astype(int) - 1  # to start from 0
-
         class_names = np.array(["R", "L", "U", "D"])
 
         # all trials
         # FIXME : not sure what to pass for mrk_pos
         # mrk pos here is the results of all trials
-        trialresult = trial_info[
-            "result"]  # 1 =correct target selected, 0=incorrect target selected,NaN=no target selected; timeout
+        # 1 =correct target selected, 0=incorrect target selected,NaN=no target selected; timeout
+        trialresult = trial_info["result"]
 
         mrk = bbcpy.datatypes.eeg.Marker(mrk_pos=trialresult,
                                          mrk_class=mrk_class,
@@ -300,15 +289,15 @@ class SMR_Data():
                                                     fs=srm_fs,
                                                     mrk=mrk,
                                                     chans=chans)
-        print("before bandpass filter")
-        print_data_info(epo_data)
+        # print("before bandpass filter")
+        # print_data_info(epo_data)
 
         # FIXME bandpass filter the data bte 8-30 Hz in liter
         if self.bands is not None:
             epo_data = epo_data.lfilter(self.bands)
 
-        print("after bandpass filter")
-        print_data_info(epo_data)
+        # print("after bandpass filter")
+        # print_data_info(epo_data)
 
         # if noisy channels are present, remove them from the data
         if subject_info["noisechan"] is not None:
@@ -326,11 +315,11 @@ class SMR_Data():
         else:
             session_info_dict["noisechans"] = None
 
-        print("after referencing")
-        print_data_info(epo_data)
+        # print("after referencing")
+        # print_data_info(epo_data)
 
         if self.transform == "TSCeption":
-            epo_data = transform_electrodes_configurations(epo_data)
+            epo_data = transform_electrodes_configurations(epo_data.copy())
 
         # valid trials are defined as the trials where labeles are correct (true) in trialresult
 

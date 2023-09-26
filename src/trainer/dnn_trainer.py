@@ -10,10 +10,10 @@ import numpy as np
 import pyrootutils
 import sklearn
 import torch
+import torchmetrics
 import torchsummary
 from lightning import LightningModule
 from sklearn.metrics import confusion_matrix
-from sklearn.metrics import f1_score
 from torchmetrics import MaxMetric, MeanMetric, F1Score
 from torchmetrics.classification.accuracy import Accuracy
 
@@ -66,12 +66,14 @@ class DnnLitModule(LightningModule):
 
         self.train_loss = MeanMetric()
         self.train_acc = Accuracy(task="multiclass", num_classes=self.num_classes)
-        self.train_f1 = F1Score(task="multiclass", num_classes=self.num_classes)
+        self.train_f1 = F1Score(task="multiclass", num_classes=self.num_classes, average="macro")
+
+        self.train_f1_best = MaxMetric()
 
         # Validation metric objects for calculating and averaging accuracy across batches
         self.val_loss = MeanMetric()
         self.val_acc = Accuracy(task="multiclass", num_classes=self.num_classes)
-        self.val_f1 = F1Score(task="multiclass", num_classes=self.num_classes)
+        self.val_f1 = F1Score(task="multiclass", num_classes=self.num_classes, average="macro")
 
         # for tracking best so far validation accuracy (used for checkpointing/ early stopping / HPO)
         self.val_acc_best = MaxMetric()
@@ -103,6 +105,14 @@ class DnnLitModule(LightningModule):
         preds = torch.nn.functional.one_hot(preds_ie, num_classes=self.num_classes)
 
         return loss, preds, y
+
+    def model_step_logits(self, batch: Any):
+        x, y = batch
+
+        logits = self.forward(x)
+        loss = self.criterion()(logits, y)
+
+        return loss, logits, torch.argmax(y, dim=1)
 
     def on_train_start(self):
 
@@ -136,6 +146,8 @@ class DnnLitModule(LightningModule):
         # update and log metrics
         self.train_loss(loss)
         self.train_acc(preds, targets)
+        self.train_f1(preds, targets)
+
         self.log("train/loss", self.train_loss, on_step=False, on_epoch=True, prog_bar=True)
         self.log("train/acc", self.train_acc, on_step=False, on_epoch=True, prog_bar=True)
         self.log("train/f1", self.train_f1, on_step=False, on_epoch=True, prog_bar=True)
@@ -148,9 +160,6 @@ class DnnLitModule(LightningModule):
         train_all_outputs = self.training_step_outputs
         train_all_targets = self.training_step_targets
 
-        # F1 Macro all epoch saving outputs and target per batch
-        f1_macro_epoch = f1_score(train_all_outputs, train_all_targets, average='macro')
-        self.log("train/f1_epoch", f1_macro_epoch, on_step=False, on_epoch=True, prog_bar=True)
         # Calculate the confusion matrix and log it to mlflow
         if (self.current_epoch + 1) % self.plots_settings["plot_every_n_epoch"] == 0:
             # Calculate the confusion matrix and log it to mlflow
@@ -158,7 +167,14 @@ class DnnLitModule(LightningModule):
             title = f"Training Confusion matrix epoch_{self.current_epoch}"
             self.confusion_matrix_to_png(cm, title, f"train_cm_epo_{self.current_epoch}")
 
-        # Log gradient for each parameter FIXME
+        # F1 is a metric object, so we need to call `.compute()` to get the value
+        f1 = self.train_f1.compute()  # get current val f1
+        self.train_f1_best(f1)  # update best so far val f1
+        # log `val_f1_best` as a value through `.compute()` method, instead of as a metric object
+        # otherwise metric would be reset by lightning after each epoch
+        self.log("train/f1_best", self.train_f1_best.compute(), sync_dist=True, prog_bar=True)
+
+        # FIXME : Log gradient for each parameter
         for name, param in self.named_parameters():
             if param.grad is not None:
                 self.log(f"grad_{name}_norm", param.grad.norm().item(), on_step=False, on_epoch=True, prog_bar=True)
@@ -181,6 +197,26 @@ class DnnLitModule(LightningModule):
         self.val_step_outputs = []  # save outputs in each batch to compute metric overall epoch
         self.val_step_targets = []  # save targets in each batch to compute metric overall epoch
 
+        # Summary plot for val # FIXME multiclass
+        # Define collection that is a mix of metrics that return a scalar tensors and not
+        self.confmat = torchmetrics.classification.MulticlassConfusionMatrix(num_classes=self.num_classes)
+        self.roc = torchmetrics.classification.MulticlassROC(num_classes=self.num_classes)
+        self.mean_roc = MeanMetric()
+
+        # ATTRIBUTES TO SAVE BATCH OUTPUTS
+        self.val_step_outputs_ie = []  # save outputs in each batch to compute metric overall epoch
+        self.val_step_targets_ie = []  # save targets in each batch to compute metric overall epoch
+
+
+        self.collection = torchmetrics.MetricCollection(
+            torchmetrics.Accuracy(task="multiclass", num_classes=self.num_classes).to(self.device),
+            torchmetrics.Recall(task="multiclass", num_classes=self.num_classes).to(self.device),
+            torchmetrics.Precision(task="multiclass", num_classes=self.num_classes).to(self.device),
+            self.confmat.to(self.device),
+        )
+        # Define tracker over the collection to easy keep track of the metrics over multiple steps
+        self.tracker = torchmetrics.wrappers.MetricTracker(self.collection)
+
     def validation_step(self, batch: Any, batch_idx: int):
 
         loss, preds, targets = self.model_step(batch)
@@ -195,9 +231,25 @@ class DnnLitModule(LightningModule):
         # update and log metrics
         self.val_loss(loss)
         self.val_acc(preds, targets)
+        self.val_f1(preds, targets)
+
         self.log("val/loss", self.val_loss, on_step=False, on_epoch=True, prog_bar=True)
         self.log("val/acc", self.val_acc, on_step=False, on_epoch=True, prog_bar=True)
         self.log("val/f1", self.val_f1, on_step=False, on_epoch=True, prog_bar=True)
+
+        # Log metrics from the collection
+
+
+        _, logits, targets_ie = self.model_step_logits(batch)
+        self.roc(logits, targets_ie)
+        # --> HERE STEP 2 <--
+        self.val_step_outputs_ie.extend(logits)
+        self.val_step_targets_ie.extend(targets_ie)
+
+
+        self.tracker.increment()  # Notify the tracker of a new step
+        self.tracker.update(preds, targets)
+
         return loss
 
     def on_validation_epoch_end(self):
@@ -205,9 +257,6 @@ class DnnLitModule(LightningModule):
         val_all_outputs = self.val_step_outputs
         val_all_targets = self.val_step_targets
 
-        # F1 Macro all epoch saving outputs and target per batch
-        val_f1_macro_epoch = f1_score(val_all_outputs, val_all_targets, average='macro')
-        self.log("val/f1_epoch", val_f1_macro_epoch, on_step=False, on_epoch=True, prog_bar=True)
         # Calculate the confusion matrix and log it to mlflow
         if (self.current_epoch + 1) % self.plots_settings["plot_every_n_epoch"] == 0:
             # Calculate the confusion matrix and log it to mlflow
@@ -229,10 +278,22 @@ class DnnLitModule(LightningModule):
         # otherwise metric would be reset by lightning after each epoch
         self.log("val/f1_best", self.val_f1_best.compute(), sync_dist=True, prog_bar=True)
 
+
+
+
+        # Log metrics from the collection
+        if (self.current_epoch + 1) % self.plots_settings["plot_every_n_epoch"] == 0:
+            all_results = self.tracker.compute_all()
+            self.roc.compute()
+            self.plot_summary_advanced(all_results, image_name=f"val_summary_epoch_{self.current_epoch}")
+
         # free up the memory
         # --> HERE STEP 3 <--
         self.val_step_outputs.clear()
         self.val_step_targets.clear()
+
+        self.val_step_outputs_ie.clear()
+        self.val_step_targets_ie.clear()
 
     def on_test_start(self):
         # log hyperparameters
@@ -270,6 +331,7 @@ class DnnLitModule(LightningModule):
         # update and log metrics
         self.test_loss(loss)
         self.test_acc(preds, targets)
+        self.test_f1(preds, targets)
         self.log("test/loss", self.test_loss, on_step=False, on_epoch=True, prog_bar=True)
         self.log("test/acc", self.test_acc, on_step=False, on_epoch=True, prog_bar=True)
         self.log("test/f1", self.test_f1, on_step=False, on_epoch=True, prog_bar=True)
@@ -278,10 +340,6 @@ class DnnLitModule(LightningModule):
 
         test_all_outputs = self.test_step_outputs
         test_all_targets = self.test_step_targets
-
-        ## F1 Macro all epoch saving outputs and target per batch
-        test_f1_macro_epoch = f1_score(test_all_targets, test_all_outputs, average='macro')
-        self.log("test/f1_epoch", test_f1_macro_epoch, on_step=False, on_epoch=True, prog_bar=True)
 
         cm = confusion_matrix(test_all_outputs, test_all_targets)
         title = f"Testing Confusion matrix, forced trials"
@@ -403,6 +461,7 @@ class DnnLitModule(LightningModule):
         """Log all hyperparameters to mlflow"""
         for k, v in self.hparams.items():
             self.mlflow_client.log_param(self.run_id, k, v)
+
     def calculate_sample_weights(self, y, NUM_MIN_SAMPLES=10):
         """Calculate sample weights for unbalanced dataset"""
         y_np = np.argmax(y.cpu().numpy(), axis=1)
@@ -487,21 +546,56 @@ class DnnLitModule(LightningModule):
                                                  local_dir=tmpdirname)
 
         # save model summary as a text file
-        with tempfile.TemporaryDirectory() as tmpdirname:
-            x_shape = (1, self.net.num_electrodes, self.net.chunk_size)
-            summary_path = os.path.join(tmpdirname, f"{model_name}_summary.txt")
-            with open(summary_path, "w") as f:
-                sys.stdout = f
-                torchsummary.summary(self.net, x_shape, device="cuda")
-                sys.stdout = sys.__stdout__
+        # with tempfile.TemporaryDirectory() as tmpdirname:
+        #     x_shape = (1, self.net.num_electrodes, self.net.chunk_size)
+        #     summary_path = os.path.join(tmpdirname, f"{model_name}_summary.txt")
+        #     with open(summary_path, "w") as f:
+        #         sys.stdout = f
+        #         torchsummary.summary(self.net, x_shape, device="cuda")
+        #         sys.stdout = sys.__stdout__
+        #
+        #     self.mlflow_client.log_artifacts(self.run_id,
+        #                                      local_dir=tmpdirname)
+        # # save to onnx
+        # with tempfile.TemporaryDirectory() as tmpdirname:
+        #     x_tmp = torch.randn(1, 1, self.net.num_electrodes, self.net.chunk_size).cuda()
+        #     onnx_path = os.path.join(tmpdirname, f"{model_name}.onnx")
+        #     torch.onnx.export(self.net, x_tmp, onnx_path, verbose=True, input_names=["input"],
+        #                       output_names=["output"])
+        #     self.mlflow_client.log_artifacts(self.run_id,
+        #                                      local_dir=tmpdirname)
 
-            self.mlflow_client.log_artifacts(self.run_id,
-                                             local_dir=tmpdirname)
-        # save to onnx
+    def plot_summary_advanced(self, all_results, task_name="2D", image_name=None):
+
+
+        # Constuct a single figure with appropriate layout for all metrics
+        fig = plt.figure(layout="constrained")
+        ax1 = plt.subplot(2, 2, 1)
+        ax2 = plt.subplot(2, 2, 2)
+        ax3 = plt.subplot(2, 2, (3, 4))
+
+        if task_name == "2D":
+
+            # ConfusionMatrix and ROC we just plot the last step, notice how we call the plot method of those metrics
+            # self.confmat.plot(val=all_results['MulticlassConfusionMatrix'], ax=ax1)
+            self.roc.plot(ax=ax2)
+
+            scalar_results = {k: v for k, v in all_results.items() if isinstance(v, torch.Tensor) and v.numel() == 1}
+
+        if task_name == "RL":
+            self.confmat.plot(val=all_results['ConfusionMatrix'], ax=ax1)
+            self.roc.plot(ax=ax2)
+
+            # For the remainig we plot the full history, but we need to extract the scalar values from the results
+            scalar_results = [
+                {k: v for k, v in ar.items() if isinstance(v, torch.Tensor) and v.numel() == 1} for ar in all_results
+            ]
+
+        self.tracker.plot(val=scalar_results, ax=ax3)
+
         with tempfile.TemporaryDirectory() as tmpdirname:
-            x_tmp = torch.randn(1, 1, self.net.num_electrodes, self.net.chunk_size).cuda()
-            onnx_path = os.path.join(tmpdirname, f"{model_name}.onnx")
-            torch.onnx.export(self.net, x_tmp, onnx_path, verbose=True, input_names=["input"],
-                              output_names=["output"])
-            self.mlflow_client.log_artifacts(self.run_id,
-                                             local_dir=tmpdirname)
+            plot_path = os.path.join(tmpdirname, f"{image_name}.png")
+
+            plt.savefig(plot_path)  # Save the plot to the temporary directory
+            self.mlflow_client.log_artifacts(self.run_id, local_dir=tmpdirname)
+            plt.close(fig)
