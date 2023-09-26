@@ -1,25 +1,20 @@
 #!/bin/bash
-
-#SBATCH --job-name=TSCeption-S1-10
+#SBATCH --job-name=TSCeption-hpo
 #SBATCH --partition=gpu-2h
 #SBATCH --gpus-per-node=1
 #SBATCH --ntasks-per-node=2
-#SBATCH --output=../jobs_outputs/TSCeption-S1-10/%x_%j.o
-#SBATCH --error=../jobs_outputs/TSCeption-S1-10/%x_%j.e
+#SBATCH --output=../jobs_outputs/TSCeption-hpo/%x_%j.o
+#SBATCH --error=../jobs_outputs/TSCeption-hpo/%x_%j.e
 
 echo "I am a job with ID $SLURM_JOB_ID"
 echo "current working directory is $(pwd)"
 
-# Define data you want to run
-SUBJECT=("S1" "S2" "S3" "S4" "S5" "S6" "S7" "S8" "S9" "S10")
 
-# Loop over the data
-for S in "${SUBJECT[@]}"; do
+echo "I am a job with ID $SLURM_JOB_ID"
+echo "current working directory is $(pwd)"
 
-    echo "Processing data $S"
-    # 1. copy the squashed dataset to the nodes /tmp
-    cp ./../squashfs_smr_data/${S}.sqfs /tmp/
-    # 3. bind the squashed dataset to your apptainer environment and run your script with apptainer
-    apptainer run -B /tmp/${S}.sqfs:/input-data:image-src=/ ./../env_images/bbcpy_lightning_v5.sif python ./src/baseline_train.py +experiment=Tsception +data.subject_sessions_dict="{$S: "all"}" logger.mlflow.experiment_name="${S}-all-RL"
+# 1. copy the squashed dataset to the nodes /tmp
+cp ./../squashfs_smr_data/hpo_best_pvc.sqfs /tmp/
 
-done
+# 3. bind the squashed dataset to your apptainer environment and run your script with apptainer
+apptainer run --nv -B /tmp/hpo_best_pvc.sqfs.sqfs:/input-data:image-src=/ ./../env_images/bbcpy_en.sif python ./src/dnn_hpo_train.py experiment=Tsception_hpo +data.subject_sessions_dict='{S5: "all", S9:"all" ,S20:"all", S2:"all", S19:"all", S14:"all"}' hparams_search=tsception_optuna.yaml logger.mlflow.run_name="best-6-pvc"

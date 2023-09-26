@@ -3,14 +3,10 @@
 # overwrite task name so debugging logs are stored in separate folder
 task_name: "debug-dnn-win"
 
-# Train
-train: False
-tune: True
-
 defaults:
   - override /data: smr_datamodule.yaml
-  - override /model: eegnet.yaml
-  #  - override /model: TSCeption.yaml
+#  - override /model: eegnet.yaml
+  - override /model: TSCeption.yaml
   - override /trainer: gpu.yaml
   - override /paths: default.yaml
   - override /extras: default.yaml
@@ -31,13 +27,13 @@ paths:
 logger:
   mlflow:
     experiment_name: DEBUG-DNN-TRAIN
-    run_name: EEGNet-v1
-    #    run_name: TSCeption-v1
+#    run_name: EEGNet-v1
+    run_name: TSCeption-v1
     tracking_uri: file:${paths.log_dir}/mlflow/mlruns
 
 model:
   net:
-    chunk_size: 900
+#    chunk_size: 900
     num_classes: 4
   plots_settings:
     plot_every_n_epoch: 1
@@ -50,10 +46,10 @@ data:
   #  loading_data_mode: "within_subject"
   subject_sessions_dict:
 #    S4: "all"
-    S3: "all"
+#    S3: "all"
     S5: "all"
-  #  transform: "TSCeption"
-  transform: False
+  transform: "TSCeption"
+#  transform: False
   normalize: { norm_type: "std", norm_axis: 0 }
   train_val_split: False
   cross_validation: { num_splits: 3, split_seed: 1234 }
@@ -64,8 +60,7 @@ data:
 trainer:
   min_epochs: 1 # prevents early stopping
   max_epochs: 2
-  # perform a validation loop every N training epochs
-  check_val_every_n_epoch: 1
+  check_val_every_n_epoch: 1 # perform a validation loop every N training epochs
   precision: 16
   num_sanity_val_steps: 1
   deterministic: False
@@ -73,7 +68,7 @@ trainer:
 
 callbacks:
   early_stopping:
-    monitor: "val/f1_epoch"
+    monitor: "val/f1_best"
     patience: 2
     mode: "max"
 
@@ -92,14 +87,15 @@ hydra:
   # sweep over these parameters
   sweeper:
     storage: postgresql://${db.username}:${db.password}@${db.hostname}:${db.port}/${db.database}
-    study_name: eegnet_hpo
+    study_name: tsception_hpo
     n_jobs: 1
     n_trials: 2
     params:
       model.optimizer.lr: interval(0.0001, 0.1)
-      model.net.F1: choice(4, 6, 8)
-      model.net.D: choice(2, 4, 8)
-      model.net.F2: choice(8, 12, 16, 32)
-
+      data.batch_size: choice(32, 64, 128)
+      model.net.sampling_rate: choice(1000, 2000, 4000)
+      model.net.num_T: choice(10, 15, 20)
+      model.net.num_S: choice(10, 15, 20)
+      model.net.hid_channels: choice(32, 64, 128)
 
 

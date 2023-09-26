@@ -75,6 +75,10 @@ def train(cfg: DictConfig) -> Tuple[dict, dict]:
         "trainer": trainer,
     }
 
+    # load data
+    log.info("Loading data...")
+    datamodule.load_raw_data()
+
     if logger:
         log.info("Logging hyperparameters!")
         utils.log_hyperparameters(object_dict)

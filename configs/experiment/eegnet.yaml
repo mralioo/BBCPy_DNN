@@ -79,5 +79,5 @@ callbacks:
 
   early_stopping:
     monitor: "val/acc_best"
-    patience: 10
+    patience: 30
     mode: "max"
