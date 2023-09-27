@@ -1,5 +1,4 @@
 #!/bin/bash
-
 #SBATCH --job-name=TSCeption-debug-hpo
 #SBATCH --partition=gpu-2d
 #SBATCH --gpus-per-node=1

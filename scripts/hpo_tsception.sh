@@ -4,7 +4,7 @@
 #SBATCH --gpus-per-node=1
 #SBATCH --mem=400G        # Some buffer above 30GB
 #SBATCH --ntasks-per-node=1   # One main task that runs the trial and manages CV
-#SBATCH --cpus-per-task=5 # Assuming you want to run each CV fold in parallel
+#SBATCH --cpus-per-task=6 # Assuming you want to run each CV fold in parallel
 #SBATCH --output=../jobs_outputs/TSCeption-debug-hpo/%x_%j.o
 #SBATCH --error=../jobs_outputs/TSCeption-debug-hpo/%x_%j.e
 
