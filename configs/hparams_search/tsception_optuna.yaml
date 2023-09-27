@@ -20,7 +20,7 @@ hydra:
 
     # storage URL to persist optimization results
     # for example, you can use SQLite if you set 'sqlite:///example.db'
-    storage: null
+    storage: sqlite:///${oc.env:PROJECT_ROOT}/logs/dnn/optuna.db
 
     # name of the study to persist optimization results
     study_name: tsception_hpo

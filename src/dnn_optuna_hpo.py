@@ -52,9 +52,6 @@ def train(cfg: DictConfig) -> Tuple[dict, dict]:
     if cfg.get("seed"):
         L.seed_everything(cfg.seed, workers=True)
 
-    log.info(f"Instantiating model <{cfg.model._target_}>")
-    model: LightningModule = hydra.utils.instantiate(cfg.model)
-
     log.info("Instantiating callbacks...")
     callbacks: List[Callback] = utils.instantiate_callbacks(cfg.get("callbacks"))
 
@@ -69,13 +66,33 @@ def train(cfg: DictConfig) -> Tuple[dict, dict]:
     # load data
     datamodule.load_raw_data()
 
-    def objective(trial: optuna.trial.Trial) -> float:
-        pass
+    log.info("Instantiating Optuna...")
+    optuna_hpo = cfg.get("hparams_search")
+    sampler = hydra.utils.instantiate(optuna_hpo.sampler)
+    pruner = hydra.utils.instantiate(optuna_hpo.pruner)
 
+    study = optuna.create_study(direction=optuna_hpo.direction,
+                                sampler=sampler,
+                                pruner=pruner,
+                                study_name=optuna_hpo.study_name,
+                                storage="sqlite:///./optuna.db",
+                                load_if_exists=False)
 
+    def objective(trial):
+        # Suggest values for hyperparameters
+        lr = trial.suggest_float('lr', 1e-5, 1e-1, log=True)
+        F1 = trial.suggest_int('F1', 8, 12)
+        F2 = trial.suggest_int('F2', 8, 24)
 
+        # Override the configuration with Optuna's suggestions
+        cfg.optimizer.lr = lr
+        cfg.model.net.F1 = F1
+        cfg.model.net.F2 = F2
 
-    if cfg.get("tune"):
+        # Instantiate the model
+        log.info(f"Instantiating model <{cfg.model._target_}>")
+        model: LightningModule = hydra.utils.instantiate(cfg.model)
+
         log.info("Starting hyperparameter optimization!")
 
         cv_score = []
@@ -91,6 +108,8 @@ def train(cfg: DictConfig) -> Tuple[dict, dict]:
             print_gpu_memory()
 
             datamodule.update_kfold_index(k)
+
+            trial_id = trial.number
             # here we train the model on given split...
             # inti trainer again
             log.info("Instantiating loggers...")
@@ -122,18 +141,21 @@ def train(cfg: DictConfig) -> Tuple[dict, dict]:
 
             train_metrics = trainer.callback_metrics
 
-            cv_score.append(train_metrics)
+            cv_score.append(train_metrics[cfg.optimized_metric])
 
-        for key in cv_score[0].keys():
-            avg_metrics[f"avg_{key}"] = sum([fold[key].item() for fold in cv_score]) / len(cv_score)
+        # Return a value that you aim to optimize, e.g., validation loss
+        return sum(cv_score) / nums_folds
 
-        for key, value in avg_metrics.items():
-            trainer.logger.log_metrics({f"avg_{key}": value})
+    study.optimize(objective,
+                   n_trials=optuna_hpo.n_trials,
+                   timeout=optuna_hpo.timeout)
+
+    print("Best hyperparameters:", study.best_params)
 
     return avg_metrics, object_dict
 
 
-@hydra.main(version_base="1.3", config_path="../configs", config_name="dnn_train_hpo.yaml")
+@hydra.main(version_base="1.3", config_path="../configs", config_name="dnn_optuna_hpo.yaml")
 def main(cfg: DictConfig) -> Optional[float]:
     # apply extra utilities
     # (e.g. ask for tags if none are provided in cfg, print cfg tree, etc.)

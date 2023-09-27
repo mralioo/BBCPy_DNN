@@ -27,13 +27,12 @@ paths:
 logger:
   mlflow:
     experiment_name: DEBUG-DNN-TRAIN
-#    run_name: EEGNet-v1
     run_name: TSCeption-v1
     tracking_uri: file:${paths.log_dir}/mlflow/mlruns
 
+
 model:
   net:
-#    chunk_size: 900
     num_classes: 4
   plots_settings:
     plot_every_n_epoch: 1
@@ -52,7 +51,7 @@ data:
 #  transform: False
   normalize: { norm_type: "std", norm_axis: 0 }
   train_val_split: False
-  cross_validation: { num_splits: 3, split_seed: 1234 }
+  cross_validation: { num_splits: 2, split_seed: 1234 }
   batch_size: 15
   num_workers: 1
   pin_memory: False
@@ -85,17 +84,16 @@ hydra:
   # use this to also set hydra loggers to 'DEBUG'
   verbose: True
   # sweep over these parameters
-  sweeper:
-    storage: postgresql://${db.username}:${db.password}@${db.hostname}:${db.port}/${db.database}
-    study_name: tsception_hpo
-    n_jobs: 1
-    n_trials: 2
-    params:
-      model.optimizer.lr: interval(0.0001, 0.1)
-      data.batch_size: choice(32, 64, 128)
-      model.net.sampling_rate: choice(1000, 2000, 4000)
-      model.net.num_T: choice(10, 15, 20)
-      model.net.num_S: choice(10, 15, 20)
-      model.net.hid_channels: choice(32, 64, 128)
+#  sweeper:
+#    study_name: tsception_hpo
+#    n_jobs: 1
+#    n_trials: 2
+#    params:
+#      model.optimizer.lr: interval(0.0001, 0.1)
+#      data.batch_size: choice(32, 64, 128)
+#      model.net.sampling_rate: choice(1000, 2000, 4000)
+#      model.net.num_T: choice(10, 15, 20)
+#      model.net.num_S: choice(10, 15, 20)
+#      model.net.hid_channels: choice(32, 64, 128)
 
 

@@ -13,17 +13,15 @@ defaults:
   - extras: default.yaml
   - hydra: default.yaml
   - db: default.yaml
+  - hparams_search: eegnet_optuna_hpo.yaml
 
   # experiment configs allow for version control of specific hyperparameters
   # e.g. best hyperparameters for given model and datamodule
   - experiment: eegnet.yaml
 
-  # config for hyperparameter optimization
-  - hparams_search: eegnet_optuna.yaml
-
   # debugging config (enable through command line, e.g. `python train.py debug=default)
 #  - debug: null
-  - debug: dnn_win_os.yaml
+  - debug: hpo_dnn_win_os.yaml
 
 # task name, determines output directory path
 task_name: "tune"

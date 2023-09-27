@@ -37,11 +37,11 @@ data:
   pin_memory: True
 
 model:
-  plots_settings:
-    plot_every_n_epoch: 10
   net:
     num_classes: 4
     num_electrodes: 54
+  plots_settings:
+    plot_every_n_epoch: 10
 
 trainer:
   min_epochs: 30
