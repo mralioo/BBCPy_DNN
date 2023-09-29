@@ -1,12 +1,12 @@
 #!/bin/bash
-#SBATCH --job-name=eegnet-hpo-best-pvc
+#SBATCH --job-name=eegnet-hpo-LR
 #SBATCH --partition=gpu-2d
 #SBATCH --gpus-per-node=1
 #SBATCH --mem=400GB
 #SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=8
-#SBATCH --output=../jobs_outputs/eegnet-hpo-best-pvc/%x_%j.o
-#SBATCH --error=../jobs_outputs/eegnet-hpo-best-pvc/%x_%j.e
+#SBATCH --output=../jobs_outputs/eegnet-hpo-LR/%x_%j.o
+#SBATCH --error=../jobs_outputs/eegnet-hpo-LR/%x_%j.e
 
 echo "I am a job with ID $SLURM_JOB_ID"
 echo "current working directory is $(pwd)"

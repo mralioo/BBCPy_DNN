@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --job-name=TSCeption-debug-hpo
+#SBATCH --job-name=debug-tsception--hpo-LR
 #SBATCH --partition=gpu-2d
 #SBATCH --gpus-per-node=1
 #SBATCH --mem=100G        # Some buffer above 30GB
