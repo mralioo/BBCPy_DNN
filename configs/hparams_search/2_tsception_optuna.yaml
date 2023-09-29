@@ -21,7 +21,7 @@ hydra:
 
     # storage URL to persist optimization results
     # for example, you can use SQLite if you set 'sqlite:///example.db'
-    storage: sqlite:///${oc.env:PROJECT_ROOT}/logs/${logger.mlflow.experiment_name}.db
+    storage: sqlite:////${oc.env:PROJECT_ROOT}/logs/${logger.mlflow.experiment_name}.db
 #    storage: null
 
     # name of the study to persist optimization results
