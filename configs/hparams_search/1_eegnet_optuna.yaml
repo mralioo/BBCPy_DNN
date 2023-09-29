@@ -5,6 +5,7 @@
 
 defaults:
   - override /hydra/sweeper: optuna
+  - override /db: default.yaml
 
 # choose metric which will be optimized by Optuna
 # make sure this is the correct name of some metric logged in lightning module!
@@ -20,7 +21,8 @@ hydra:
 
     # storage URL to persist optimization results
     # for example, you can use SQLite if you set 'sqlite:///example.db'
-    storage: sqlite:///${oc.env:PROJECT_ROOT}/logs/${logger.mlflow.experiment_name}.db
+#    storage: sqlite:///${oc.env:PROJECT_ROOT}/logs/${logger.mlflow.experiment_name}.db
+    storage: postgresql://${db.username}:${db.password}@${db.ip_address}:${db.port}/${db.database}
 
     # name of the study to persist optimization results
     study_name: ${logger.mlflow.run_name}
