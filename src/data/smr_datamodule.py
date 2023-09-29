@@ -127,7 +127,7 @@ class SMR_Data():
         self.srm_data_path = data_dir
         self.task_name = task_name
 
-        if self.task_name == "RL":
+        if self.task_name == "LR":
             self.classes = ["R", "L"]
         elif self.task_name == "2D":
             self.classes = ["R", "L", "U", "D"]
@@ -252,7 +252,7 @@ class SMR_Data():
 
         return srm_obj, chan_dict_info
 
-    def load_forced_valid_trials_data(self, session_path):
+    def load_trials(self, session_path, load_forced_trials=False):
 
         srm_data, timepoints, srm_fs, clab, mnt, trial_info, subject_info = \
             bbcpy.load.srm_eeg.load_single_mat_session(file_path=session_path)
@@ -326,18 +326,22 @@ class SMR_Data():
         valid_trials_idx = np.where(epo_data.mrk == np.bool_(True))[0]
         valid_trials = epo_data[valid_trials_idx].copy()
 
-        # forced trials are defined as the trials where labeles are correct (true) in forcedresult
-        # and not in valid trials
-        forced_trials = trial_info["forcedresult"]
-
-        forced_trials_idx = np.setdiff1d(np.where(forced_trials == np.bool_(True))[0], valid_trials_idx)
-
-        # TODO IMPORTANT repalce y to forced y trials
-        forced_trials = epo_data[forced_trials_idx].copy()
+        forced_trials = np.array(None)
 
         # preprocess the data
         valid_trials = self.preprocess_data(valid_trials)
-        forced_trials = self.preprocess_data(forced_trials)
+
+        if load_forced_trials:
+            # forced trials are defined as the trials where labeles are correct (true) in forcedresult
+            # and not in valid trials
+            forced_trials = trial_info["forcedresult"]
+
+            forced_trials_idx = np.setdiff1d(np.where(forced_trials == np.bool_(True))[0], valid_trials_idx)
+
+            # TODO IMPORTANT repalce y to forced y trials
+            forced_trials = epo_data[forced_trials_idx].copy()
+
+            forced_trials = self.preprocess_data(forced_trials)
 
         # save subject info
         session_info_dict["shapes"] = {"valid_trials": valid_trials.shape,
@@ -356,7 +360,7 @@ class SMR_Data():
             # load data
             logging.info(f"Loading session {session_name} ...")
             valid_obj_new, forced_obj_new, session_info_dict = \
-                self.load_forced_valid_trials_data(session_path)
+                self.load_trials(session_path)
 
             logging.info(f"valid trials shape: {valid_obj_new.shape},"
                          f"forced trials shape: {forced_obj_new.shape}")
