@@ -5,8 +5,8 @@ task_name: "debug-dnn-win"
 
 defaults:
   - override /data: smr_datamodule.yaml
-#  - override /model: eegnet.yaml
-  - override /model: TSCeption.yaml
+  - override /model: eegnet.yaml
+#  - override /model: TSCeption.yaml
   - override /trainer: gpu.yaml
   - override /paths: default.yaml
   - override /extras: default.yaml
@@ -27,19 +27,19 @@ paths:
 logger:
   mlflow:
     experiment_name: DEBUG-DNN-TRAIN
-#    run_name: EEGNet-v1
-    run_name: TSCeption-v1
+    run_name: EEGNet-v1
+#    run_name: TSCeption-v1
     tracking_uri: file:${paths.log_dir}/mlflow/mlruns
 
 model:
   net:
-#    chunk_size: 900
-    num_classes: 2
+    chunk_size: 900
+    num_classes: 4
   plots_settings:
     plot_every_n_epoch: 1
 
 data:
-  task_name: "LR"
+  task_name: "2D"
   ival: 1s:10s:10ms
   chans: [ "*" ]
   loading_data_mode: "cross_subject_hpo"
@@ -48,8 +48,8 @@ data:
 #    S4: "all"
 #    S3: "all"
     S5: "all"
-  transform: "TSCeption"
-#  transform: False
+#  transform: "TSCeption"
+  transform: False
   normalize: { norm_type: "std", norm_axis: 0 }
   train_val_split: False
   cross_validation: { num_splits: 3, split_seed: 1234 }
@@ -93,9 +93,10 @@ hydra:
     params:
       model.optimizer.lr: interval(0.0001, 0.1)
       data.batch_size: choice(32, 64, 128)
-      model.net.sampling_rate: choice(500, 1000, 2000)
-      model.net.num_T: choice(10, 15, 20)
-      model.net.num_S: choice(10, 15, 20)
-      model.net.hid_channels: choice(32, 64, 128)
+      model.net.kernel_1: choice(512, 1024, 2048)
+      model.net.kernel_2: choice(128, 256, 512)
+      model.net.F1: choice(4, 6, 8)
+      model.net.D: choice(2, 4, 8)
+      model.net.F2: choice(8, 12, 16, 32)
 
 

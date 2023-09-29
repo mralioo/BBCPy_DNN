@@ -61,7 +61,7 @@ paths:
 
 logger:
   mlflow:
-    experiment_name: EEGNET-HPO-2D
+    experiment_name: EEGNET-HPO-LR
     run_name: S6
 
 callbacks:

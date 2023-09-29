@@ -58,5 +58,5 @@ paths:
 
 logger:
   mlflow:
-    experiment_name: TSception-HPO-NORM
+    experiment_name: TSception-HPO-2D
     run_name: S1

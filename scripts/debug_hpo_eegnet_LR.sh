@@ -15,4 +15,4 @@ echo "current working directory is $(pwd)"
 cp ./../squashfs_smr_data/hpo_best_pvc_debug.sqfs /tmp/
 
 # 3. bind the squashed dataset to your apptainer environment and run your script with apptainer
-apptainer run --nv -B /tmp/hpo_best_pvc_debug.sqfs:/input-data:image-src=/ ./../env_images/bbcpy_en.sif python ./src/dnn_hpo_train.py experiment=1_eegnet_LR +data.subject_sessions_dict='{S5: "all", S9:"all"}' hparams_search=1_eegnet_optuna logger.mlflow.run_name="best-2-pvc"
+apptainer run --nv -B /tmp/hpo_best_pvc_debug.sqfs:/input-data:image-src=/ ./../env_images/bbcpy_en.sif python ./src/dnn_hpo_train.py experiment=1_eegnet_LR +data.subject_sessions_dict='{S5: "all", S9:"all"}' hparams_search=1_eegnet_optuna logger.mlflow.run_name="LR-best-2-pvc"
