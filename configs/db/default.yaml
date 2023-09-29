@@ -3,5 +3,5 @@ hostname: localhost
 port: 5432
 username: postgres
 password: Fida2002
-database: optuna
+database: cluster_optuna_db
 ip_address: 149.233.53.111
