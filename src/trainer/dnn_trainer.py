@@ -77,7 +77,7 @@ class DnnLitModule(LightningModule):
         if self.num_classes == 2:
             probs = F.sigmoid(logits, dim=1)
         if self.num_classes > 2:
-            probs = F.softmax(logits, dim=1)
+            probs = F.softmax(logits, dim=2)
 
         # FIXME : add class weights
         # classes_weights_tensor = torch.tensor(self.calculate_sample_weights(y)).to(self.device)
