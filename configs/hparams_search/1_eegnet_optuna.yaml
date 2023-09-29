@@ -22,7 +22,8 @@ hydra:
     # storage URL to persist optimization results
     # for example, you can use SQLite if you set 'sqlite:///example.db'
 #    storage: sqlite:///${oc.env:PROJECT_ROOT}/logs/${logger.mlflow.experiment_name}.db
-    storage: postgresql://${db.username}:${db.password}@${db.ip_address}:${db.port}/${db.database}
+#    storage: postgresql://${db.username}:${db.password}@${db.ip_address}:${db.port}/${db.database}
+    storage: null
 
     # name of the study to persist optimization results
     study_name: ${logger.mlflow.run_name}
