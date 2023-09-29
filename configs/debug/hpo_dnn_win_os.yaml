@@ -34,12 +34,12 @@ logger:
 model:
   net:
 #    chunk_size: 900
-    num_classes: 4
+    num_classes: 2
   plots_settings:
     plot_every_n_epoch: 1
 
 data:
-  task_name: "2D"
+  task_name: "LR"
   ival: 1s:10s:10ms
   chans: [ "*" ]
   loading_data_mode: "cross_subject_hpo"
@@ -59,7 +59,7 @@ data:
 
 trainer:
   min_epochs: 1 # prevents early stopping
-  max_epochs: 2
+  max_epochs: 10
   check_val_every_n_epoch: 1 # perform a validation loop every N training epochs
   precision: 16
   num_sanity_val_steps: 1
@@ -69,7 +69,7 @@ trainer:
 callbacks:
   early_stopping:
     monitor: "val/f1_best"
-    patience: 2
+    patience: 10
     mode: "max"
 
 extras:
@@ -85,17 +85,17 @@ hydra:
   # use this to also set hydra loggers to 'DEBUG'
   verbose: True
   # sweep over these parameters
-#  sweeper:
+  sweeper:
 #    storage: sqlite:///${oc.env:PROJECT_ROOT}/logs/dnn/${logger.mlflow.experiment_name}.db
 #    study_name: logger.mlflow.run_name
-#    n_jobs: 1
-#    n_trials: 2
-#    params:
-#      model.optimizer.lr: interval(0.0001, 0.1)
-#      data.batch_size: choice(32, 64, 128)
-#      model.net.sampling_rate: choice(1000, 2000, 4000)
-#      model.net.num_T: choice(10, 15, 20)
-#      model.net.num_S: choice(10, 15, 20)
-#      model.net.hid_channels: choice(32, 64, 128)
+    n_jobs: 1
+    n_trials: 2
+    params:
+      model.optimizer.lr: interval(0.0001, 0.1)
+      data.batch_size: choice(32, 64, 128)
+      model.net.sampling_rate: choice(500, 1000, 2000)
+      model.net.num_T: choice(10, 15, 20)
+      model.net.num_S: choice(10, 15, 20)
+      model.net.hid_channels: choice(32, 64, 128)
 
 

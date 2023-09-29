@@ -21,10 +21,10 @@ hydra:
 
     # storage URL to persist optimization results
     # for example, you can use SQLite if you set 'sqlite:///example.db'
-    storage: sqlite:///${oc.env:PROJECT_ROOT}/logs/dnn/${logger.mlflow.experiment_name}.db
+    storage: sqlite:///${oc.env:PROJECT_ROOT}/logs/${logger.mlflow.experiment_name}.db
 
     # name of the study to persist optimization results
-    study_name: logger.mlflow.run_name
+    study_name: ${logger.mlflow.run_name}
 
     # number of parallel workers
     n_jobs: 1
@@ -33,7 +33,7 @@ hydra:
     direction: maximize
 
     # total number of runs that will be executed
-    n_trials: 20
+    n_trials: 10
 
     # choose Optuna hyperparameter sampler
     # you can choose bayesian sampler (tpe), random search (without optimization), grid sampler, and others

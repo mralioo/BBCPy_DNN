@@ -17,9 +17,9 @@ criterion:
   _target_: torch.nn.CrossEntropyLoss
   _partial_: true
 
+
 plots_settings:
-  # plots each n epochs
-  plot_every_n_epoch: 5
+  plot_every_n_epoch: 5 # plot every n epochs
 
 net:
   _target_: torcheeg.models.cnn.EEGNet

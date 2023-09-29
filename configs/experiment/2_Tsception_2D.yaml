@@ -14,25 +14,30 @@ defaults:
 # all parameters below will be merged with parameters from default configurations set above
 # this allows you to overwrite only specified parameters
 
-tags: [ "torcheeg", "TSCeption", "Within-Subject", "RL" ]
+tags: [ "torcheeg", "TSCeption", "Within-Subject", "2D" ]
 
 seed: 12345
 
 data:
-  task_name: "LR"
+  task_name: "2D"
   ival: 1s:10s:1ms
   chans: [ "*" ]
   bands:
     - 8
     - 40
-  loading_data_mode: "within_subject"
+  loading_data_mode: "cross_subject_hpo"
   transform: "TSCeption"
   normalize: { norm_type: "std", norm_axis: 0 }
+  train_val_split: False
+  cross_validation: { num_splits: 5, split_seed: 1234 }
   batch_size: 32
-  num_workers: 6
-  pin_memory: False
+  num_workers: 4
+  pin_memory: True
 
 model:
+  criterion:
+    _target_: torch.nn.CrossEntropyLoss
+    _partial_: true
   plots_settings:
     plot_every_n_epoch: 10
   net:
@@ -47,7 +52,7 @@ trainer:
 paths:
   root_dir: ${oc.env:PROJECT_ROOT}
   data_dir: /input-data
-  log_dir: ${oc.env:PROJECT_ROOT}/logs/dnn
+  log_dir: ${oc.env:PROJECT_ROOT}/logs
   output_dir: ${hydra:runtime.output_dir}
   work_dir: ${hydra:runtime.cwd}
 

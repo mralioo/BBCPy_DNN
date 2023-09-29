@@ -20,11 +20,10 @@ hydra:
 
     # storage URL to persist optimization results
     # for example, you can use SQLite if you set 'sqlite:///example.db'
-#    storage: postgresql://${db.username}:${db.password}@${db.hostname}:${db.port}/${db.database}
-    storage: null
+    storage: sqlite:///${oc.env:PROJECT_ROOT}/logs/${logger.mlflow.experiment_name}.db
 
     # name of the study to persist optimization results
-    study_name: eegnet_hpo
+    study_name: ${logger.mlflow.run_name}
 
     # number of parallel workers
     n_jobs: 1
