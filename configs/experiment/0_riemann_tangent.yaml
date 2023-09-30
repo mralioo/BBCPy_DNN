@@ -28,6 +28,9 @@ data:
   normalize: { norm_type: "std", norm_axis: 0 }
   transform: None
 
+trainer:
+  train_val_split: { val_size: 0.2, random_seed: 1234 }
+
 paths:
   root_dir: ${oc.env:PROJECT_ROOT}
   data_dir: /input-data
