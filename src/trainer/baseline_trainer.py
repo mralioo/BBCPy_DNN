@@ -62,10 +62,6 @@ class SklearnTrainer(object):
         #                                                                          classes=self.datamodule.valid_trials.className,
         #                                                                          y=self.datamodule.valid_trials.y)
 
-        # FIXME with multi run does it automatically?
-        # self.optuna_search = optuna.integration.OptunaSearchCV(pipeline, self.hyperparameter_search)
-        # self.optuna_search = pipeline
-
         mlflow.set_tracking_uri(Path(self.logger.mlflow.tracking_uri).as_uri())
 
         experiment_name = self.logger.mlflow.experiment_name
@@ -94,24 +90,8 @@ class SklearnTrainer(object):
             log.info("Best params: {}".format(self.opt.best_params_))
             best_model = self.opt.best_estimator_
 
-            # test on forced trials data
-            y_pred = best_model.predict(test_data)
-
-            test_forced_acc = sklearn.metrics.accuracy_score(test_data.y, y_pred)
-            test_forced_f1 = sklearn.metrics.f1_score(test_data.y, y_pred, average='weighted')
-            test_forced_recall = sklearn.metrics.recall_score(test_data.y, y_pred, average='weighted')
-            test_forced_precision = sklearn.metrics.precision_score(test_data.y, y_pred, average='weighted')
-
-            mlflow.log_metric("test_forced_acc", test_forced_acc)
-            mlflow.log_metric("test_forced_f1", test_forced_f1)
-            mlflow.log_metric("test_forced_recall", test_forced_recall)
-            mlflow.log_metric("test_forced_precision", test_forced_precision)
-
-            cm_vali = confusion_matrix(test_data.y, y_pred)
-            test_forced_cm_title = "cm_forced_trials"
-
-            self.plot_confusion_matrix(conf_mat=cm_vali,
-                                       title=test_forced_cm_title)
+            # test on data "valid" / forced trials
+            self.predict_test_data(best_model, test_data, test_data_type="valid")
 
             # log dataset dict to mlflow parent run
             _, metrics, _, _ = fetch_logged_data(parent_run.info.run_id)
@@ -256,15 +236,17 @@ class SklearnTrainer(object):
                         roc_auc = sklearn.metrics.auc(fpr, tpr)
                         test_aucs.append(roc_auc)
 
+                        # Test data metrics (valid / forced trials)
+                        test_set_name = "test_valid"
                         test_metrics_dict = self.compute_metrics(y_true=test_data.y, y_pred=y_pred,
-                                                                 set_name="test_forced")
+                                                                 set_name=test_set_name)
 
                         test_f1_list.append(test_metrics_dict["f1_score"])
                         test_recall_list.append(test_metrics_dict["recall_score"])
 
                         cm_test = confusion_matrix(test_data.y, y_pred)
                         self.plot_confusion_matrix(conf_mat=cm_test,
-                                                   title="cm_forced_trials_fold_{}".format(foldNum))
+                                                   title="cm_{}_fold_{}".format(test_set_name, foldNum))
                         test_cm_list.append(compute_percentages_cm(cm_test))
 
                         # fetch logged data from child run
@@ -293,7 +275,7 @@ class SklearnTrainer(object):
 
                 # log the test mean confusion matrix to mlflow parent run
                 mean_f1_score_test = np.mean(test_f1_list)
-                mlflow.log_metric("test_forced-mean_f1_score", mean_f1_score_test)
+                mlflow.log_metric(f"{test_set_name}-mean_f1_score", mean_f1_score_test)
 
                 self.plot_roc_curve(tprs=test_tprs,
                                     aucs=test_aucs,
@@ -302,7 +284,7 @@ class SklearnTrainer(object):
                                     title="Cross-validation_roc-curve_test")
 
                 self.plot_confusion_matrix(test_cm_list,
-                                           title=f"cv-{num_cv}_ftest-avg-cm_{model_name}",
+                                           title=f"cv-{num_cv}_{test_set_name}-avg-cm_{model_name}",
                                            type="mean")
 
                 # fetch logged data from parent run
@@ -497,7 +479,7 @@ class SklearnTrainer(object):
                       mlflow_run,
                       train_data,
                       test_data,
-                      global_classes_weights,
+                      global_classes_weights=None,
                       cv_classes_weights_dict=None):
 
         params, _, _, _ = fetch_logged_data(mlflow_run.info.run_id)
@@ -507,8 +489,9 @@ class SklearnTrainer(object):
                 json.dump(params, f, default=default)
             mlflow.log_artifacts(tmpdirname)
 
-        hparams["global_classes_weights"] = {self.classes_names[i]: global_classes_weights[i] for i in
-                                             range(len(self.classes_names))}
+        if global_classes_weights is not None:
+            hparams["global_classes_weights"] = {self.classes_names[i]: global_classes_weights[i] for i in
+                                                 range(len(self.classes_names))}
 
         if cv_classes_weights_dict is not None:
             hparams["cv_classes_weights"] = cv_classes_weights_dict
@@ -534,3 +517,22 @@ class SklearnTrainer(object):
                     json.dump(subject_info_dict, f, default=default)
 
                 mlflow.log_artifacts(tmpdirname)
+
+    def predict_test_data(self, clf, test_data, test_data_type):
+
+        y_pred = clf.predict(test_data)
+
+        test_acc = sklearn.metrics.accuracy_score(test_data.y, y_pred)
+        test_f1 = sklearn.metrics.f1_score(test_data.y, y_pred, average='weighted')
+        test_recall = sklearn.metrics.recall_score(test_data.y, y_pred, average='weighted')
+        test_forced_precision = sklearn.metrics.precision_score(test_data.y, y_pred, average='weighted')
+
+        test_cm_title = f"cm_{test_data_type}_trials"
+        mlflow.log_metric(f"test_{test_data_type}_acc", test_acc)
+        mlflow.log_metric(f"test_{test_data_type}_f1", test_f1)
+        mlflow.log_metric(f"test_{test_data_type}_recall", test_recall)
+        mlflow.log_metric(f"test_{test_data_type}_precision", test_forced_precision)
+
+        cm_vali = confusion_matrix(test_data.y, y_pred)
+        self.plot_confusion_matrix(conf_mat=cm_vali,
+                                   title=test_cm_title)
