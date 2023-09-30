@@ -1,10 +1,10 @@
 #!/bin/bash
 #SBATCH --job-name=debug-tsception--hpo
-#SBATCH --partition=gpu-2d
+#SBATCH --partition=gpu-5h
 #SBATCH --gpus-per-node=1
-#SBATCH --mem=100G        # Some buffer above 30GB
+#SBATCH --mem=80G          # Some buffer above 30GB
 #SBATCH --ntasks-per-node=1   # One main task that runs the trial and manages CV
-#SBATCH --cpus-per-task=5 # Assuming you want to run each CV fold in parallel
+#SBATCH --cpus-per-task=3 # Assuming you want to run each CV fold in parallel
 #SBATCH --output=../jobs_outputs/debug-tsception--hpo-2d/%x_%j.o
 #SBATCH --error=../jobs_outputs/debug-tsception--hpo-2d/%x_%j.e
 
