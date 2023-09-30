@@ -1,6 +1,6 @@
 # @package _global_
 
-optimized_metric: "best_cv_score"
+optimized_metric: "vali-mean_f1_score"
 
 # specify here default configuration
 # order of defaults determines the order in which configs override each other
