@@ -23,9 +23,6 @@ data:
     - 8
     - 13
   chans: [ "*" ]
-  classes:
-    - "R"
-    - "L"
   loading_data_mode: "within_subject"
 
 paths:
@@ -38,5 +35,5 @@ paths:
 logger:
   mlflow:
     tags: ${tags}
-    experiment_name: A-RL-S1-all
-    run_name: riemann
+    experiment_name: Riemann-v1
+    run_name: S1
