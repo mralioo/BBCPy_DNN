@@ -4,10 +4,8 @@
 #SBATCH --partition=cpu-2d
 #SBATCH --gpus-per-node=0
 #SBATCH --nodes=1
-#SBATCH --ntasks-per-node=9
 #SBATCH --output=../jobs_outputs/S%a/%x_%j.o
 #SBATCH --error=../jobs_outputs/S%a/%x_%j.e
-#SBATCH --mail-user=mr.ali.alouane@gmail.com
 #SBATCH --array=1-5
 
 echo "I am a job with ID $SLURM_JOB_ID for subject S$SLURM_ARRAY_TASK_ID"
