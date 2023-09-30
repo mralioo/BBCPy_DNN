@@ -19,6 +19,7 @@ from src.utils.hyperparam_opt import optimize_hyperparams
 from src.utils.mlflow import fetch_logged_data
 from src.utils.vis import compute_percentages_cm, calculate_cm_stats
 from src.utils.file_mgmt import default
+from src.data.smr_datamodule import train_valid_split
 
 log = utils.get_pylogger(__name__)
 
@@ -29,11 +30,17 @@ class SklearnTrainer(object):
 
     def __init__(self,
                  cv,
+                 train_val_split,
                  datamodule,
                  logger=None,
                  hyperparameter_search=None):
 
         self.cv = cv
+
+        if train_val_split:
+            self.train_val_split = dict(train_val_split)
+        else:
+            self.train_val_split = None
 
         self.logger = logger
         self.datamodule = datamodule
@@ -44,14 +51,16 @@ class SklearnTrainer(object):
 
         log.info("Loading data...")
 
-        train_data, test_data = self.datamodule.prepare_dataloader()
+        self.datamodule.prepare_dataloader()
+        self.classes_names = self.datamodule.classes
+
+        # train and test data
+        train_data, test_data = train_valid_split(self.datamodule.valid_trials, self.train_val_split)
 
         # compute classes weights for imbalanced dataset
-        global_classes_weights = sklearn.utils.class_weight.compute_class_weight(class_weight='balanced',
-                                                                                 classes=train_data.className,
-                                                                                 y=train_data.y)
-
-        self.classes_names = train_data.className
+        # global_classes_weights = sklearn.utils.class_weight.compute_class_weight(class_weight='balanced',
+        #                                                                          classes=self.datamodule.valid_trials.className,
+        #                                                                          y=self.datamodule.valid_trials.y)
 
         # FIXME with multi run does it automatically?
         # self.optuna_search = optuna.integration.OptunaSearchCV(pipeline, self.hyperparameter_search)
@@ -105,49 +114,26 @@ class SklearnTrainer(object):
                                        title=test_forced_cm_title)
 
             # log dataset dict to mlflow parent run
-            train_sessions_dict = self.datamodule.subject_sessions_dict
-            tmp_dict = {}
-            for key, value in train_sessions_dict.items():
-                tmp_dict[key] = list(value)
+            _, metrics, _, _ = fetch_logged_data(parent_run.info.run_id)
+            self.log_to_mlflow(hparams, parent_run, train_data, test_data, None, None)
 
-            parent_run_id = parent_run.info.run_id
-            params, metrics, tags, artifacts = fetch_logged_data(parent_run_id)
-
-            hparams.update(params)
-            hparams.update(tags)
-            hparams["global_classes_weights"] = {self.classes_names[i]: global_classes_weights[i] for i in
-                                                 range(len(self.classes_names))}
-
-            # Use a temporary directory to save
-            with tempfile.TemporaryDirectory() as tmpdirname:
-                description_path = os.path.join(tmpdirname, "data_description.json")
-                with open(description_path, "w") as f:
-                    json.dump(tmp_dict, f)
-
-                hparam_path = os.path.join(tmpdirname, "Hparams.json")
-                with open(hparam_path, "w") as f:
-                    json.dump(hparams, f)
-
-                mlflow.log_artifacts(tmpdirname)
-
-        return metrics
+        return metrics, self.opt.best_params_
 
     def train(self, pipeline, hparams):
 
         log.info("Loading data...")
-        train_data, test_data = self.datamodule.prepare_dataloader()
+
+        self.datamodule.prepare_dataloader()
+        self.classes_names = self.datamodule.classes
+
+        # train and test data
+        # FIXME: test on valid data / forced trials not yet
+        train_data, test_data = train_valid_split(self.datamodule.valid_trials, self.train_val_split)
 
         # compute classes weights for imbalanced dataset
         global_classes_weights = sklearn.utils.class_weight.compute_class_weight(class_weight='balanced',
                                                                                  classes=np.unique(train_data.y),
                                                                                  y=train_data.y)
-
-        train_data_shape = train_data.shape
-        test_data_shape = test_data.shape
-
-        self.classes_names = train_data.className
-
-        metrics = None
 
         if "mlflow" in self.logger:
             self.clf = pipeline
@@ -321,29 +307,10 @@ class SklearnTrainer(object):
 
                 # fetch logged data from parent run
                 # parent_run_id = parent_run.info.run_id
-                params, _, tags, _ = fetch_logged_data(child_run.info.run_id)
-                hparams["pipeline_params"] = params
-                hparams["pipeline_tags"] = tags
-                hparams["global_classes_weights"] = {self.classes_names[i]: global_classes_weights[i] for i in
-                                                     range(len(self.classes_names))}
+                _, metrics, _, _ = fetch_logged_data(parent_run.info.run_id)
 
-                hparams["cv_classes_weights"] = cv_classes_weights_dict
-                hparams["train_data_shape"] = train_data_shape
-                hparams["test_data_shape"] = test_data_shape
-
-                # load successfull loaded data sessions dict
-                hparams["loaded_sessions"] = self.datamodule.loaded_subjects_sessions
-                hparams["subject_info_dict"] = self.datamodule.subject_info_dict["subject_info"]
-                hparams["noisechan"] = self.datamodule.subject_info_dict["noisechan"]
-                hparams["subject_pvc"] = self.datamodule.subject_info_dict["pvc"]
-
-                # Use a temporary directory to save
-                with tempfile.TemporaryDirectory() as tmpdirname:
-                    hparam_path = os.path.join(tmpdirname, "Hparams.json")
-                    with open(hparam_path, "w") as f:
-                        json.dump(hparams, f, default=default)
-
-                    mlflow.log_artifacts(tmpdirname)
+                self.log_to_mlflow(hparams, child_run, train_data, test_data, global_classes_weights,
+                                   cv_classes_weights_dict)
 
                 log.info(f"Training completed!")
 
@@ -524,3 +491,46 @@ class SklearnTrainer(object):
 
             plt.savefig(plot_path)  # Save the plot to the temporary directory
             mlflow.log_artifacts(tmpdirname)
+
+    def log_to_mlflow(self,
+                      hparams,
+                      mlflow_run,
+                      train_data,
+                      test_data,
+                      global_classes_weights,
+                      cv_classes_weights_dict=None):
+
+        params, _, _, _ = fetch_logged_data(mlflow_run.info.run_id)
+        with tempfile.TemporaryDirectory() as tmpdirname:
+            hparam_path = os.path.join(tmpdirname, "pipeline_params.json")
+            with open(hparam_path, "w") as f:
+                json.dump(params, f, default=default)
+            mlflow.log_artifacts(tmpdirname)
+
+        hparams["global_classes_weights"] = {self.classes_names[i]: global_classes_weights[i] for i in
+                                             range(len(self.classes_names))}
+
+        if cv_classes_weights_dict is not None:
+            hparams["cv_classes_weights"] = cv_classes_weights_dict
+
+        hparams["train_data_shape"] = train_data.shape
+        hparams["test_data_shape"] = test_data.shape
+
+        # load successfully loaded data sessions dict
+        with tempfile.TemporaryDirectory() as tmpdirname:
+            hparam_path = os.path.join(tmpdirname, "dataset_info.json")
+            with open(hparam_path, "w") as f:
+                json.dump(hparams, f, default=default)
+
+            mlflow.log_artifacts(tmpdirname)
+
+        for subject_name, subject_info_dict in self.datamodule.subjects_info_dict.items():
+            if self.datamodule.loading_data_mode != "cross_subject_hpo":
+                mlflow.log_param("pvc", subject_info_dict["pvc"])
+            # Use a temporary directory to save
+            with tempfile.TemporaryDirectory() as tmpdirname:
+                hparam_path = os.path.join(tmpdirname, f"{subject_name}_info.json")
+                with open(hparam_path, "w") as f:
+                    json.dump(subject_info_dict, f, default=default)
+
+                mlflow.log_artifacts(tmpdirname)

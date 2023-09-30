@@ -430,11 +430,6 @@ class DnnLitModule(LightningModule):
                                                  local_dir=tmpdirname)
                 plt.close(figure)
 
-    def log_haprams(self):
-        """Log all hyperparameters to mlflow"""
-        for k, v in self.hparams.items():
-            self.mlflow_client.log_param(self.run_id, k, v)
-
     def calculate_sample_weights(self, y, NUM_MIN_SAMPLES=10):
         """Calculate sample weights for unbalanced dataset"""
         y_np = np.argmax(y.cpu().numpy(), axis=1)
@@ -561,7 +556,6 @@ class DnnLitModule(LightningModule):
 
             # For the remainig we plot the full history, but we need to extract the scalar values from the results
             scalar_results = {k: v[-1] for k, v in all_results.items() if isinstance(v, torch.Tensor)}
-
 
         self.tracker.plot(val=scalar_results, ax=ax3)
 

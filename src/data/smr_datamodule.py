@@ -3,6 +3,7 @@ import logging
 
 import numpy as np
 from omegaconf import OmegaConf
+from sklearn.model_selection import KFold
 
 import bbcpy
 
@@ -194,15 +195,29 @@ class SMR_Data():
     def preprocess_data(self, srm_obj):
         """ Reshape the SRM data object to the desired shape """
 
-        if (self.classes is not None) and (self.select_chans is not None) and (self.select_timepoints is not None):
-            if isinstance(self.classes, str):
-                self.classes = [self.classes]
-            if self.select_timepoints == "all":
-                obj = srm_obj[self.classes][:, self.select_chans, :].copy()
+        if isinstance(srm_obj.chans, bbcpy.datatypes.eeg.ChanUnion):
+            # for multiple channels
+            if (self.classes is not None) and (self.select_chans is not None) and (self.select_timepoints is not None):
+                if isinstance(self.classes, str):
+                    self.classes = [self.classes]
+                if self.select_timepoints == "all":
+                    obj = srm_obj[self.classes][:, :, :].copy()
+                else:
+                    obj = srm_obj[self.classes][:, :, self.select_timepoints].copy()
             else:
-                obj = srm_obj[self.classes][:, self.select_chans, self.select_timepoints].copy()
+                obj = srm_obj
+
         else:
-            obj = srm_obj
+
+            if (self.classes is not None) and (self.select_chans is not None) and (self.select_timepoints is not None):
+                if isinstance(self.classes, str):
+                    self.classes = [self.classes]
+                if self.select_timepoints == "all":
+                    obj = srm_obj[self.classes][:, self.select_chans, :].copy()
+                else:
+                    obj = srm_obj[self.classes][:, self.select_chans, self.select_timepoints].copy()
+            else:
+                obj = srm_obj
 
         return obj
 
@@ -512,29 +527,47 @@ class SMR_Data():
         else:
             raise Exception(f"Loading data mode {self.loading_data_mode} not supported")
 
-    def train_valid_split(self, data, train_val_split_dict):
-        """ Split the data into train and validation sets """
 
-        random_seed = train_val_split_dict["random_seed"]
-        val_ratio = train_val_split_dict["val_size"]
+def train_valid_split(data, train_val_split_dict):
+    """ Split the data into train and validation sets """
 
-        # Set the random seed for reproducibility
-        np.random.seed(random_seed)
+    random_seed = train_val_split_dict["random_seed"]
+    val_ratio = train_val_split_dict["val_size"]
 
-        # Shuffle the data
-        # TODO : Shuffle the SMR data object
-        indices = np.random.permutation(len(data))
-        data = data[indices]
-        data.y = data.y[indices]
+    # Set the random seed for reproducibility
+    np.random.seed(random_seed)
 
-        # Compute the index where the validation set starts
-        val_start_idx = int(len(data) * (1 - val_ratio))
+    # Shuffle the data
+    # TODO : Shuffle the SMR data object
+    indices = np.random.permutation(len(data))
+    data = data[indices]
+    data.y = data.y[indices]
 
-        # Split the data into training and validation sets
-        train_data = data[:val_start_idx]
-        val_data = data[val_start_idx:]
+    # Compute the index where the validation set starts
+    val_start_idx = int(len(data) * (1 - val_ratio))
 
-        return train_data, val_data
+    # Split the data into training and validation sets
+    train_data = data[:val_start_idx]
+    val_data = data[val_start_idx:]
+
+    return train_data, val_data
+
+
+def cross_validation(data, cross_validation_dict, kfold_idx):
+    kf = KFold(n_splits=cross_validation_dict["num_splits"],
+               shuffle=True,
+               random_state=cross_validation_dict["split_seed"])
+
+    all_splits_trial_kf = [k for k in kf.split(data)]
+
+    train_indexes, val_indexes = all_splits_trial_kf[kfold_idx]
+
+    train_indexes, val_indexes = train_indexes.tolist(), val_indexes.tolist()
+
+    train_data, val_data = (data[train_indexes],
+                            data[val_indexes])
+
+    return train_data, val_data
 
 
 def normalize(data, norm_type="std", axis=None, keepdims=True, eps=10 ** -5, norm_params=None):

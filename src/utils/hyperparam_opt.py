@@ -41,6 +41,11 @@ def _get_class(step_class):
     return class_, class_name
 
 
+def overide_pipeline_best_params(pipeline, best_params):
+    pass
+
+
+
 def optimize_hyperparams(cfg, pipeline):
     """
     Runs hyperparameter optmization based on hydra's definitions
