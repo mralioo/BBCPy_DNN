@@ -18,13 +18,13 @@ tags: [ "baseline" , "multi-band" , "Within-Subject" , "RL"]
 seed: 12345
 
 data:
+  task_name: "LR"
   ival: 1s:10s:1ms
   bands: [ [ 8, 13 ], [ 21, 26 ], [ 31.5, 39 ] ]
   chans: [ "*" ]
-  classes:
-    - "R"
-    - "L"
   loading_data_mode: "within_subject"
+  normalize: { norm_type: "std", norm_axis: 0 }
+  transform: None
 
 paths:
   root_dir: ${oc.env:PROJECT_ROOT}

@@ -19,7 +19,7 @@ SUBJECT="S$SLURM_ARRAY_TASK_ID"
 cp ./../squashfs_smr_data/${SUBJECT}.sqfs /tmp/
 
 # Define experiments you want to run
-experiments=("0_csp" "0_mbcsp" "0_riemann" "0_riemann_tangent")
+experiments=("0_csp" "0_riemann" "0_riemann_tangent")
 
 # Loop over the experiments
 for experiment in "${experiments[@]}"; do
@@ -27,6 +27,6 @@ for experiment in "${experiments[@]}"; do
     echo "Processing experiment $experiment for subject $SUBJECT"
 
     # 3. bind the squashed dataset to your apptainer environment and run your script with apptainer
-    apptainer run -B /tmp/${SUBJECT}.sqfs:/input-data:image-src=/ ./../env_images/bbcpy_lightning_v3.sif python ./src/baseline_train.py +experiment=${experiment} +data.subject_sessions_dict="{$SUBJECT: "all"}" logger.mlflow.experiment_name="A-RL-${SUBJECT}-all"
+    apptainer run -B /tmp/${SUBJECT}.sqfs:/input-data:image-src=/ ./../env_images/bbcpy_lightning_v3.sif python ./src/baseline_train.py +experiment=${experiment} +data.subject_sessions_dict="{$SUBJECT: "all"}" logger.mlflow.experiment_name="${SUBJECT}-RL"
 
 done
