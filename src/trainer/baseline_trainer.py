@@ -46,13 +46,14 @@ class SklearnTrainer(object):
         self.datamodule = datamodule
 
         self.hyperparameter_search = hyperparameter_search
-
-    def search_hyperparams(self, pipeline, hparams):
+        self.best_params = None
 
         log.info("Loading data...")
 
         self.datamodule.prepare_dataloader()
         self.classes_names = self.datamodule.classes
+
+    def search_hyperparams(self, pipeline, hparams):
 
         # train and test data
         train_data, test_data = train_valid_split(self.datamodule.valid_trials, self.train_val_split)
@@ -87,7 +88,9 @@ class SklearnTrainer(object):
 
             self.opt.fit(train_data, train_data.y)
 
-            log.info("Best params: {}".format(self.opt.best_params_))
+            self.best_params = self.opt.best_params_
+
+            log.info("Best params: {}".format(self.best_params))
             best_model = self.opt.best_estimator_
 
             # test on data "valid" / forced trials
@@ -97,14 +100,11 @@ class SklearnTrainer(object):
             _, metrics, _, _ = fetch_logged_data(parent_run.info.run_id)
             self.log_to_mlflow(hparams, parent_run, train_data, test_data, None, None)
 
-        return metrics, self.opt.best_params_
+        return metrics
 
     def train(self, pipeline, hparams):
 
-        log.info("Loading data...")
 
-        self.datamodule.prepare_dataloader()
-        self.classes_names = self.datamodule.classes
 
         # train and test data
         # FIXME: test on valid data / forced trials not yet
@@ -115,10 +115,16 @@ class SklearnTrainer(object):
                                                                                  classes=np.unique(train_data.y),
                                                                                  y=train_data.y)
 
-        if "mlflow" in self.logger:
-            self.clf = pipeline
-            num_folds = self.cv.n_splits
+        if self.best_params is not None:
+            for param_name in self.best_params:
+                step, param = param_name.split('__', 1)
+                pipeline.named_steps[step].set_params(**{param: self.best_params[param_name]})
 
+        self.clf = pipeline
+
+        if "mlflow" in self.logger:
+
+            num_folds = self.cv.n_splits
             log.info(f"Train with cross-validation with {num_folds} folds...")
 
             # initialize training lists for storing results of confusion matrix to calculate mean std

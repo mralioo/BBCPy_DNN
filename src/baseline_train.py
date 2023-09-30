@@ -5,6 +5,7 @@ import numpy as np
 import pyrootutils
 from lightning import Callback
 from omegaconf import DictConfig
+import gc
 
 import bbcpy
 from pipeline import Pipeline
@@ -105,6 +106,10 @@ def train(cfg: DictConfig) -> tuple[
         metric_dict = trainer.test(pipeline=pipeline,
                                    datamodule=datamodule)
         log.info("Training finished!")
+
+    # clean up
+    del datamodule, pipeline, callbacks, logger, trainer
+    gc.collect()
 
     return metric_dict, object_dict
 
