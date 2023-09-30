@@ -67,7 +67,7 @@ class SklearnTrainer(object):
 
         experiment_name = self.logger.mlflow.experiment_name
 
-        run_name = "{}_{}".format(self.logger.mlflow.run_name,
+        run_name = "HPO_{}_{}".format(self.logger.mlflow.run_name,
                                   datetime.now().strftime("%Y-%m-%d_%H-%M-%S"))
 
         log.info("Create experiment: {}".format(experiment_name))
@@ -103,10 +103,8 @@ class SklearnTrainer(object):
         return metrics
 
     def train(self, pipeline, hparams):
-
-
-
         # train and test data
+
         # FIXME: test on valid data / forced trials not yet
         train_data, test_data = train_valid_split(self.datamodule.valid_trials, self.train_val_split)
 
@@ -157,7 +155,7 @@ class SklearnTrainer(object):
 
             experiment_name = self.logger.mlflow.experiment_name
 
-            run_name = "{}_{}".format(self.logger.mlflow.run_name,
+            run_name = "T_{}_{}".format(self.logger.mlflow.run_name,
                                       datetime.now().strftime("%Y-%m-%d_%H-%M-%S"))
 
             log.info("Create experiment: {}".format(experiment_name))

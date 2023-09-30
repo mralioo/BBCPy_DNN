@@ -85,8 +85,8 @@ def optimize_hyperparams(cfg, pipeline):
     return class_(estimator=pipeline,
                   param_grid=param_space["param_grid"],
                   scoring=scorer,
-                  cv=cfg.hyperparam_opt.cv, )
-    # n_jobs=cfg.hyperparam_opt.n_jobs)
+                  cv=cfg.hyperparam_opt.cv)
+                  # n_jobs=cfg.hyperparam_opt.n_jobs)
 
 
 class BayesianOptCV(BaseSearchCV):

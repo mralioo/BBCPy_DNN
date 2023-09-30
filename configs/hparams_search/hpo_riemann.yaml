@@ -9,3 +9,4 @@ hyperparam_opt:
     _target_: sklearn.model_selection.KFold
     n_splits: 10
     shuffle: True
+#  n_jobs: 4
