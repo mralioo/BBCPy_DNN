@@ -27,6 +27,6 @@ for experiment in "${experiments[@]}"; do
     echo "Processing experiment $experiment for subject $SUBJECT"
 
     # 3. bind the squashed dataset to your apptainer environment and run your script with apptainer
-    apptainer run -B /tmp/${SUBJECT}.sqfs:/input-data:image-src=/ ./../env_images/bbcpy_lightning_v3.sif python ./src/baseline_train.py +experiment="0_${experiment}" +hparams_search="hpo_${experiment}"  +data.subject_sessions_dict="{$SUBJECT: "all"}" logger.mlflow.experiment_name="${experiment}-RL" logger.mlflow.run_name="${SUBJECT}-RL"
+    apptainer run -B /tmp/${SUBJECT}.sqfs:/input-data:image-src=/ ./../env_images/bbcpy_en.sif python ./src/baseline_train.py +experiment="0_${experiment}" +hparams_search="hpo_${experiment}"  +data.subject_sessions_dict="{$SUBJECT: "all"}" logger.mlflow.experiment_name="${experiment}-RL" logger.mlflow.run_name="${SUBJECT}-RL"
 
 done
