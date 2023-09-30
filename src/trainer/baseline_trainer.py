@@ -20,6 +20,7 @@ from src.utils.mlflow import fetch_logged_data
 from src.utils.vis import compute_percentages_cm, calculate_cm_stats
 from src.utils.file_mgmt import default
 from src.data.smr_datamodule import train_valid_split
+from src.utils.device import print_memory_usage, print_cpu_cores
 
 log = utils.get_pylogger(__name__)
 
@@ -52,6 +53,10 @@ class SklearnTrainer(object):
 
         self.datamodule.prepare_dataloader()
         self.classes_names = self.datamodule.classes
+
+        log.info("Resolving device...")
+        print_memory_usage()
+        print_cpu_cores()
 
     def search_hyperparams(self, pipeline, hparams):
 

@@ -8,7 +8,7 @@ from omegaconf import DictConfig
 import gc
 
 import bbcpy
-from pipeline import Pipeline
+
 from src.data.smr_datamodule import SMR_Data
 from trainer.baseline_trainer import SklearnTrainer
 
@@ -37,7 +37,7 @@ log = utils.get_pylogger(__name__)
 
 @utils.task_wrapper
 def train(cfg: DictConfig) -> tuple[
-    dict[Any, Any] | Any, dict[str, SMR_Data | Pipeline | list[Callback] | DictConfig | SklearnTrainer | Any]]:
+    dict[Any, Any] | Any, dict[str, SMR_Data  | list[Callback] | DictConfig | SklearnTrainer | Any]]:
     """Trains the model. Can additionally evaluate on a testset, using best weights obtained during
     training.
 
@@ -109,6 +109,7 @@ def train(cfg: DictConfig) -> tuple[
 
     # clean up
     del datamodule, pipeline, callbacks, logger, trainer
+
     gc.collect()
 
     return metric_dict, object_dict
