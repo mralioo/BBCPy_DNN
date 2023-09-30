@@ -9,7 +9,7 @@ import gc
 
 import bbcpy
 
-from src.data.smr_datamodule import SMR_Data
+
 from trainer.baseline_trainer import SklearnTrainer
 
 pyrootutils.setup_root(__file__, indicator=".project-root", pythonpath=True)
@@ -31,6 +31,7 @@ pyrootutils.setup_root(__file__, indicator=".project-root", pythonpath=True)
 # ------------------------------------------------------------------------------------ #
 
 from src import utils
+from src.data.smr_datamodule import SMR_Data
 
 log = utils.get_pylogger(__name__)
 
