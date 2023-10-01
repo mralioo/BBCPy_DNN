@@ -50,7 +50,7 @@ data:
   transform: None
 
 trainer:
-  train_val_split: { val_size: 0.2, random_seed: 1234 }
+  train_val_split: { val_size: 0.1, random_seed: 1234 }
 
 extras:
   ignore_warnings: False
