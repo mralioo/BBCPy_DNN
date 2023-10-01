@@ -15,7 +15,7 @@ defaults:
 #  - override /hparams_search: hpo_csp.yaml
 
 
-tune: True
+tune: False
 train: True
 
 paths:

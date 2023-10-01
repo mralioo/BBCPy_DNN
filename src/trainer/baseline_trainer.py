@@ -156,7 +156,7 @@ class SklearnTrainer(object):
             num_smaples_test = test_data.y.shape[0]
             test_mean_fpr = np.linspace(0, 1, num_smaples_test)
 
-            mlflow.set_tracking_uri(self.logger.mlflow.tracking_uri)
+            mlflow.set_tracking_uri(Path(self.logger.mlflow.tracking_uri).as_uri())
 
             experiment_name = self.logger.mlflow.experiment_name
 
