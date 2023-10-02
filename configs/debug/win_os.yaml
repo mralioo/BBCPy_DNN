@@ -5,14 +5,14 @@ task_name: "debug-win"
 
 defaults:
   - override /trainer: sklearn.yaml
-  - override /model: riemann_tangent_clf.yaml
-  - override /hparams_search: hpo_riemann_tangent.yaml
+#  - override /model: riemann_tangent_clf.yaml
+#  - override /hparams_search: hpo_riemann_tangent.yaml
 #  - override /model: riemann_clf.yaml
 #  - override /hparams_search: hpo_riemann.yaml
 #  - override /model: mbcsp_clf.yaml
 #  - override /hparams_search: hpo_mbcsp.yaml
-#  - override /model: csp_clf.yaml
-#  - override /hparams_search: hpo_csp.yaml
+  - override /model: csp_clf.yaml
+  - override /hparams_search: hpo_csp.yaml
 
 
 tune: False
@@ -31,14 +31,14 @@ logger:
   mlflow:
     #    experiment_name: DEBUG-HPO
     experiment_name: DEBUG-TRAIN
-    run_name: riemann_tangent
+#    run_name: riemann_tangent
 #    run_name: riemann
-#    run_name: csp
+    run_name: csp
 #    run_name: mbcsp
     tracking_uri: ${paths.log_dir}\mlflow\mlruns
 
 data:
-  task_name: "LR"
+  task_name: "2D"
   ival: 2s:10s:10ms
   chans: [ "*" ]
 #  bands: [ [ 8, 13 ], [ 21, 26 ], [ 31.5, 39 ] ]
@@ -51,6 +51,10 @@ data:
 
 trainer:
   train_val_split: { val_size: 0.1, random_seed: 1234 }
+  cv:
+    _target_: sklearn.model_selection.KFold
+    n_splits: 2
+    shuffle: True
 
 extras:
   ignore_warnings: False
