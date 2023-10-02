@@ -8,14 +8,12 @@
 #SBATCH --output=../jobs_outputs/debug-hpo-eegnet-2D/%x_%j.o
 #SBATCH --error=../jobs_outputs/debug-hpo-eegnet-2D/%x_%j.e
 
-#!/bin/bash
-
 # Define Python script arguments and parameters
 PYTHON_SCRIPT="./src/dnn_hpo_train.py"
-EXPERIMENT_ARG="experiment=1_eegnet_2D"
-DATA_ARG="+data.subject_sessions_dict='{S5: \"all\", S9:\"all\"}'"
-HPARAMS_ARG="hparams_search=1_eegnet_optuna"
-LOGGER_ARG="logger.mlflow.run_name=\"C1-m-2D\""
+EXPERIMENT_ARG=1_eegnet_2D
+DATA_ARG="{S5: 'all', S9: 'all'}"   # Corrected this line
+HPARAMS_ARG=1_eegnet_optuna
+LOGGER_ARG="C1-m-2D"
 
 # Define paths
 SQUASHFS_PATH="./../squashfs_smr_data/hpo_best_pvc_debug.sqfs"
@@ -30,4 +28,4 @@ echo "current working directory is $(pwd)"
 cp $SQUASHFS_PATH $TMP_PATH
 
 # Run the script with apptainer, binding the squashed dataset
-apptainer run --nv -B $TMP_PATH:/input-data:image-src=/ $ENV_IMAGE_PATH python $PYTHON_SCRIPT $EXPERIMENT_ARG $DATA_ARG $HPARAMS_ARG $LOGGER_ARG
+apptainer run --nv -B $TMP_PATH:/input-data:image-src=/ $ENV_IMAGE_PATH python $PYTHON_SCRIPT experiment=$EXPERIMENT_ARG +data.subject_sessions_dict="$DATA_ARG" hparams_search=$HPARAMS_ARG logger.mlflow.run_name=$LOGGER_ARG
