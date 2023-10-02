@@ -13,12 +13,12 @@ defaults:
 # all parameters below will be merged with parameters from default configurations set above
 # this allows you to overwrite only specified parameters
 
-tags: [ "baseline" , "alpha_band" , "Within-Subject" , "RL"]
+tags: [ "baseline" , "alpha_band" , "Within-Subject" , "2D"]
 
 seed: 12345
 
 data:
-  task_name: "LR"
+  task_name: "2D"
   ival: 1s:10s:1ms
   bands:
     - 8
@@ -34,7 +34,7 @@ trainer:
 paths:
   root_dir: ${oc.env:PROJECT_ROOT}
   data_dir: /input-data
-  log_dir: ${oc.env:PROJECT_ROOT}/logs/
+  log_dir: ${oc.env:PROJECT_ROOT}/logs
   output_dir: ${hydra:runtime.output_dir}
   work_dir: ${hydra:runtime.cwd}
 
@@ -43,4 +43,4 @@ logger:
     tags: ${tags}
     experiment_name: A-RL-S1-all
     run_name: csp
-    tracking_uri: ${paths.log_dir}/mlflow
+

@@ -5,16 +5,20 @@
 #SBATCH --gpus-per-node=0
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=16
-#SBATCH --output=../jobs_outputs/debug_baseline_C1/S%a_%x_%j.o
-#SBATCH --error=../jobs_outputs/debug_baseline_C1/S%a_%x_%j.e
-#SBATCH --mail-user=mr.ali.alouane@gmail.com
-#SBATCH --array=0-4  # This should range from 0 to (number of subjects - 1)
+#SBATCH --output=../jobs_outputs/baseline_C1/S%a_%x_%j.o
+#SBATCH --error=../jobs_outputs/baseline_C1/S%a_%x_%j.e
+#SBATCH --array=0-1  # This should range from 0 to (number of subjects - 1)
 
 # Declare a list of specific subjects
-SUBJECTS=("S57" "S39" "S9" "S30" "S52" "S51" "S49")  # You can add or remove subjects as needed
+SUBJECTS=("S5" "S9")  # You can add or remove subjects as needed
 
 # Use the SLURM_ARRAY_TASK_ID as an index to get the subject
 SUBJECT=${SUBJECTS[$SLURM_ARRAY_TASK_ID]}
+
+
+# Dynamically set the output and error paths
+#SBATCH --output=../jobs_outputs/baseline_C1/${SUBJECT}_%x_%j.o
+#SBATCH --error=../jobs_outputs/baseline_C1/${SUBJECT}_%x_%j.e
 
 echo "I am a job with ID $SLURM_JOB_ID for subject $SUBJECT"
 echo "current working directory is $(pwd)"
@@ -28,9 +32,9 @@ experiments=("csp" "riemann" "riemann_tangent")
 # Loop over the experiments
 for experiment in "${experiments[@]}"; do
 
+    echo "************************************************************"
+    echo "************************************************************"
     echo "Processing experiment $experiment for subject $SUBJECT"
-    echo "************************************************************"
-    echo "************************************************************"
     echo "************************************************************"
     echo "************************************************************"
 

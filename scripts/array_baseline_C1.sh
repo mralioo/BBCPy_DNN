@@ -8,7 +8,7 @@
 #SBATCH --output=../jobs_outputs/baseline_C1/S%a_%x_%j.o
 #SBATCH --error=../jobs_outputs/baseline_C1/S%a_%x_%j.e
 #SBATCH --mail-user=mr.ali.alouane@gmail.com
-#SBATCH --array=0-4  # This should range from 0 to (number of subjects - 1)
+#SBATCH --array=0-7  # This should range from 0 to (number of subjects - 1)
 
 # Declare a list of specific subjects
 SUBJECTS=("S57" "S39" "S9" "S30" "S52" "S51" "S49")  # You can add or remove subjects as needed

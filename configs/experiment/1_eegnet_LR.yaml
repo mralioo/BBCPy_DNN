@@ -21,7 +21,7 @@ seed: 12345
 optimized_metric: "val/acc_best"
 
 data:
-  task_name: "2D"
+  task_name: "LR"
   ival: 1s:10s:1ms
   chans: [ "*" ]
   bands:
