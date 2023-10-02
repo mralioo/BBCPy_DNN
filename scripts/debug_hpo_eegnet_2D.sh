@@ -8,11 +8,26 @@
 #SBATCH --output=../jobs_outputs/debug-hpo-eegnet-2D/%x_%j.o
 #SBATCH --error=../jobs_outputs/debug-hpo-eegnet-2D/%x_%j.e
 
+#!/bin/bash
+
+# Define Python script arguments and parameters
+PYTHON_SCRIPT="./src/dnn_hpo_train.py"
+EXPERIMENT_ARG="experiment=1_eegnet_2D"
+DATA_ARG="+data.subject_sessions_dict='{S5: \"all\", S9:\"all\"}'"
+HPARAMS_ARG="hparams_search=1_eegnet_optuna"
+LOGGER_ARG="logger.mlflow.run_name=\"C1-m-2D\""
+
+# Define paths
+SQUASHFS_PATH="./../squashfs_smr_data/hpo_best_pvc_debug.sqfs"
+ENV_IMAGE_PATH="./../env_images/bbcpy_en.sif"
+TMP_PATH="/tmp/hpo_best_pvc_debug.sqfs"
+
+# Echo job details
 echo "I am a job with ID $SLURM_JOB_ID"
 echo "current working directory is $(pwd)"
 
-# 1. copy the squashed dataset to the nodes /tmp
-cp ./../squashfs_smr_data/hpo_best_pvc_debug.sqfs /tmp/
+# Copy the squashed dataset to the node's /tmp
+cp $SQUASHFS_PATH $TMP_PATH
 
-# 3. bind the squashed dataset to your apptainer environment and run your script with apptainer
-apptainer run --nv -B /tmp/hpo_best_pvc_debug.sqfs:/input-data:image-src=/ ./../env_images/bbcpy_en.sif python ./src/dnn_hpo_train.py experiment=1_eegnet_2D +data.subject_sessions_dict='{S5: "all", S9:"all"}' hparams_search=1_eegnet_optuna logger.mlflow.run_name="2D-best-2-pvc"
+# Run the script with apptainer, binding the squashed dataset
+apptainer run --nv -B $TMP_PATH:/input-data:image-src=/ $ENV_IMAGE_PATH python $PYTHON_SCRIPT $EXPERIMENT_ARG $DATA_ARG $HPARAMS_ARG $LOGGER_ARG
