@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH --job-name=debug-hpo-eegnet-LR
-#SBATCH --partition=gpu-5h
+#SBATCH --partition=gpu-2d
 #SBATCH --gpus-per-node=1
 #SBATCH --mem=80G          # Some buffer above 30GB
 #SBATCH --ntasks-per-node=1   # One main task that runs the trial and manages CV

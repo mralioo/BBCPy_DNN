@@ -1,8 +1,8 @@
 #!/bin/bash
 #SBATCH --job-name=debug-hpo-eegnet-2D
-#SBATCH --partition=gpu-5h
+#SBATCH --partition=gpu-2d
 #SBATCH --gpus-per-node=1
-#SBATCH --mem=80G      # Some buffer above 30GB
+#SBATCH --mem=200G      # Some buffer above 30GB
 #SBATCH --ntasks-per-node=1   # One main task that runs the trial and manages CV
 #SBATCH --cpus-per-task=3 # Assuming you want to run each CV fold in parallel
 #SBATCH --output=../jobs_outputs/debug-hpo-eegnet-2D/%x_%j.o

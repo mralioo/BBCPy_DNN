@@ -51,8 +51,8 @@ class SklearnTrainer(object):
         self.best_params = None
 
         log.info("Loading data...")
-
         self.datamodule.prepare_dataloader()
+
         self.classes_names = self.datamodule.classes
         self.task_name = self.datamodule.task_name
 
@@ -113,6 +113,11 @@ class SklearnTrainer(object):
             # log dataset dict to mlflow parent run
             _, metrics, _, _ = fetch_logged_data(parent_run.info.run_id)
             self.log_to_mlflow(hparams, parent_run, train_data, test_data, None, None)
+
+            log.info("Hyperparameter search completed!")
+            # clean up
+            gc.collect()
+            
 
         return metrics
 

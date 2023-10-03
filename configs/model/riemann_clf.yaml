@@ -3,7 +3,7 @@ steps_config: # use yaml list syntax to preserve to order
   FeatureExtraction:
     AverageVariance:
       applied: True
-      excllev: 1.2
+      excllev: 1.8
       estimator: 'lwf'
     Covariance:
       applied: True
