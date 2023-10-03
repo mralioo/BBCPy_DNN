@@ -9,8 +9,8 @@ steps_config: # use yaml list syntax to preserve to order
   FeatureExtraction:
     CSP:
       applied: True
-      n_cmps: 8
-      excllev: 1.2
+      n_cmps: 4
+      excllev: 1.8
       estimator: 'scm'
   Transformation:
     var:

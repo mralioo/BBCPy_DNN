@@ -1,10 +1,10 @@
 #!/bin/bash
 
 #SBATCH --job-name=debug_baseline_C1
-#SBATCH --partition=cpu-2d
+#SBATCH --partition=cpu-2h
 #SBATCH --gpus-per-node=0
 #SBATCH --nodes=1
-#SBATCH --ntasks-per-node=16
+#SBATCH --ntasks-per-node=32
 #SBATCH --output=../jobs_outputs/baseline_C1/S%a_%x_%j.o
 #SBATCH --error=../jobs_outputs/baseline_C1/S%a_%x_%j.e
 #SBATCH --array=0-1  # This should range from 0 to (number of subjects - 1)
