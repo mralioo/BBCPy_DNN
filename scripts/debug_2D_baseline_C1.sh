@@ -42,3 +42,5 @@ for experiment in "${experiments[@]}"; do
     apptainer run -B /tmp/${SUBJECT}.sqfs:/input-data:image-src=/ ./../env_images/bbcpy_en.sif python ./src/baseline_train.py experiment="0_${experiment}_2D" hparams_search="hpo_${experiment}"  +data.subject_sessions_dict="{$SUBJECT: "all"}" logger.mlflow.experiment_name="${experiment}-2D" logger.mlflow.run_name="${SUBJECT}-2D"
 
 done
+
+

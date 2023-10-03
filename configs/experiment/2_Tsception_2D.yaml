@@ -39,14 +39,19 @@ model:
     _target_: torch.nn.CrossEntropyLoss
     _partial_: true
   plots_settings:
-    plot_every_n_epoch: 10
+    plot_every_n_epoch: 20
   net:
     num_classes: 4
     num_electrodes: 54
+    sampling_rate: 1000
+    num_T: 10
+    num_S: 15
+    hid_channels: 128
+    dropout: 0.5
 
 trainer:
-  min_epochs: 30
-  max_epochs: 60
+  min_epochs: 50
+  max_epochs: 100
   check_val_every_n_epoch: 1
 
 paths:
@@ -72,5 +77,5 @@ callbacks:
 
   early_stopping:
     monitor: "val/acc_best"
-    patience: 20
+    patience: 50
     mode: "max"

@@ -43,14 +43,21 @@ model:
   net:
     chunk_size: 9000
     num_classes: 2
+    num_electrodes: 62
+    dropout: 0.5
+    kernel_1: 512
+    kernel_2: 256
+    F1: 6
+    F2: 16
+    D: 8
   plots_settings:
-    plot_every_n_epoch: 10
+    plot_every_n_epoch: 20
 
 trainer:
-  min_epochs: 30
-  max_epochs: 60
+  min_epochs: 50
+  max_epochs: 100
   check_val_every_n_epoch: 1
-  precision: 16
+#  precision: 16
 
 paths:
   root_dir: ${oc.env:PROJECT_ROOT}
@@ -75,5 +82,5 @@ callbacks:
 
   early_stopping:
     monitor: "val/acc_best"
-    patience: 20
+    patience: 50
     mode: "max"

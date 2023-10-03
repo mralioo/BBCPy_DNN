@@ -11,7 +11,7 @@
 # Define Python script arguments and parameters
 PYTHON_SCRIPT="./src/dnn_hpo_train.py"
 EXPERIMENT_ARG=1_eegnet_2D
-DATA_ARG="{S5: 'all', S9: 'all'}"   # Corrected this line
+DATA_ARG="{S5: 'all', S9: 'all'}"
 HPARAMS_ARG=1_eegnet_optuna
 LOGGER_ARG="C1-m-2D"
 

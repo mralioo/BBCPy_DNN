@@ -30,7 +30,7 @@ data:
   normalize: { norm_type: "std", norm_axis: 0 }
   train_val_split: False
   cross_validation: { num_splits: 3, split_seed: 1234 }
-  batch_size: 32
+  batch_size: 128
   num_workers: 4
   pin_memory: True
 
@@ -43,6 +43,11 @@ model:
   net:
     num_classes: 2
     num_electrodes: 54
+    sampling_rate: 500
+    num_T: 15
+    num_S: 20
+    hid_channels: 32
+    dropout: 0.5
 
 trainer:
   min_epochs: 30
@@ -72,5 +77,5 @@ callbacks:
 
   early_stopping:
     monitor: "val/acc_best"
-    patience: 20
+    patience: 50
     mode: "max"

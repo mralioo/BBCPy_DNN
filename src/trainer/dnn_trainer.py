@@ -53,6 +53,15 @@ class DnnLitModule(LightningModule):
         self.net = net
         self.num_classes = self.net.num_classes
 
+        self.classes_names_dict = {}
+        if self.num_classes == 2:
+            self.classes_names_dict = {0: "R", 1: "L"}
+
+        if self.num_classes == 4:
+            self.classes_names_dict = {0: "R", 1: "L", 2: "U", 3: "D"}
+
+        self.classes_names = [v for k, v in self.classes_names_dict.items()]
+
         # set loss function
         self.criterion = self.hparams.criterion
 
@@ -122,19 +131,8 @@ class DnnLitModule(LightningModule):
         self.val_f1.reset()
         self.val_f1_best.reset()
 
-        # init classes names
-        # init classes names
-        self.classes_names = self.datamodule.classes
-        self.task_name = self.datamodule.task_name
-
-        self.classes_names_dict = {}
-        if self.task_name == "LR":
-            self.classes_names_dict = {0: "R", 1: "L"}
-
-        if self.task_name == "2D":
-            self.classes_names_dict = {0: "R", 1: "L", 2: "U", 3: "D"}
-
     def training_step(self, batch: Any):
+
         loss, preds, targets = self.model_step(batch)
 
         # GET AND SAVE OUTPUTS AND TARGETS PER BATCH
@@ -219,16 +217,16 @@ class DnnLitModule(LightningModule):
 
             # --> HERE STEP 2 <--
             _, logits, targets_ie = self.model_step_logits(batch)
-            self.val_step_outputs_logits.extend(logits)
-            self.val_step_targets_ie.extend(targets_ie)
+            self.val_step_outputs_logits.extend(logits.cpu().tolist())
+            self.val_step_targets_ie.extend(targets_ie.cpu().tolist())
 
         if self.num_classes > 2:
             _, logits, targets_ie = self.model_step_logits(batch)
             self.roc(logits, targets_ie)
 
             # --> HERE STEP 2 <--
-            self.val_step_outputs_logits.extend(logits)
-            self.val_step_targets_ie.extend(targets_ie)
+            self.val_step_outputs_logits.extend(logits.cpu().tolist())
+            self.val_step_targets_ie.extend(targets_ie.cpu().tolist())
 
         self.tracker.increment()  # Notify the tracker of a new step
         self.tracker.update(preds, targets)
@@ -253,13 +251,11 @@ class DnnLitModule(LightningModule):
             self.roc.compute()
             self.plot_summary_advanced(all_results, image_name=f"val_summary_epoch_{self.current_epoch}")
 
-            # Plot ROC curve ovr and ovo
+            # Plot ROC curve ovr and ovo FIXME : test on LR
             self.plot_roc_curve_ovr(Y_ie=self.val_step_targets_ie, Y_pred_logits=self.val_step_outputs_logits,
                                     filename=f"val_roc_ovr_epoch_{self.current_epoch}")
             self.plot_roc_curve_ovo(Y_ie=self.val_step_targets_ie, Y_pred_logits=self.val_step_outputs_logits,
                                     filename=f"val_roc_ovo_epoch_{self.current_epoch}")
-
-
 
         # Accuracy is a metric object, so we need to call `.compute()` to get the value
         acc = self.val_acc.compute()  # get current val acc
@@ -561,10 +557,11 @@ class DnnLitModule(LightningModule):
 
     def plot_roc_curve_ovr(self, Y_ie, Y_pred_logits, filename=None):
 
+        if isinstance(Y_pred_logits, list):
+            Y_pred_logits = np.array(Y_pred_logits)
+
         fig = plt.figure(figsize=(16, 10))
         bins = [i / 20 for i in range(20)] + [1]
-
-        num_classes = len(self.classes_names)
 
         for i, (k, v) in enumerate(self.classes_names_dict.items()):
             # Gets the class
@@ -577,7 +574,7 @@ class DnnLitModule(LightningModule):
             df_aux = df_aux.reset_index(drop=True)
 
             # Plots the probability distribution for the class and the rest
-            ax = plt.subplot(2, num_classes, i + 1)
+            ax = plt.subplot(2, self.num_classes, i + 1)
 
             # Assuming df_aux has columns 'prob' and 'class'
             classes = df_aux['class'].unique()
@@ -592,7 +589,7 @@ class DnnLitModule(LightningModule):
             ax.set_xlabel(f"P(x = {v})")
 
             # Calculates the ROC Coordinates and plots the ROC Curves
-            ax_bottom = plt.subplot(2, num_classes, i + (num_classes + 1))
+            ax_bottom = plt.subplot(2, self.num_classes, i + (self.num_classes + 1))
             # tpr, fpr = get_all_roc_coordinates(df_aux['class'], df_aux['prob'])
             tpr, fpr, _ = roc_curve(y_true=df_aux['class'], y_score=df_aux['prob'])
             plot_roc_curve(tpr, fpr, scatter=False, ax=ax_bottom)
@@ -612,12 +609,13 @@ class DnnLitModule(LightningModule):
 
     def plot_roc_curve_ovo(self, Y_ie, Y_pred_logits, filename=None):
 
+        if isinstance(Y_pred_logits, list):
+            Y_pred_logits = np.array(Y_pred_logits)
+
         classes_combinations = []
 
-        num_classes = len(self.classes_names)
-
-        for i in range(num_classes):
-            for j in range(i + 1, num_classes):
+        for i in range(self.num_classes):
+            for j in range(i + 1, self.num_classes):
                 classes_combinations.append([self.classes_names[i], self.classes_names[j]])
                 classes_combinations.append([self.classes_names[j], self.classes_names[i]])
 
@@ -627,8 +625,6 @@ class DnnLitModule(LightningModule):
 
         roc_auc_ovo = {}
 
-        # class_names = {v: k for k, v in self.classes_names_dict.items()}
-
         for i in range(len(classes_combinations)):
             # Gets the class
             comb = classes_combinations[i]
@@ -636,8 +632,6 @@ class DnnLitModule(LightningModule):
             c2 = comb[1]
             c1_index = self.classes_names.index(c1)
             title = c1 + " vs " + c2
-
-            # Prepares an auxiliar dataframe to help with the plots
 
             # Prepares an auxiliar dataframe to help with the plots
             df_aux = pd.DataFrame(Y_ie)
