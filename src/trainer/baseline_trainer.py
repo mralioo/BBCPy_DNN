@@ -251,8 +251,6 @@ class SklearnTrainer(object):
 
                         # Roc curve / average Roc curve
                         if self.task_name == "LR":
-                            # log coefficients
-                            mlflow.log_metric("coefficients", self.clf.coef_)
 
                             # Train data metrics
                             self.compute_roc_curve(y_true=y_train, y_pred=y_pred, set_name="train")

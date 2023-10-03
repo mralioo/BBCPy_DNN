@@ -1,31 +1,31 @@
 import itertools
 import json
 import os.path
+import sys
 import tempfile
 from typing import Any
 
 import matplotlib.pyplot as plt
 import numpy as np
+import pandas as pd
 import pyrootutils
 import sklearn
 import torch
 import torch.nn.functional as F
 import torchmetrics
+import torchsummary
 from lightning import LightningModule
-from sklearn.metrics import confusion_matrix
+from sklearn.metrics import confusion_matrix, roc_auc_score, roc_curve
 from torchmetrics import MaxMetric, MeanMetric, F1Score
 from torchmetrics.classification.accuracy import Accuracy
 
 pyrootutils.setup_root(__file__, indicator=".project-root", pythonpath=True)
-from src.utils.file_mgmt import default
-from src.utils.vis import calculate_cm_stats
 
-from src.utils.device import print_memory_usage, print_cpu_cores, print_gpu_memory
 from src import utils
+from src.utils.file_mgmt import default
+from src.utils.vis import calculate_cm_stats, plot_roc_curve
+from src.utils.device import print_memory_usage, print_cpu_cores, print_gpu_memory
 from src.models.components.layers_init import xavier_initialize_weights
-
-import torchsummary
-import sys
 
 logging = utils.get_pylogger(__name__)
 
@@ -122,6 +122,18 @@ class DnnLitModule(LightningModule):
         self.val_f1.reset()
         self.val_f1_best.reset()
 
+        # init classes names
+        # init classes names
+        self.classes_names = self.datamodule.classes
+        self.task_name = self.datamodule.task_name
+
+        self.classes_names_dict = {}
+        if self.task_name == "LR":
+            self.classes_names_dict = {0: "R", 1: "L"}
+
+        if self.task_name == "2D":
+            self.classes_names_dict = {0: "R", 1: "L", 2: "U", 3: "D"}
+
     def training_step(self, batch: Any):
         loss, preds, targets = self.model_step(batch)
 
@@ -206,15 +218,16 @@ class DnnLitModule(LightningModule):
             self.roc(preds, targets.long())
 
             # --> HERE STEP 2 <--
-            self.val_step_outputs_ie.extend(preds)
-            self.val_step_targets_ie.extend(targets)
+            _, logits, targets_ie = self.model_step_logits(batch)
+            self.val_step_outputs_logits.extend(logits)
+            self.val_step_targets_ie.extend(targets_ie)
 
         if self.num_classes > 2:
             _, logits, targets_ie = self.model_step_logits(batch)
             self.roc(logits, targets_ie)
 
             # --> HERE STEP 2 <--
-            self.val_step_outputs_ie.extend(logits)
+            self.val_step_outputs_logits.extend(logits)
             self.val_step_targets_ie.extend(targets_ie)
 
         self.tracker.increment()  # Notify the tracker of a new step
@@ -236,8 +249,17 @@ class DnnLitModule(LightningModule):
             title = f"Validation Confusion matrix epoch_{self.current_epoch}"
             self.confusion_matrix_to_png(cm, title, f"vali_cm_epo_{self.current_epoch}")
 
+            # Plot ROC curve  Summary FIXME : do we need it ?
             self.roc.compute()
             self.plot_summary_advanced(all_results, image_name=f"val_summary_epoch_{self.current_epoch}")
+
+            # Plot ROC curve ovr and ovo
+            self.plot_roc_curve_ovr(Y_ie=self.val_step_targets_ie, Y_pred_logits=self.val_step_outputs_logits,
+                                    filename=f"val_roc_ovr_epoch_{self.current_epoch}")
+            self.plot_roc_curve_ovo(Y_ie=self.val_step_targets_ie, Y_pred_logits=self.val_step_outputs_logits,
+                                    filename=f"val_roc_ovo_epoch_{self.current_epoch}")
+
+
 
         # Accuracy is a metric object, so we need to call `.compute()` to get the value
         acc = self.val_acc.compute()  # get current val acc
@@ -261,7 +283,7 @@ class DnnLitModule(LightningModule):
         self.val_step_outputs.clear()
         self.val_step_targets.clear()
 
-        self.val_step_outputs_ie.clear()
+        self.val_step_outputs_logits.clear()
         self.val_step_targets_ie.clear()
 
     def on_test_start(self):
@@ -286,6 +308,9 @@ class DnnLitModule(LightningModule):
         # ATTRIBUTES TO SAVE BATCH OUTPUTS
         self.test_step_outputs = []  # save outputs in each batch to compute metric overall epoch
         self.test_step_targets = []  # save targets in each batch to compute metric overall epoch
+
+        self.test_step_logits = []  # save outputs in each batch to compute metric overall epoch
+        self.test_step_targets_ie = []  # save targets in each batch to compute metric overall epoch
 
     def test_step(self, batch: Any, batch_idx: int):
 
@@ -534,6 +559,158 @@ class DnnLitModule(LightningModule):
                 self.mlflow_client.log_artifacts(self.run_id,
                                                  local_dir=tmpdirname)
 
+    def plot_roc_curve_ovr(self, Y_ie, Y_pred_logits, filename=None):
+
+        fig = plt.figure(figsize=(16, 10))
+        bins = [i / 20 for i in range(20)] + [1]
+
+        num_classes = len(self.classes_names)
+
+        for i, (k, v) in enumerate(self.classes_names_dict.items()):
+            # Gets the class
+            # c = k
+            # Prepares an auxiliar dataframe to help with the plots
+            df_aux = pd.DataFrame(Y_ie)
+
+            df_aux['class'] = [1 if y == k else 0 for y in Y_ie]
+            df_aux['prob'] = Y_pred_logits[:, i]
+            df_aux = df_aux.reset_index(drop=True)
+
+            # Plots the probability distribution for the class and the rest
+            ax = plt.subplot(2, num_classes, i + 1)
+
+            # Assuming df_aux has columns 'prob' and 'class'
+            classes = df_aux['class'].unique()
+
+            for cls in classes:
+                subset = df_aux[df_aux['class'] == cls]
+                ax.hist(subset['prob'], bins=bins, label=cls, alpha=0.6)  # alpha is for transparency
+
+            # sns.histplot(x="prob", data=df_aux, hue='class', color='b', ax=ax, bins=bins)
+            ax.set_title(v)
+            ax.legend([f"Class: {v}", "Rest"])
+            ax.set_xlabel(f"P(x = {v})")
+
+            # Calculates the ROC Coordinates and plots the ROC Curves
+            ax_bottom = plt.subplot(2, num_classes, i + (num_classes + 1))
+            # tpr, fpr = get_all_roc_coordinates(df_aux['class'], df_aux['prob'])
+            tpr, fpr, _ = roc_curve(y_true=df_aux['class'], y_score=df_aux['prob'])
+            plot_roc_curve(tpr, fpr, scatter=False, ax=ax_bottom)
+            ax_bottom.set_title("ROC Curve OvR")
+
+        # plt.tight_layout()
+
+        # Use a temporary directory to save the plot
+        with tempfile.TemporaryDirectory() as tmpdirname:
+            plot_path = os.path.join(tmpdirname, f"{filename}.png")
+
+            plt.savefig(plot_path)  # Save the plot to the temporary directory
+            # self.mlflow_client.log_artifact(tmpdirname)
+            self.mlflow_client.log_artifacts(self.run_id,
+                                             local_dir=tmpdirname)
+        plt.close(fig)
+
+    def plot_roc_curve_ovo(self, Y_ie, Y_pred_logits, filename=None):
+
+        classes_combinations = []
+
+        num_classes = len(self.classes_names)
+
+        for i in range(num_classes):
+            for j in range(i + 1, num_classes):
+                classes_combinations.append([self.classes_names[i], self.classes_names[j]])
+                classes_combinations.append([self.classes_names[j], self.classes_names[i]])
+
+        # Plots the Probability Distributions and the ROC Curves One vs ONe
+        fig = plt.figure(figsize=(30, 30))
+        bins = [i / 20 for i in range(20)] + [1]
+
+        roc_auc_ovo = {}
+
+        # class_names = {v: k for k, v in self.classes_names_dict.items()}
+
+        for i in range(len(classes_combinations)):
+            # Gets the class
+            comb = classes_combinations[i]
+            c1 = comb[0]
+            c2 = comb[1]
+            c1_index = self.classes_names.index(c1)
+            title = c1 + " vs " + c2
+
+            # Prepares an auxiliar dataframe to help with the plots
+
+            # Prepares an auxiliar dataframe to help with the plots
+            df_aux = pd.DataFrame(Y_ie)
+
+            df_aux['class'] = [self.classes_names_dict[y] for y in Y_ie]
+            df_aux['prob'] = Y_pred_logits[:, c1_index]
+
+            # Slices only the subset with both classes
+            df_aux = df_aux[(df_aux['class'] == c1) | (df_aux['class'] == c2)]
+            df_aux['class'] = [1 if y == c1 else 0 for y in df_aux['class']]
+            df_aux = df_aux.reset_index(drop=True)
+
+            if i < 6:
+                # Plots the probability distribution for the class and the rest
+                ax = plt.subplot(4, 6, i + 1)
+
+                # Assuming df_aux has columns 'prob' and 'class'
+                classes = df_aux['class'].unique()
+
+                for cls in classes:
+                    subset = df_aux[df_aux['class'] == cls]
+                    ax.hist(subset['prob'], bins=bins, label=cls, alpha=0.6)  # alpha is for transparency
+
+                ax.set_title(title)
+
+                # c1_name = self.classes_names_dict[c1]
+                # c2_name = self.classes_names_dict[c2]
+
+                ax.legend([f"Class 1: {c1}", f"Class 0: {c2}"])
+                ax.set_xlabel(f"P(x = {c1})")
+
+                # Calculates the ROC Coordinates and plots the ROC Curves
+                ax_bottom = plt.subplot(4, 6, i + 7)
+                # tpr, fpr = get_all_roc_coordinates(df_aux['class'], df_aux['prob'])
+                tpr, fpr, _ = roc_curve(y_true=df_aux['class'], y_score=df_aux['prob'])
+                plot_roc_curve(tpr, fpr, scatter=False, ax=ax_bottom)
+                ax_bottom.set_title("ROC Curve OvO")
+            else:
+                # Plots the probability distribution for the class and the rest
+                ax = plt.subplot(4, 6, i + 7)
+
+                # Assuming df_aux has columns 'prob' and 'class'
+                classes = df_aux['class'].unique()
+
+                for cls in classes:
+                    subset = df_aux[df_aux['class'] == cls]
+                    ax.hist(subset['prob'], bins=bins, label=cls, alpha=0.6)  # alpha is for transparency
+
+                ax.set_title(title)
+                ax.legend([f"Class 1: {c1}", f"Class 0: {c2}"])
+                ax.set_xlabel(f"P(x = {c1})")
+                # Calculates the ROC Coordinates and plots the ROC Curves
+                ax_bottom = plt.subplot(4, 6, i + 13)
+                # tpr, fpr = get_all_roc_coordinates(df_aux['class'], df_aux['prob'])
+                tpr, fpr, _ = roc_curve(y_true=df_aux['class'], y_score=df_aux['prob'])
+
+                plot_roc_curve(tpr, fpr, scatter=False, ax=ax_bottom)
+                ax_bottom.set_title("ROC Curve OvO")
+
+            # Calculates the ROC AUC OvO
+            roc_auc_ovo[title] = roc_auc_score(df_aux['class'], df_aux['prob'])
+        # plt.tight_layout()
+
+        # Use a temporary directory to save the plot
+        with tempfile.TemporaryDirectory() as tmpdirname:
+            plot_path = os.path.join(tmpdirname, f"{filename}.png")
+
+            plt.savefig(plot_path)  # Save the plot to the temporary directory
+            # self.mlflow_client.log_artifact(tmpdirname)
+            self.mlflow_client.log_artifacts(self.run_id,
+                                             local_dir=tmpdirname)
+        plt.close(fig)
+
     def plot_summary_advanced(self, all_results, image_name=None):
 
         # Constuct a single figure with appropriate layout for all metrics
@@ -621,7 +798,7 @@ class DnnLitModule(LightningModule):
         self.val_step_targets = []  # save targets in each batch to compute metric overall epoch
 
         # ATTRIBUTES TO SAVE BATCH OUTPUTS
-        self.val_step_outputs_ie = []  # save outputs in each batch to compute metric overall epoch
+        self.val_step_outputs_logits = []  # save outputs in each batch to compute metric overall epoch
         self.val_step_targets_ie = []  # save targets in each batch to compute metric overall epoch
 
         self.train_loss = MeanMetric()
