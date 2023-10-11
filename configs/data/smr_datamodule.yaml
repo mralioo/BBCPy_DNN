@@ -7,3 +7,4 @@ fallback_neighbors: 3
 loading_data_mode: within_subject
 num_workers: 2
 pin_memory: False
+process_noisy_channels : True

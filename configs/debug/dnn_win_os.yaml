@@ -36,12 +36,12 @@ logger:
 model:
   net:
 #    chunk_size: 900
-    num_classes: 4
+    num_classes: 2
   plots_settings:
     plot_every_n_epoch: 1
 
 data:
-  task_name: "2D"
+  task_name: "LR"
   ival: 1s:10s:10ms
   chans: [ "*" ]
   loading_data_mode: "within_subject"

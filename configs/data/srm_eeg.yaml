@@ -5,3 +5,4 @@ ival: "all"
 chans: [ "*" ]
 fallback_neighbors: 3
 loading_data_mode: within_subject
+process_noisy_channels : True

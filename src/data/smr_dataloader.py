@@ -52,6 +52,7 @@ class SRM_DataModule(LightningDataModule):
                  chans,
                  subject_sessions_dict,
                  loading_data_mode,
+                 process_noisy_channels,
                  fallback_neighbors,
                  transform,
                  normalize,
@@ -69,6 +70,8 @@ class SRM_DataModule(LightningDataModule):
 
         if self.task_name == "RL":
             self.classes = ["R", "L"]
+        elif self.task_name == "UD":
+            self.classes = ["U", "D"]
         elif self.task_name == "2D":
             self.classes = ["R", "L", "U", "D"]
 
@@ -79,6 +82,7 @@ class SRM_DataModule(LightningDataModule):
         self.fallback_neighbors = fallback_neighbors
         self.transform = transform
         self.normalize = normalize
+        self.process_noisy_channels = process_noisy_channels
         self.subject_sessions_dict = subject_sessions_dict
 
         if train_val_split:
@@ -119,7 +123,8 @@ class SRM_DataModule(LightningDataModule):
                                        chans=self.chans,
                                        fallback_neighbors=self.fallback_neighbors,
                                        transform=self.transform,
-                                       normalize=self.normalize)
+                                       normalize=self.normalize,
+                                       process_noisy_channels=self.process_noisy_channels, )
 
         self.smr_datamodule.prepare_dataloader()
         # Info about resources
