@@ -17,6 +17,9 @@ for SUBJECT in "${SUBJECTS[@]}"; do
     echo "I am a job for subject $SUBJECT"
     echo "current working directory is $(pwd)"
 
+    # 1. copy the squashed dataset to the nodes /tmp
+    cp ./../squashfs_smr_data/${SUBJECT}.sqfs /tmp/
+
     # ... (rest of your script remains unchanged, but ensure to change the run_name in the apptainer command)
 
     apptainer run -B /tmp/${SUBJECT}.sqfs:/input-data:image-src=/ ./../env_images/bbcpy_en.sif python ./src/baseline_train.py experiment=1_eegnet_2D +data.subject_sessions_dict="{$SUBJECT: "all"}" logger.mlflow.experiment_name="EEGNET-2D" logger.mlflow.run_name="${SUBJECT}-2D"
