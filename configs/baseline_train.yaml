@@ -1,5 +1,7 @@
 # @package _global_
 
+optimized_metric: "vali-mean_f1_score"
+
 # specify here default configuration
 # order of defaults determines the order in which configs override each other
 defaults:
@@ -15,19 +17,13 @@ defaults:
 
   # experiment configs allow for version control of specific hyperparameters
   # e.g. best hyperparameters for given model and datamodule
-#  - experiment: null
+  - experiment: null
 
   # config for hyperparameter optimization
-#  - hparams_search: null
-  - hparams_search: eegnet_optuna_hpo.yaml
-  #  - hparams_search: sklearn_optuna.yaml
-
-  # optional local config for machine/user specific settings
-  # it's optional since it doesn't need to exist and is excluded from version control
-#  - local: win_os.yaml
+  - hparams_search: null
 
   # debugging config (enable through command line, e.g. `python train.py debug=default)
-#  - debug: win_os
+  - debug: null
 
 # task name, determines output directory path
 # list of tasks [train, test, hparams_search]

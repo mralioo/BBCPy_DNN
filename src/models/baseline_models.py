@@ -74,7 +74,8 @@ def classifier_pipeline(steps_config):
                         class_weight = algo_config.class_weight
 
                     svc_step = pyriemann.classification.SVC(metric='logeuclid',
-                                                            class_weight=class_weight)
+                                                            class_weight=class_weight,
+                                                            probability=True)
                     steps.append(svc_step)
 
                 elif algo_name == 'SVC-sklearn' and algo_config.applied == True:

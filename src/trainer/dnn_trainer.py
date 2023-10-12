@@ -1,26 +1,30 @@
 import itertools
 import json
 import os.path
+import sys
 import tempfile
 from typing import Any
 
 import matplotlib.pyplot as plt
 import numpy as np
+import pandas as pd
 import pyrootutils
 import sklearn
 import torch
+import torch.nn.functional as F
 import torchmetrics
+import torchsummary
 from lightning import LightningModule
-from sklearn.metrics import confusion_matrix
+from sklearn.metrics import confusion_matrix, roc_auc_score, roc_curve
 from torchmetrics import MaxMetric, MeanMetric, F1Score
 from torchmetrics.classification.accuracy import Accuracy
 
 pyrootutils.setup_root(__file__, indicator=".project-root", pythonpath=True)
-from src.utils.file_mgmt import default
-from src.utils.vis import calculate_cm_stats
 
-from src.utils.device import print_memory_usage, print_cpu_cores, print_gpu_memory
 from src import utils
+from src.utils.file_mgmt import default
+from src.utils.vis import calculate_cm_stats, plot_roc_curve
+from src.utils.device import print_memory_usage, print_cpu_cores, print_gpu_memory
 from src.models.components.layers_init import xavier_initialize_weights
 
 logging = utils.get_pylogger(__name__)
@@ -49,7 +53,16 @@ class DnnLitModule(LightningModule):
         self.net = net
         self.num_classes = self.net.num_classes
 
-        # loss function
+        self.classes_names_dict = {}
+        if self.num_classes == 2:
+            self.classes_names_dict = {0: "R", 1: "L"}
+
+        if self.num_classes == 4:
+            self.classes_names_dict = {0: "R", 1: "L", 2: "U", 3: "D"}
+
+        self.classes_names = [v for k, v in self.classes_names_dict.items()]
+
+        # set loss function
         self.criterion = self.hparams.criterion
 
         # plots settings
@@ -69,24 +82,37 @@ class DnnLitModule(LightningModule):
         x, y = batch
 
         logits = self.forward(x)
+
+        if self.num_classes == 2:
+            probs = F.softmax(logits, dim=1)
+        if self.num_classes > 2:
+            probs = F.softmax(logits, dim=1)
+
         # FIXME : add class weights
         # classes_weights_tensor = torch.tensor(self.calculate_sample_weights(y)).to(self.device)
         # loss = self.criterion(weight=classes_weights_tensor)(logits, y)
-        loss = self.criterion()(logits, y)
+
+        loss = self.criterion()(probs, y)
 
         # transform logits to one hot encoding
-        preds_ie = torch.argmax(logits, dim=1)
-        preds = torch.nn.functional.one_hot(preds_ie, num_classes=self.num_classes)
+        # preds_ie = torch.argmax(probs, dim=1)
+        # preds = torch.nn.functional.one_hot(preds_ie, num_classes=self.num_classes)
 
-        return loss, preds, y
+        return loss, probs, y
 
     def model_step_logits(self, batch: Any):
         x, y = batch
 
         logits = self.forward(x)
-        loss = self.criterion()(logits, y)
 
-        return loss, logits, torch.argmax(y, dim=1)
+        if self.num_classes == 2:
+            probs = F.softmax(logits, dim=1)
+        if self.num_classes > 2:
+            probs = F.softmax(logits, dim=1)
+
+        loss = self.criterion()(probs, y)
+
+        return loss, probs, torch.argmax(y, dim=1)
 
     def on_train_start(self):
 
@@ -106,6 +132,7 @@ class DnnLitModule(LightningModule):
         self.val_f1_best.reset()
 
     def training_step(self, batch: Any):
+
         loss, preds, targets = self.model_step(batch)
 
         # GET AND SAVE OUTPUTS AND TARGETS PER BATCH
@@ -159,7 +186,7 @@ class DnnLitModule(LightningModule):
         self.training_step_targets.clear()
 
     def on_validation_start(self):
-        self.class_names = self.trainer.datamodule.classes
+
         # mlflow autologging
         self.mlflow_client = self.logger.experiment
         self.run_id = self.logger.run_id
@@ -185,12 +212,21 @@ class DnnLitModule(LightningModule):
         self.log("val/f1", self.val_f1, on_step=False, on_epoch=True, prog_bar=True)
 
         # Log metrics from the collection
+        if self.num_classes == 2:
+            self.roc(preds, targets.long())
 
-        _, logits, targets_ie = self.model_step_logits(batch)
-        self.roc(logits, targets_ie)
-        # --> HERE STEP 2 <--
-        self.val_step_outputs_ie.extend(logits)
-        self.val_step_targets_ie.extend(targets_ie)
+            # --> HERE STEP 2 <--
+            _, logits, targets_ie = self.model_step_logits(batch)
+            self.val_step_outputs_logits.extend(logits.cpu().tolist())
+            self.val_step_targets_ie.extend(targets_ie.cpu().tolist())
+
+        if self.num_classes > 2:
+            _, logits, targets_ie = self.model_step_logits(batch)
+            self.roc(logits, targets_ie)
+
+            # --> HERE STEP 2 <--
+            self.val_step_outputs_logits.extend(logits.cpu().tolist())
+            self.val_step_targets_ie.extend(targets_ie.cpu().tolist())
 
         self.tracker.increment()  # Notify the tracker of a new step
         self.tracker.update(preds, targets)
@@ -202,12 +238,24 @@ class DnnLitModule(LightningModule):
         val_all_outputs = self.val_step_outputs
         val_all_targets = self.val_step_targets
 
+        all_results = self.tracker.compute_all()
+
         # Calculate the confusion matrix and log it to mlflow
         if (self.current_epoch + 1) % self.plots_settings["plot_every_n_epoch"] == 0:
             # Calculate the confusion matrix and log it to mlflow
             cm = confusion_matrix(val_all_targets, val_all_outputs)
             title = f"Validation Confusion matrix epoch_{self.current_epoch}"
             self.confusion_matrix_to_png(cm, title, f"vali_cm_epo_{self.current_epoch}")
+
+            # Plot ROC curve  Summary FIXME : do we need it ?
+            self.roc.compute()
+            self.plot_summary_advanced(all_results, image_name=f"val_summary_epoch_{self.current_epoch}")
+
+            # Plot ROC curve ovr and ovo FIXME : test on LR
+            self.plot_roc_curve_ovr(Y_ie=self.val_step_targets_ie, Y_pred_logits=self.val_step_outputs_logits,
+                                    filename=f"val_roc_ovr_epoch_{self.current_epoch}")
+            self.plot_roc_curve_ovo(Y_ie=self.val_step_targets_ie, Y_pred_logits=self.val_step_outputs_logits,
+                                    filename=f"val_roc_ovo_epoch_{self.current_epoch}")
 
         # Accuracy is a metric object, so we need to call `.compute()` to get the value
         acc = self.val_acc.compute()  # get current val acc
@@ -223,18 +271,15 @@ class DnnLitModule(LightningModule):
         # otherwise metric would be reset by lightning after each epoch
         self.log("val/f1_best", self.val_f1_best.compute(), sync_dist=True, prog_bar=True)
 
-        # Log metrics from the collection
-        if (self.current_epoch + 1) % self.plots_settings["plot_every_n_epoch"] == 0:
-            all_results = self.tracker.compute_all()
-            self.roc.compute()
-            self.plot_summary_advanced(all_results, image_name=f"val_summary_epoch_{self.current_epoch}")
+        # rest tracker
+        self.tracker.reset()
 
         # free up the memory
         # --> HERE STEP 3 <--
         self.val_step_outputs.clear()
         self.val_step_targets.clear()
 
-        self.val_step_outputs_ie.clear()
+        self.val_step_outputs_logits.clear()
         self.val_step_targets_ie.clear()
 
     def on_test_start(self):
@@ -259,6 +304,9 @@ class DnnLitModule(LightningModule):
         # ATTRIBUTES TO SAVE BATCH OUTPUTS
         self.test_step_outputs = []  # save outputs in each batch to compute metric overall epoch
         self.test_step_targets = []  # save targets in each batch to compute metric overall epoch
+
+        self.test_step_logits = []  # save outputs in each batch to compute metric overall epoch
+        self.test_step_targets_ie = []  # save targets in each batch to compute metric overall epoch
 
     def test_step(self, batch: Any, batch_idx: int):
 
@@ -309,6 +357,10 @@ class DnnLitModule(LightningModule):
         return {"optimizer": optimizer}
 
     def confusion_matrix_to_png(self, conf_mat, title, figure_file_name=None, type='standard'):
+        # FIXME: add class names
+        target_map_dict = {0: "R", 1: "L", 2: "U", 3: "D"}
+        class_names = [target_map_dict[i] for i in range(self.num_classes)]
+
         if type == 'standard':
             plt.rcParams["font.family"] = 'DejaVu Sans'
             figure = plt.figure(figsize=(9, 9))
@@ -317,8 +369,8 @@ class DnnLitModule(LightningModule):
             plt.colorbar()
             # FIXME : check if this is correct order of classes names
             tick_marks = np.arange(self.num_classes)
-            plt.xticks(tick_marks, self.class_names)
-            plt.yticks(tick_marks, self.class_names)
+            plt.xticks(tick_marks, class_names)
+            plt.yticks(tick_marks, class_names)
             # set title
             plt.title(title)
 
@@ -399,11 +451,6 @@ class DnnLitModule(LightningModule):
                                                  local_dir=tmpdirname)
                 plt.close(figure)
 
-    def log_haprams(self):
-        """Log all hyperparameters to mlflow"""
-        for k, v in self.hparams.items():
-            self.mlflow_client.log_param(self.run_id, k, v)
-
     def calculate_sample_weights(self, y, NUM_MIN_SAMPLES=10):
         """Calculate sample weights for unbalanced dataset"""
         y_np = np.argmax(y.cpu().numpy(), axis=1)
@@ -443,10 +490,8 @@ class DnnLitModule(LightningModule):
     def save_hparams_to_mlflow(self):
         """Log all hyperparameters to mlflow"""
 
-        model_name = self.hparams.net.__class__.__name__
         # by default lightning executes validation step sanity checks before training starts,
         # so it's worth to make sure validation metrics don't store results from these checks
-        self.class_names = self.trainer.datamodule.classes
 
         # mlflow autologging
         self.mlflow_client = self.logger.experiment
@@ -487,49 +532,201 @@ class DnnLitModule(LightningModule):
                 self.mlflow_client.log_artifacts(self.run_id,
                                                  local_dir=tmpdirname)
 
+        model_name = self.hparams.net.__class__.__name__
         # save model summary as a text file
-        # with tempfile.TemporaryDirectory() as tmpdirname:
-        #     x_shape = (1, self.net.num_electrodes, self.net.chunk_size)
-        #     summary_path = os.path.join(tmpdirname, f"{model_name}_summary.txt")
-        #     with open(summary_path, "w") as f:
-        #         sys.stdout = f
-        #         torchsummary.summary(self.net, x_shape, device="cuda")
-        #         sys.stdout = sys.__stdout__
-        #
-        #     self.mlflow_client.log_artifacts(self.run_id,
-        #                                      local_dir=tmpdirname)
-        # # save to onnx
-        # with tempfile.TemporaryDirectory() as tmpdirname:
-        #     x_tmp = torch.randn(1, 1, self.net.num_electrodes, self.net.chunk_size).cuda()
-        #     onnx_path = os.path.join(tmpdirname, f"{model_name}.onnx")
-        #     torch.onnx.export(self.net, x_tmp, onnx_path, verbose=True, input_names=["input"],
-        #                       output_names=["output"])
-        #     self.mlflow_client.log_artifacts(self.run_id,
-        #                                      local_dir=tmpdirname)
+        # FIXME : add support for other models
+        if model_name == "EEGNet":
+            with tempfile.TemporaryDirectory() as tmpdirname:
+                x_shape = (1, self.net.num_electrodes, self.net.chunk_size)
+                summary_path = os.path.join(tmpdirname, f"{model_name}_summary.txt")
+                with open(summary_path, "w") as f:
+                    sys.stdout = f
+                    torchsummary.summary(self.net, x_shape, device="cuda")
+                    sys.stdout = sys.__stdout__
 
-    def plot_summary_advanced(self, all_results, task_name="2D", image_name=None):
+                self.mlflow_client.log_artifacts(self.run_id,
+                                                 local_dir=tmpdirname)
+            # save to onnx
+            with tempfile.TemporaryDirectory() as tmpdirname:
+                x_tmp = torch.randn(1, 1, self.net.num_electrodes, self.net.chunk_size).cuda()
+                onnx_path = os.path.join(tmpdirname, f"{model_name}.onnx")
+                torch.onnx.export(self.net, x_tmp, onnx_path, verbose=True, input_names=["input"],
+                                  output_names=["output"])
+                self.mlflow_client.log_artifacts(self.run_id,
+                                                 local_dir=tmpdirname)
+
+    def plot_roc_curve_ovr(self, Y_ie, Y_pred_logits, filename=None):
+
+        if isinstance(Y_pred_logits, list):
+            Y_pred_logits = np.array(Y_pred_logits)
+
+        fig = plt.figure(figsize=(16, 10))
+        bins = [i / 20 for i in range(20)] + [1]
+
+        for i, (k, v) in enumerate(self.classes_names_dict.items()):
+            # Gets the class
+            # c = k
+            # Prepares an auxiliar dataframe to help with the plots
+            df_aux = pd.DataFrame(Y_ie)
+
+            df_aux['class'] = [1 if y == k else 0 for y in Y_ie]
+            df_aux['prob'] = Y_pred_logits[:, i]
+            df_aux = df_aux.reset_index(drop=True)
+
+            # Plots the probability distribution for the class and the rest
+            ax = plt.subplot(2, self.num_classes, i + 1)
+
+            # Assuming df_aux has columns 'prob' and 'class'
+            classes = df_aux['class'].unique()
+
+            for cls in classes:
+                subset = df_aux[df_aux['class'] == cls]
+                ax.hist(subset['prob'], bins=bins, label=cls, alpha=0.6)  # alpha is for transparency
+
+            # sns.histplot(x="prob", data=df_aux, hue='class', color='b', ax=ax, bins=bins)
+            ax.set_title(v)
+            ax.legend([f"Class: {v}", "Rest"])
+            ax.set_xlabel(f"P(x = {v})")
+
+            # Calculates the ROC Coordinates and plots the ROC Curves
+            ax_bottom = plt.subplot(2, self.num_classes, i + (self.num_classes + 1))
+            # tpr, fpr = get_all_roc_coordinates(df_aux['class'], df_aux['prob'])
+            tpr, fpr, _ = roc_curve(y_true=df_aux['class'], y_score=df_aux['prob'])
+            plot_roc_curve(tpr, fpr, scatter=False, ax=ax_bottom)
+            ax_bottom.set_title("ROC Curve OvR")
+
+        # plt.tight_layout()
+
+        # Use a temporary directory to save the plot
+        with tempfile.TemporaryDirectory() as tmpdirname:
+            plot_path = os.path.join(tmpdirname, f"{filename}.png")
+
+            plt.savefig(plot_path)  # Save the plot to the temporary directory
+            # self.mlflow_client.log_artifact(tmpdirname)
+            self.mlflow_client.log_artifacts(self.run_id,
+                                             local_dir=tmpdirname)
+        plt.close(fig)
+
+    def plot_roc_curve_ovo(self, Y_ie, Y_pred_logits, filename=None):
+
+        if isinstance(Y_pred_logits, list):
+            Y_pred_logits = np.array(Y_pred_logits)
+
+        classes_combinations = []
+
+        for i in range(self.num_classes):
+            for j in range(i + 1, self.num_classes):
+                classes_combinations.append([self.classes_names[i], self.classes_names[j]])
+                classes_combinations.append([self.classes_names[j], self.classes_names[i]])
+
+        # Plots the Probability Distributions and the ROC Curves One vs ONe
+        fig = plt.figure(figsize=(30, 30))
+        bins = [i / 20 for i in range(20)] + [1]
+
+        roc_auc_ovo = {}
+
+        for i in range(len(classes_combinations)):
+            # Gets the class
+            comb = classes_combinations[i]
+            c1 = comb[0]
+            c2 = comb[1]
+            c1_index = self.classes_names.index(c1)
+            title = c1 + " vs " + c2
+
+            # Prepares an auxiliar dataframe to help with the plots
+            df_aux = pd.DataFrame(Y_ie)
+
+            df_aux['class'] = [self.classes_names_dict[y] for y in Y_ie]
+            df_aux['prob'] = Y_pred_logits[:, c1_index]
+
+            # Slices only the subset with both classes
+            df_aux = df_aux[(df_aux['class'] == c1) | (df_aux['class'] == c2)]
+            df_aux['class'] = [1 if y == c1 else 0 for y in df_aux['class']]
+            df_aux = df_aux.reset_index(drop=True)
+
+            if i < 6:
+                # Plots the probability distribution for the class and the rest
+                ax = plt.subplot(4, 6, i + 1)
+
+                # Assuming df_aux has columns 'prob' and 'class'
+                classes = df_aux['class'].unique()
+
+                for cls in classes:
+                    subset = df_aux[df_aux['class'] == cls]
+                    ax.hist(subset['prob'], bins=bins, label=cls, alpha=0.6)  # alpha is for transparency
+
+                ax.set_title(title)
+
+                # c1_name = self.classes_names_dict[c1]
+                # c2_name = self.classes_names_dict[c2]
+
+                ax.legend([f"Class 1: {c1}", f"Class 0: {c2}"])
+                ax.set_xlabel(f"P(x = {c1})")
+
+                # Calculates the ROC Coordinates and plots the ROC Curves
+                ax_bottom = plt.subplot(4, 6, i + 7)
+                # tpr, fpr = get_all_roc_coordinates(df_aux['class'], df_aux['prob'])
+                tpr, fpr, _ = roc_curve(y_true=df_aux['class'], y_score=df_aux['prob'])
+                plot_roc_curve(tpr, fpr, scatter=False, ax=ax_bottom)
+                ax_bottom.set_title("ROC Curve OvO")
+            else:
+                # Plots the probability distribution for the class and the rest
+                ax = plt.subplot(4, 6, i + 7)
+
+                # Assuming df_aux has columns 'prob' and 'class'
+                classes = df_aux['class'].unique()
+
+                for cls in classes:
+                    subset = df_aux[df_aux['class'] == cls]
+                    ax.hist(subset['prob'], bins=bins, label=cls, alpha=0.6)  # alpha is for transparency
+
+                ax.set_title(title)
+                ax.legend([f"Class 1: {c1}", f"Class 0: {c2}"])
+                ax.set_xlabel(f"P(x = {c1})")
+                # Calculates the ROC Coordinates and plots the ROC Curves
+                ax_bottom = plt.subplot(4, 6, i + 13)
+                # tpr, fpr = get_all_roc_coordinates(df_aux['class'], df_aux['prob'])
+                tpr, fpr, _ = roc_curve(y_true=df_aux['class'], y_score=df_aux['prob'])
+
+                plot_roc_curve(tpr, fpr, scatter=False, ax=ax_bottom)
+                ax_bottom.set_title("ROC Curve OvO")
+
+            # Calculates the ROC AUC OvO
+            roc_auc_ovo[title] = roc_auc_score(df_aux['class'], df_aux['prob'])
+        # plt.tight_layout()
+
+        # Use a temporary directory to save the plot
+        with tempfile.TemporaryDirectory() as tmpdirname:
+            plot_path = os.path.join(tmpdirname, f"{filename}.png")
+
+            plt.savefig(plot_path)  # Save the plot to the temporary directory
+            # self.mlflow_client.log_artifact(tmpdirname)
+            self.mlflow_client.log_artifacts(self.run_id,
+                                             local_dir=tmpdirname)
+        plt.close(fig)
+
+    def plot_summary_advanced(self, all_results, image_name=None):
 
         # Constuct a single figure with appropriate layout for all metrics
         fig = plt.figure(layout="constrained")
-        ax1 = plt.subplot(2, 2, 1)
+        # ax1 = plt.subplot(2, 2, 1)
         ax2 = plt.subplot(2, 2, 2)
         ax3 = plt.subplot(2, 2, (3, 4))
 
-        if task_name == "2D":
+        if self.num_classes == 2:
             # ConfusionMatrix and ROC we just plot the last step, notice how we call the plot method of those metrics
-            # self.confmat.plot(val=all_results['MulticlassConfusionMatrix'], ax=ax1)
+            # self.confmat.plot(val=all_results['BinaryConfusionMatrix'], ax=ax1)
             self.roc.plot(ax=ax2)
 
-            scalar_results = {k: v for k, v in all_results.items() if isinstance(v, torch.Tensor) and v.numel() == 1}
+            scalar_results = {k: v[-1] for k, v in all_results.items() if isinstance(v, torch.Tensor)}
 
-        if task_name == "RL":
-            self.confmat.plot(val=all_results['ConfusionMatrix'], ax=ax1)
+        if self.num_classes == 4:
+            self.tracker.reset()
+            # self.confmat.plot(val=all_results['ConfusionMatrix'], ax=ax1)
             self.roc.plot(ax=ax2)
 
             # For the remainig we plot the full history, but we need to extract the scalar values from the results
-            scalar_results = [
-                {k: v for k, v in ar.items() if isinstance(v, torch.Tensor) and v.numel() == 1} for ar in all_results
-            ]
+            scalar_results = {k: v[-1] for k, v in all_results.items() if isinstance(v, torch.Tensor)}
 
         self.tracker.plot(val=scalar_results, ax=ax3)
 
@@ -541,28 +738,6 @@ class DnnLitModule(LightningModule):
             plt.close(fig)
 
     def init_metrics(self):
-
-        # ATTRIBUTES TO SAVE BATCH OUTPUTS
-        self.training_step_outputs = []  # save outputs in each batch to compute metric overall epoch
-        self.training_step_targets = []  # save targets in each batch to compute metric overall epoch
-
-        # ATTRIBUTES TO SAVE BATCH OUTPUTS
-        self.val_step_outputs = []  # save outputs in each batch to compute metric overall epoch
-        self.val_step_targets = []  # save targets in each batch to compute metric overall epoch
-
-        # ATTRIBUTES TO SAVE BATCH OUTPUTS
-        self.val_step_outputs_ie = []  # save outputs in each batch to compute metric overall epoch
-        self.val_step_targets_ie = []  # save targets in each batch to compute metric overall epoch
-
-        self.train_loss = MeanMetric()
-        self.train_f1_best = MaxMetric()
-        # Validation metric objects for calculating and averaging accuracy across batches
-        self.val_loss = MeanMetric()
-        # for tracking best so far validation accuracy (used for checkpointing/ early stopping / HPO)
-        self.val_acc_best = MaxMetric()
-        self.val_f1_best = MaxMetric()
-
-        self.test_loss = MeanMetric()
 
         if self.num_classes == 4:
             self.train_acc = Accuracy(task="multiclass", num_classes=self.num_classes)
@@ -577,7 +752,7 @@ class DnnLitModule(LightningModule):
             self.test_f1 = F1Score(task="multiclass", num_classes=self.num_classes)
 
             # Define collection that is a mix of metrics that return a scalar tensors and not
-            self.confmat = torchmetrics.classification.MulticlassConfusionMatrix(num_classes=self.num_classes)
+            # self.confmat = torchmetrics.classification.MulticlassConfusionMatrix(num_classes=self.num_classes)
             self.roc = torchmetrics.classification.MulticlassROC(num_classes=self.num_classes)
             self.mean_roc = MeanMetric()
 
@@ -585,17 +760,49 @@ class DnnLitModule(LightningModule):
                 torchmetrics.Accuracy(task="multiclass", num_classes=self.num_classes),
                 torchmetrics.Recall(task="multiclass", num_classes=self.num_classes),
                 torchmetrics.Precision(task="multiclass", num_classes=self.num_classes),
-                self.confmat,
+                # self.confmat,
             )
-            # Define tracker over the collection to easy keep track of the metrics over multiple steps
-            self.tracker = torchmetrics.wrappers.MetricTracker(self.collection)
 
         if self.num_classes == 2:
-            self.train_acc = Accuracy(task="binary", num_classes=self.num_classes)
-            self.train_f1 = F1Score(task="binary", num_classes=self.num_classes, average="macro")
+            self.train_acc = Accuracy(task="binary")
+            self.train_f1 = F1Score(task="binary", average="macro")
 
-            self.val_acc = Accuracy(task="binary", num_classes=self.num_classes)
-            self.val_f1 = F1Score(task="binary", num_classes=self.num_classes, average="macro")
+            self.val_acc = Accuracy(task="binary")
+            self.val_f1 = F1Score(task="binary", average="macro")
 
-            self.test_acc = Accuracy(task="binary", num_classes=self.num_classes)
-            self.test_f1 = F1Score(task="binary", num_classes=self.num_classes)
+            self.test_acc = Accuracy(task="binary")
+            self.test_f1 = F1Score(task="binary")
+
+            # Define collection that is a mix of metrics that return a scalar tensors and not
+            # self.confmat = torchmetrics.ConfusionMatrix(task="binary")
+            self.roc = torchmetrics.ROC(task="binary")
+            self.collection = torchmetrics.MetricCollection(
+                torchmetrics.Accuracy(task="binary"),
+                torchmetrics.Recall(task="binary"),
+                torchmetrics.Precision(task="binary"),
+                # self.confmat,
+            )
+
+        # ATTRIBUTES TO SAVE BATCH OUTPUTS
+        self.training_step_outputs = []  # save outputs in each batch to compute metric overall epoch
+        self.training_step_targets = []  # save targets in each batch to compute metric overall epoch
+
+        # ATTRIBUTES TO SAVE BATCH OUTPUTS
+        self.val_step_outputs = []  # save outputs in each batch to compute metric overall epoch
+        self.val_step_targets = []  # save targets in each batch to compute metric overall epoch
+
+        # ATTRIBUTES TO SAVE BATCH OUTPUTS
+        self.val_step_outputs_logits = []  # save outputs in each batch to compute metric overall epoch
+        self.val_step_targets_ie = []  # save targets in each batch to compute metric overall epoch
+
+        self.train_loss = MeanMetric()
+        self.train_f1_best = MaxMetric()
+        # Validation metric objects for calculating and averaging accuracy across batches
+        self.val_loss = MeanMetric()
+        # for tracking best so far validation accuracy (used for checkpointing/ early stopping / HPO)
+        self.val_acc_best = MaxMetric()
+        self.val_f1_best = MaxMetric()
+
+        self.test_loss = MeanMetric()
+        # Define tracker over the collection to easy keep track of the metrics over multiple steps
+        self.tracker = torchmetrics.wrappers.MetricTracker(self.collection)

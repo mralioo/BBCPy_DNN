@@ -5,10 +5,11 @@
 
 defaults:
   - override /hydra/sweeper: optuna
+  - override /db: default.yaml
 
 # choose metric which will be optimized by Optuna
 # make sure this is the correct name of some metric logged in lightning module!
-optimized_metric: "avg_val/acc_best"
+optimized_metric: "avg_val/f1_best"
 
 # here we define Optuna hyperparameter search
 # it optimizes for value returned from function with @hydra.main decorator
@@ -20,11 +21,12 @@ hydra:
 
     # storage URL to persist optimization results
     # for example, you can use SQLite if you set 'sqlite:///example.db'
-#    storage: postgresql://${db.username}:${db.password}@${db.hostname}:${db.port}/${db.database}
+#    storage: sqlite:///${oc.env:PROJECT_ROOT}/logs/${logger.mlflow.experiment_name}.db
+#    storage: postgresql://${db.username}:${db.password}@${db.ip_address}:${db.port}/${db.database}
     storage: null
 
     # name of the study to persist optimization results
-    study_name: eegnet_hpo
+    study_name: ${logger.mlflow.run_name}
 
     # number of parallel workers
     n_jobs: 1

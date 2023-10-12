@@ -3,6 +3,7 @@ import logging
 
 import numpy as np
 from omegaconf import OmegaConf
+from sklearn.model_selection import KFold
 
 import bbcpy
 
@@ -118,6 +119,7 @@ class SMR_Data():
                  fallback_neighbors,
                  transform,
                  normalize,
+                 process_noisy_channels
                  ):
 
         """ Initialize the SMR datamodule
@@ -127,7 +129,7 @@ class SMR_Data():
         self.srm_data_path = data_dir
         self.task_name = task_name
 
-        if self.task_name == "RL":
+        if self.task_name == "LR":
             self.classes = ["R", "L"]
         elif self.task_name == "2D":
             self.classes = ["R", "L", "U", "D"]
@@ -138,20 +140,32 @@ class SMR_Data():
 
         self.loading_data_mode = loading_data_mode
 
-        self.select_chans = OmegaConf.to_container(chans)
+        if isinstance(chans, str):
+            self.select_chans = [chans]
+        else:
+            self.select_chans = OmegaConf.to_container(chans)
+
         self.select_timepoints = ival
-        self.bands = OmegaConf.to_container(bands)
+
+        if isinstance(bands, list):
+            self.bands = bands
+        else:
+            self.bands = OmegaConf.to_container(bands)
 
         self.fallback_neighbors = fallback_neighbors
 
         self.transform = transform
 
-        if normalize:
+        if normalize is not None and not isinstance(normalize, dict):
             self.normalize = OmegaConf.to_container(normalize)
+        elif normalize is not None and isinstance(normalize, dict):
+            self.normalize = normalize
         else:
             self.normalize = None
 
         self.subjects_info_dict = {}
+
+        self.process_noisy_channels = process_noisy_channels
 
     @property
     def num_classes(self):
@@ -194,15 +208,29 @@ class SMR_Data():
     def preprocess_data(self, srm_obj):
         """ Reshape the SRM data object to the desired shape """
 
-        if (self.classes is not None) and (self.select_chans is not None) and (self.select_timepoints is not None):
-            if isinstance(self.classes, str):
-                self.classes = [self.classes]
-            if self.select_timepoints == "all":
-                obj = srm_obj[self.classes][:, self.select_chans, :].copy()
+        if isinstance(srm_obj.chans, bbcpy.datatypes.eeg.ChanUnion):
+            # for multiple channels
+            if (self.classes is not None) and (self.select_chans is not None) and (self.select_timepoints is not None):
+                if isinstance(self.classes, str):
+                    self.classes = [self.classes]
+                if self.select_timepoints == "all":
+                    obj = srm_obj[self.classes][:, :, :].copy()
+                else:
+                    obj = srm_obj[self.classes][:, :, self.select_timepoints].copy()
             else:
-                obj = srm_obj[self.classes][:, self.select_chans, self.select_timepoints].copy()
+                obj = srm_obj
+
         else:
-            obj = srm_obj
+
+            if (self.classes is not None) and (self.select_chans is not None) and (self.select_timepoints is not None):
+                if isinstance(self.classes, str):
+                    self.classes = [self.classes]
+                if self.select_timepoints == "all":
+                    obj = srm_obj[self.classes][:, self.select_chans, :].copy()
+                else:
+                    obj = srm_obj[self.classes][:, self.select_chans, self.select_timepoints].copy()
+            else:
+                obj = srm_obj
 
         return obj
 
@@ -252,7 +280,7 @@ class SMR_Data():
 
         return srm_obj, chan_dict_info
 
-    def load_forced_valid_trials_data(self, session_path):
+    def load_trials(self, session_path, load_forced_trials=False):
 
         srm_data, timepoints, srm_fs, clab, mnt, trial_info, subject_info = \
             bbcpy.load.srm_eeg.load_single_mat_session(file_path=session_path)
@@ -266,7 +294,7 @@ class SMR_Data():
         chans = remove_reference_channel(clab, mnt)
 
         # true labels
-        target_map_dict = {1: "R", 2: "L", 3: "U", 4: "D"}
+        # target_map_dict = {1: "R", 2: "L", 3: "U", 4: "D"}
         mrk_class = np.array(trial_info["targetnumber"])
         mrk_class = mrk_class.astype(int) - 1  # to start from 0
         class_names = np.array(["R", "L", "U", "D"])
@@ -303,21 +331,27 @@ class SMR_Data():
         if subject_info["noisechan"] is not None:
             # shift to left becasue of REF. channel removal
             noisy_chans_id_list = [int(chan) - 1 for chan in subject_info["noisechan"]]
-            session_info_dict["noisechans"] = {}
-            for noisy_chans_id in noisy_chans_id_list:
-                epo_data, chan_dict_info = self.referencing(epo_data.copy(),
-                                                            noisy_chans_id,
-                                                            noisy_chans_id_list,
-                                                            mode="average")
 
-                noise_chans_name = str(epo_data.chans[noisy_chans_id])
-                session_info_dict["noisechans"][noise_chans_name] = chan_dict_info
+            if self.process_noisy_channels:
+                session_info_dict["noisechans"] = {}
+                for noisy_chans_id in noisy_chans_id_list:
+                    epo_data, chan_dict_info = self.referencing(epo_data.copy(),
+                                                                noisy_chans_id,
+                                                                noisy_chans_id_list,
+                                                                mode="average")
+
+                    noise_chans_name = str(epo_data.chans[noisy_chans_id])
+                    session_info_dict["noisechans"][noise_chans_name] = chan_dict_info
+            else:
+                session_info_dict["noisechans"] = noisy_chans_id_list
+
         else:
             session_info_dict["noisechans"] = None
 
         # print("after referencing")
         # print_data_info(epo_data)
 
+        # channels configurations transformation
         if self.transform == "TSCeption":
             epo_data = transform_electrodes_configurations(epo_data.copy())
 
@@ -326,18 +360,22 @@ class SMR_Data():
         valid_trials_idx = np.where(epo_data.mrk == np.bool_(True))[0]
         valid_trials = epo_data[valid_trials_idx].copy()
 
-        # forced trials are defined as the trials where labeles are correct (true) in forcedresult
-        # and not in valid trials
-        forced_trials = trial_info["forcedresult"]
-
-        forced_trials_idx = np.setdiff1d(np.where(forced_trials == np.bool_(True))[0], valid_trials_idx)
-
-        # TODO IMPORTANT repalce y to forced y trials
-        forced_trials = epo_data[forced_trials_idx].copy()
+        forced_trials = np.array(None)
 
         # preprocess the data
         valid_trials = self.preprocess_data(valid_trials)
-        forced_trials = self.preprocess_data(forced_trials)
+
+        if load_forced_trials:
+            # forced trials are defined as the trials where labeles are correct (true) in forcedresult
+            # and not in valid trials
+            forced_trials = trial_info["forcedresult"]
+
+            forced_trials_idx = np.setdiff1d(np.where(forced_trials == np.bool_(True))[0], valid_trials_idx)
+
+            # TODO IMPORTANT repalce y to forced y trials
+            forced_trials = epo_data[forced_trials_idx].copy()
+
+            forced_trials = self.preprocess_data(forced_trials)
 
         # save subject info
         session_info_dict["shapes"] = {"valid_trials": valid_trials.shape,
@@ -356,7 +394,7 @@ class SMR_Data():
             # load data
             logging.info(f"Loading session {session_name} ...")
             valid_obj_new, forced_obj_new, session_info_dict = \
-                self.load_forced_valid_trials_data(session_path)
+                self.load_trials(session_path)
 
             logging.info(f"valid trials shape: {valid_obj_new.shape},"
                          f"forced trials shape: {forced_obj_new.shape}")
@@ -408,6 +446,7 @@ class SMR_Data():
     def append_sessions(self, sessions_data_dict, sessions_info_dict, ignore_noisy_sessions=False):
         """ Append all the subjects sessions """
 
+        # FIXME : not completed: check how many noisy channels has a sessions
         valid_trials = None
         for session_name, session_data in sessions_data_dict.items():
             # check if the session has noisy channels
@@ -508,29 +547,47 @@ class SMR_Data():
         else:
             raise Exception(f"Loading data mode {self.loading_data_mode} not supported")
 
-    def train_valid_split(self, data, train_val_split_dict):
-        """ Split the data into train and validation sets """
 
-        random_seed = train_val_split_dict["random_seed"]
-        val_ratio = train_val_split_dict["val_size"]
+def train_valid_split(data, train_val_split_dict):
+    """ Split the data into train and validation sets """
 
-        # Set the random seed for reproducibility
-        np.random.seed(random_seed)
+    random_seed = train_val_split_dict["random_seed"]
+    val_ratio = train_val_split_dict["val_size"]
 
-        # Shuffle the data
-        # TODO : Shuffle the SMR data object
-        indices = np.random.permutation(len(data))
-        data = data[indices]
-        data.y = data.y[indices]
+    # Set the random seed for reproducibility
+    np.random.seed(random_seed)
 
-        # Compute the index where the validation set starts
-        val_start_idx = int(len(data) * (1 - val_ratio))
+    # Shuffle the data
+    # TODO : Shuffle the SMR data object
+    indices = np.random.permutation(len(data))
+    data = data[indices]
+    data.y = data.y[indices]
 
-        # Split the data into training and validation sets
-        train_data = data[:val_start_idx]
-        val_data = data[val_start_idx:]
+    # Compute the index where the validation set starts
+    val_start_idx = int(len(data) * (1 - val_ratio))
 
-        return train_data, val_data
+    # Split the data into training and validation sets
+    train_data = data[:val_start_idx]
+    val_data = data[val_start_idx:]
+
+    return train_data, val_data
+
+
+def cross_validation(data, cross_validation_dict, kfold_idx):
+    kf = KFold(n_splits=cross_validation_dict["num_splits"],
+               shuffle=True,
+               random_state=cross_validation_dict["split_seed"])
+
+    all_splits_trial_kf = [k for k in kf.split(data)]
+
+    train_indexes, val_indexes = all_splits_trial_kf[kfold_idx]
+
+    train_indexes, val_indexes = train_indexes.tolist(), val_indexes.tolist()
+
+    train_data, val_data = (data[train_indexes],
+                            data[val_indexes])
+
+    return train_data, val_data
 
 
 def normalize(data, norm_type="std", axis=None, keepdims=True, eps=10 ** -5, norm_params=None):
@@ -596,3 +653,61 @@ def unnormalize(data_norm, norm_params):
     elif norm_params["norm_type"] == "minmax":
         data = data_norm * (norm_params["max"] - norm_params["min"]) + norm_params["min"]
     return data
+
+
+if "__main__" == __name__:
+    # Using a raw string
+    from pathlib import Path
+
+    data_dir = Path("D:\\SMR\\")
+    task_name = "LR"
+    subject_sessions_dict = {"S4": "all"}
+    loading_data_mode = "within_subject"
+    ival = "2s:10s:10ms"
+    bands = [8, 13]
+    chans = "*"
+    fallback_neighbors = 4
+    transform = None
+    normalize_dict = {"norm_type": "std", "norm_axis": 0}
+
+    smr_datamodule = SMR_Data(data_dir=data_dir,
+                              task_name=task_name,
+                              subject_sessions_dict=subject_sessions_dict,
+                              loading_data_mode=loading_data_mode,
+                              ival=ival,
+                              bands=bands,
+                              chans=chans,
+                              fallback_neighbors=fallback_neighbors,
+                              transform=transform,
+                              normalize=normalize_dict,
+                              process_noisy_channels=False)
+
+    subjects_sessions_path_dict = smr_datamodule.collect_subject_sessions(subject_sessions_dict)
+    subject_data_dict, subjects_info_dict = smr_datamodule.load_subjects_sessions(subjects_sessions_path_dict)
+
+    subject_name = list(subject_data_dict.keys())[0]
+    loaded_subject_sessions = subject_data_dict[subject_name]
+    loaded_subject_sessions_info = subjects_info_dict[subject_name]["sessions_info"]
+
+    # append the sessions (FIXME : forced trials are not used)
+    valid_trials = smr_datamodule.append_sessions(loaded_subject_sessions,
+                                                  loaded_subject_sessions_info)
+
+    from bbcpy.visual.scalp import map
+
+    map(valid_trials, valid_trials.chans)
+
+    ival = [[160, 200], [230, 260], [300, 320], [380, 430]]
+
+    rows = len(mrk_classname)
+    cols = len(ival)
+
+    plt.figure(figsize=(18, 7))
+    for [klass_idx, klass_name] in enumerate(mrk_classname):
+        for [interval_idx, [start, end]] in enumerate(ival):
+            plot_idx = klass_idx * cols + interval_idx + 1
+            plt.subplot(height, width, plot_idx)
+
+            indices = (epo_t >= start) & (epo_t <= end)
+            mean = np.mean(epo[indices, :, :][:, :, mrk_class == klass_idx], axis=(0, 2))
+            bci.scalpmap(mnt, mean)

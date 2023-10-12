@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH --job-name=riemann-tangent-S1
-#SBATCH --partition=cpu-2h
+#SBATCH --partition=cpu-5h
 #SBATCH --gpus-per-node=0
 #SBATCH --ntasks-per-node=8
 #SBATCH --output=../jobs_outputs/riemann-tangent-S1/%x_%j.o

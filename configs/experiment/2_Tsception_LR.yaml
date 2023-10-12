@@ -14,11 +14,9 @@ defaults:
 # all parameters below will be merged with parameters from default configurations set above
 # this allows you to overwrite only specified parameters
 
-tags: [ "torcheeg", "Tsception", "Cross-Subjects", "HPO", "LR"]
+tags: [ "torcheeg", "TSCeption", "Within-Subject", "RL" ]
 
 seed: 12345
-
-optimized_metric: "avg_val/acc_best"
 
 data:
   task_name: "LR"
@@ -26,22 +24,30 @@ data:
   chans: [ "*" ]
   bands:
     - 8
-    - 30
+    - 40
   loading_data_mode: "cross_subject_hpo"
   transform: "TSCeption"
   normalize: { norm_type: "std", norm_axis: 0 }
   train_val_split: False
   cross_validation: { num_splits: 3, split_seed: 1234 }
-  batch_size: 32
+  batch_size: 128
   num_workers: 4
   pin_memory: True
 
 model:
+  criterion:
+    _target_: torch.nn.BCEWithLogitsLoss
+    _partial_: true
   plots_settings:
     plot_every_n_epoch: 10
   net:
     num_classes: 2
     num_electrodes: 54
+    sampling_rate: 500
+    num_T: 15
+    num_S: 20
+    hid_channels: 32
+    dropout: 0.5
 
 trainer:
   min_epochs: 30
@@ -51,13 +57,13 @@ trainer:
 paths:
   root_dir: ${oc.env:PROJECT_ROOT}
   data_dir: /input-data
-  log_dir: ${oc.env:PROJECT_ROOT}/logs/dnn
+  log_dir: ${oc.env:PROJECT_ROOT}/logs
   output_dir: ${hydra:runtime.output_dir}
   work_dir: ${hydra:runtime.cwd}
 
 logger:
   mlflow:
-    experiment_name: TSception-HPO-NORM
+    experiment_name: TSception-HPO-LR
     run_name: S1
 
 callbacks:
@@ -71,5 +77,5 @@ callbacks:
 
   early_stopping:
     monitor: "val/acc_best"
-    patience: 10
+    patience: 50
     mode: "max"

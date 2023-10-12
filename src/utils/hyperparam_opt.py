@@ -41,6 +41,11 @@ def _get_class(step_class):
     return class_, class_name
 
 
+def overide_pipeline_best_params(pipeline, best_params):
+    pass
+
+
+
 def optimize_hyperparams(cfg, pipeline):
     """
     Runs hyperparameter optmization based on hydra's definitions
@@ -80,8 +85,8 @@ def optimize_hyperparams(cfg, pipeline):
     return class_(estimator=pipeline,
                   param_grid=param_space["param_grid"],
                   scoring=scorer,
-                  cv=cfg.hyperparam_opt.cv, )
-    # n_jobs=cfg.hyperparam_opt.n_jobs)
+                  cv=cfg.hyperparam_opt.cv)
+                  # n_jobs=cfg.hyperparam_opt.n_jobs)
 
 
 class BayesianOptCV(BaseSearchCV):

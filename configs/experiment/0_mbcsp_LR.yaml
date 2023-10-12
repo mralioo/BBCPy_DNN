@@ -5,7 +5,7 @@
 
 defaults:
   - override /data: srm_eeg.yaml
-  - override /model: riemann_tangent_clf.yaml
+  - override /model: mbcsp_clf.yaml
   - override /trainer: sklearn.yaml
   - override /logger: mlflow.yaml
   - override /paths: default.yaml
@@ -13,20 +13,21 @@ defaults:
 # all parameters below will be merged with parameters from default configurations set above
 # this allows you to overwrite only specified parameters
 
-tags: [ "baseline" , "alpha_band" , "Within-Subject" , "RL"]
+tags: [ "baseline" , "multi-band" , "Within-Subject" , "LR"]
 
 seed: 12345
 
 data:
+  task_name: "LR"
   ival: 1s:10s:1ms
-  bands:
-    - 8
-    - 13
+  bands: [ [ 8, 13 ], [ 21, 26 ], [ 31.5, 39 ] ]
   chans: [ "*" ]
-  classes:
-    - "R"
-    - "L"
   loading_data_mode: "within_subject"
+  normalize: { norm_type: "std", norm_axis: 0 }
+  transform: None
+
+trainer:
+  train_val_split: { val_size: 0.2, random_seed: 1234 }
 
 paths:
   root_dir: ${oc.env:PROJECT_ROOT}
@@ -39,4 +40,4 @@ logger:
   mlflow:
     tags: ${tags}
     experiment_name: A-RL-S1-all
-    run_name: riemann_tangent
+    run_name: mbcsp

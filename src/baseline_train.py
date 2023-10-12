@@ -1,13 +1,15 @@
-import os
-from typing import Optional, Tuple
+from typing import Optional, Tuple, Any
 
 import hydra
 import numpy as np
 import pyrootutils
+from lightning import Callback
 from omegaconf import DictConfig
+import gc
 
 import bbcpy
-from data.smr_datamodule import SMR_Data
+
+
 from trainer.baseline_trainer import SklearnTrainer
 
 pyrootutils.setup_root(__file__, indicator=".project-root", pythonpath=True)
@@ -29,12 +31,13 @@ pyrootutils.setup_root(__file__, indicator=".project-root", pythonpath=True)
 # ------------------------------------------------------------------------------------ #
 
 from src import utils
+from src.data.smr_datamodule import SMR_Data
 
 log = utils.get_pylogger(__name__)
 
 
 @utils.task_wrapper
-def train(cfg: DictConfig) -> dict:
+def train(cfg: DictConfig) -> Tuple[dict, dict]:
     """Trains the model. Can additionally evaluate on a testset, using best weights obtained during
     training.
 
@@ -73,6 +76,8 @@ def train(cfg: DictConfig) -> dict:
                                                       logger=logger,
                                                       hyperparameter_search=hyperparameter_search)
 
+    metric_dict = {}
+
     object_dict = {
         "cfg": cfg,
         "datamodule": datamodule,
@@ -84,23 +89,28 @@ def train(cfg: DictConfig) -> dict:
 
     hparams = utils.log_sklearn_hyperparameters(object_dict)
 
-    if cfg.get("train"):
-        log.info("Starting training!")
-        metric_dict = trainer.train(pipeline=pipeline,
-                                    hparams=hparams)
-        log.info("Training finished!")
-
     if cfg.get("tune"):
         log.info("Starting hyperparameter search!")
         metric_dict = trainer.search_hyperparams(pipeline=pipeline,
                                                  hparams=hparams)
         log.info("Hyperparameter search finished!")
 
+    if cfg.get("train"):
+        log.info("Starting training!")
+        metric_dict = trainer.train(pipeline=pipeline,
+                                    hparams=hparams)
+        log.info("Training finished!")
+
     if cfg.get("test"):
         log.info("Starting testing!")
         metric_dict = trainer.test(pipeline=pipeline,
                                    datamodule=datamodule)
         log.info("Training finished!")
+
+    # clean up
+    del datamodule, pipeline, callbacks, logger, trainer
+
+    gc.collect()
 
     return metric_dict, object_dict
 
@@ -116,13 +126,17 @@ def main(cfg: DictConfig) -> Optional[float]:
     # train the model
     metric_dict, _ = train(cfg)
 
+    # TODO: save metrics fro later
+    # subject_name =list(cfg.data.subject_sessions_dict.keys())[0]
+    #
+
     # # safely retrieve metric value for hydra-based hyperparameter optimization
-    metric_value = utils.get_metric_value(
-        metric_dict=metric_dict, metric_name=cfg.get("optimized_metric")
-    )
+    # metric_value = utils.get_metric_value(
+    #     metric_dict=metric_dict, metric_name=cfg.get("optimized_metric")
+    # )
 
     # return optimized metric
-    return metric_value
+    return metric_dict
 
 
 if __name__ == "__main__":

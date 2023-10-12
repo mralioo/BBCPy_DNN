@@ -4,7 +4,7 @@
 # python train.py experiment=example
 defaults:
   - override /data: smr_datamodule.yaml
-  - override /model: TSCeption.yaml
+  - override /model: eegconformer.yaml
   - override /trainer: gpu.yaml
   - override /paths: default.yaml
   - override /extras: default.yaml
@@ -14,12 +14,12 @@ defaults:
 # all parameters below will be merged with parameters from default configurations set above
 # this allows you to overwrite only specified parameters
 
-tags: [ "torcheeg", "TSCeption", "Within-Subject", "RL" ]
+tags: ["transformer-v1","Within-Subject", "2D"]
 
 seed: 12345
 
-data:
-  task_name: "LR"
+ata:
+  task_name: "2D"
   ival: 1s:10s:1ms
   chans: [ "*" ]
   bands:
@@ -53,5 +53,6 @@ paths:
 
 logger:
   mlflow:
-    experiment_name: TSception-HPO-NORM
+    experiment_name: Transformer-HPO-NORM
     run_name: S1
+

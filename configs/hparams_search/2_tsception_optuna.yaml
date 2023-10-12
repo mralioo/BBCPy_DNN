@@ -5,10 +5,11 @@
 
 defaults:
   - override /hydra/sweeper: optuna
+  - override /logger: mlflow_lightning.yaml
 
 # choose metric which will be optimized by Optuna
 # make sure this is the correct name of some metric logged in lightning module!
-optimized_metric: "val/acc_best"
+optimized_metric: "avg_val/f1_best"
 
 # here we define Optuna hyperparameter search
 # it optimizes for value returned from function with @hydra.main decorator
@@ -20,19 +21,20 @@ hydra:
 
     # storage URL to persist optimization results
     # for example, you can use SQLite if you set 'sqlite:///example.db'
+#    storage: sqlite:////${oc.env:PROJECT_ROOT}/logs/${logger.mlflow.experiment_name}.db
     storage: null
 
     # name of the study to persist optimization results
-    study_name: tsception_hpo
+    study_name: ${logger.mlflow.run_name}
 
     # number of parallel workers
-    n_jobs: 2
+    n_jobs: 1
 
     # 'minimize' or 'maximize' the objective
     direction: maximize
 
     # total number of runs that will be executed
-    n_trials: 20
+    n_trials: 10
 
     # choose Optuna hyperparameter sampler
     # you can choose bayesian sampler (tpe), random search (without optimization), grid sampler, and others
@@ -46,7 +48,7 @@ hydra:
     params:
       model.optimizer.lr: interval(0.0001, 0.1)
       data.batch_size: choice(32, 64, 128)
-      model.net.sampling_rate: choice(1000, 2000, 4000)
+      model.net.sampling_rate: choice(500, 1000, 2000)
       model.net.num_T: choice(10, 15, 20)
       model.net.num_S: choice(10, 15, 20)
       model.net.hid_channels: choice(32, 64, 128)

@@ -4,7 +4,7 @@
 # python train.py experiment=example
 defaults:
   - override /data: smr_datamodule.yaml
-  - override /model: eegnet.yaml
+  - override /model: TSCeption.yaml
   - override /trainer: gpu.yaml
   - override /paths: default.yaml
   - override /extras: default.yaml
@@ -14,11 +14,9 @@ defaults:
 # all parameters below will be merged with parameters from default configurations set above
 # this allows you to overwrite only specified parameters
 
-tags: [ "torcheeg", "EEGNET-v1","Within-Subject", "2D"]
+tags: [ "torcheeg", "TSCeption", "Within-Subject", "2D" ]
 
 seed: 12345
-
-optimized_metric: "val/acc_best"
 
 data:
   task_name: "2D"
@@ -26,40 +24,47 @@ data:
   chans: [ "*" ]
   bands:
     - 8
-    - 30
+    - 40
   loading_data_mode: "cross_subject_hpo"
-  train_val_split: False
-  cross_validation: { num_splits: 5, split_seed: 1234 }
-  transform: False
+  transform: "TSCeption"
   normalize: { norm_type: "std", norm_axis: 0 }
+  train_val_split: False
+  cross_validation: { num_splits: 3, split_seed: 1234 }
   batch_size: 32
   num_workers: 4
   pin_memory: True
 
 model:
-  net:
-    chunk_size: 9000
-    num_classes: 4
+  criterion:
+    _target_: torch.nn.CrossEntropyLoss
+    _partial_: true
   plots_settings:
-    plot_every_n_epoch: 10
+    plot_every_n_epoch: 20
+  net:
+    num_classes: 4
+    num_electrodes: 54
+    sampling_rate: 1000
+    num_T: 10
+    num_S: 15
+    hid_channels: 128
+    dropout: 0.5
 
 trainer:
-  min_epochs: 30
-  max_epochs: 60
+  min_epochs: 50
+  max_epochs: 100
   check_val_every_n_epoch: 1
-  precision: 16
 
 paths:
   root_dir: ${oc.env:PROJECT_ROOT}
   data_dir: /input-data
-  log_dir: ${oc.env:PROJECT_ROOT}/logs/dnn
+  log_dir: ${oc.env:PROJECT_ROOT}/logs
   output_dir: ${hydra:runtime.output_dir}
   work_dir: ${hydra:runtime.cwd}
 
 logger:
   mlflow:
-    experiment_name: EEGNET-HPO-2D
-    run_name: S6
+    experiment_name: TSception-HPO-2D
+    run_name: S1
 
 callbacks:
   model_checkpoint:
@@ -72,5 +77,5 @@ callbacks:
 
   early_stopping:
     monitor: "val/acc_best"
-    patience: 30
+    patience: 50
     mode: "max"

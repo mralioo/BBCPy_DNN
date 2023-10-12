@@ -3,7 +3,7 @@ _target_: src.trainer.baseline_trainer.SklearnTrainer
 cv:
   _target_: sklearn.model_selection.KFold
   n_splits: 5
-  shuffle: False
+  shuffle: True
 
 #default_root_dir: ${paths.output_dir}
 #
