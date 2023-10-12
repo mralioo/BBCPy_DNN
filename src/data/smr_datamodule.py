@@ -499,7 +499,6 @@ class SMR_Data():
 
             subject_name = list(subject_data_dict.keys())[0]
 
-
             loaded_subject_sessions = subject_data_dict[subject_name]
             loaded_subject_sessions_info = subjects_info_dict[subject_name]["sessions_info"]
 
@@ -695,6 +694,7 @@ if "__main__" == __name__:
                                                   loaded_subject_sessions_info)
 
     from bbcpy.visual.scalp import map
+
     map(valid_trials, valid_trials.chans)
 
     ival = [[160, 200], [230, 260], [300, 320], [380, 430]]
