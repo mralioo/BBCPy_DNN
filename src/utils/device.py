@@ -1,6 +1,8 @@
 import os
 import subprocess
 import multiprocessing
+
+import numpy as np
 import psutil
 import torch
 import GPUtil
@@ -75,3 +77,11 @@ def print_gpu_memory():
         print(f"  Free Memory: {gpu.memoryFree} MB")
         print(f"  Used Memory: {gpu.memoryUsed} MB")
         print("")
+
+
+def print_data_info(srm_obj):
+    print("data shape: ", srm_obj.shape)
+    print("max timepoints: ", np.max(srm_obj))
+    print("min timepoints: ", np.min(srm_obj))
+    print("mean timepoints: ", np.mean(srm_obj))
+    print("std timepoints: ", np.std(srm_obj))
