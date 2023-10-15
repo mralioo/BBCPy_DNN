@@ -287,7 +287,7 @@ class DnnLitModule(LightningModule):
         hparams = {}
         state_dict = self.trainer.datamodule.state_dict(stage="test")
         # FIXME
-        hparams["data_type"] = "forced_trials"
+        hparams["data_type"] = "Run 3 & 6"
         hparams["test_data_shape"] = state_dict["test_data_shape"]
         hparams["test_classes_weights"] = state_dict["test_classes_weights"]
         hparams["test_stats"] = state_dict["test_stats"]

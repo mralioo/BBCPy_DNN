@@ -47,12 +47,14 @@ class SRM_DataModule(LightningDataModule):
     def __init__(self,
                  data_dir,
                  task_name,
+                 trial_type,
                  ival,
                  bands,
                  chans,
                  subject_sessions_dict,
                  loading_data_mode,
                  process_noisy_channels,
+                 ignore_noisy_sessions,
                  fallback_neighbors,
                  transform,
                  normalize,
@@ -67,22 +69,19 @@ class SRM_DataModule(LightningDataModule):
 
         # data params
         self.task_name = task_name
-
-        if self.task_name == "RL":
-            self.classes = ["R", "L"]
-        elif self.task_name == "UD":
-            self.classes = ["U", "D"]
-        elif self.task_name == "2D":
-            self.classes = ["R", "L", "U", "D"]
-
+        self.trial_type = trial_type
+        self.process_noisy_channels = process_noisy_channels
+        self.ignore_noisy_sessions = ignore_noisy_sessions
+        self.fallback_neighbors = fallback_neighbors
+        # preprocessing params
         self.ival = ival
         self.bands = bands
         self.chans = chans
+
         self.loading_data_mode = loading_data_mode
-        self.fallback_neighbors = fallback_neighbors
         self.transform = transform
         self.normalize = normalize
-        self.process_noisy_channels = process_noisy_channels
+
         self.subject_sessions_dict = subject_sessions_dict
 
         if train_val_split:
@@ -116,6 +115,7 @@ class SRM_DataModule(LightningDataModule):
         """Load raw data from files."""
         self.smr_datamodule = SMR_Data(data_dir=self.data_dir,
                                        task_name=self.task_name,
+                                       trial_type=self.trial_type,
                                        subject_sessions_dict=self.subject_sessions_dict,
                                        loading_data_mode=self.loading_data_mode,
                                        ival=self.ival,
@@ -124,7 +124,8 @@ class SRM_DataModule(LightningDataModule):
                                        fallback_neighbors=self.fallback_neighbors,
                                        transform=self.transform,
                                        normalize=self.normalize,
-                                       process_noisy_channels=self.process_noisy_channels, )
+                                       process_noisy_channels=self.process_noisy_channels,
+                                       ignore_noisy_sessions=self.ignore_noisy_sessions)
 
         self.smr_datamodule.prepare_dataloader()
         # Info about resources
@@ -134,7 +135,7 @@ class SRM_DataModule(LightningDataModule):
 
     @property
     def num_classes(self):
-        return len(self.classes)
+        return len(self.smr_datamodule.classes)
 
     def update_kfold_index(self, k):
         self.k = k
@@ -147,13 +148,13 @@ class SRM_DataModule(LightningDataModule):
         if self.train_val_split:
             logging.info("Train and validation split strategy")
 
-            self.train_data, self.val_data = train_valid_split(self.smr_datamodule.valid_trials,
+            self.train_data, self.val_data = train_valid_split(self.smr_datamodule.train_trials,
                                                                self.train_val_split)
 
         if self.cross_validation:
             logging.info("Cross validation strategy; k-fold")
 
-            self.train_data, self.val_data = cross_validation(self.smr_datamodule.valid_trials,
+            self.train_data, self.val_data = cross_validation(self.smr_datamodule.train_trials,
                                                               self.cross_validation,
                                                               self.k)
 
@@ -176,7 +177,7 @@ class SRM_DataModule(LightningDataModule):
             logging.info("Loading test data...")
             # FIXME : what is the right why to normlize data for test set?
             # self.testing_set = SRMDataset(data=self.smr_datamodule.forced_trials)
-            self.testing_set = SRMDataset(data=self.smr_datamodule.valid_trials)
+            self.testing_set = SRMDataset(data=self.smr_datamodule.test_trials)
 
     def train_dataloader(self):
         return DataLoader(self.training_set,
@@ -236,10 +237,10 @@ class SRM_DataModule(LightningDataModule):
                               "valid_stats": self.validation_set.statistical_info()}
             if stage == "test":
                 state_dict = {"task_name": self.task_name,
-                              "subjects_info_dict": self.smr_datamodule.subjects_info_dict, }
-                # "test_data_shape": self.testing_set.data.shape,
-                # "test_classes_weights": self.testing_set.classes_weights(),
-                # "test_stats": self.testing_set.statistical_info()}
+                              "subjects_info_dict": self.smr_datamodule.subjects_info_dict,
+                              "test_data_shape": self.testing_set.data.shape,
+                              "test_classes_weights": self.testing_set.classes_weights(),
+                              "test_stats": self.testing_set.statistical_info()}
 
             return state_dict
 
