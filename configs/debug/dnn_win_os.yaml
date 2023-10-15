@@ -36,34 +36,37 @@ logger:
 model:
   net:
 #    chunk_size: 900
-    num_classes: 2
+    num_classes: 4
   plots_settings:
     plot_every_n_epoch: 1
 
 data:
-  task_name: "LR"
+  task_name: "2D"
+  trial_type: "forced"
   ival: 1s:10s:10ms
   chans: [ "*" ]
   loading_data_mode: "within_subject"
+  process_noisy_channels: True
+  ignore_noisy_sessions: False
   subject_sessions_dict:
-    S4: "all"
+    S1: "all"
 #    S5: "all"
   transform: "TSCeption"
   normalize: { norm_type: "std", norm_axis: 0 }
   train_val_split: { val_size: 0.2, random_seed: 42 }
   cross_validation: False
   batch_size: 32
-  num_workers: 6
+  num_workers: 4
   pin_memory: False
 
 trainer:
   min_epochs: 1 # prevents early stopping
-  max_epochs: 10
+  max_epochs: 5
   check_val_every_n_epoch: 1  # perform a validation loop every N training epochs
   #  precision: 16
   num_sanity_val_steps: 1
-  deterministic: False
-  accumulate_grad_batches: 1
+#  deterministic: False
+#  accumulate_grad_batches: 1
 #  gradient_clip_val: 1.0
 
 callbacks:

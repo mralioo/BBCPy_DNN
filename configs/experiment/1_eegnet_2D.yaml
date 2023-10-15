@@ -22,14 +22,17 @@ optimized_metric: "val/acc_best"
 
 data:
   task_name: "2D"
+  trial_type: "valid"
   ival: 1s:10s:1ms
   chans: [ "*" ]
   bands:
     - 8
     - 30
-  loading_data_mode: "cross_subject_hpo"
+  loading_data_mode: "within_subject"
+  process_noisy_channels: True
+  ignore_noisy_sessions: False
   train_val_split: False
-  cross_validation: { num_splits: 3, split_seed: 1234 }
+  cross_validation: { num_splits: 5, split_seed: 1234 }
   transform: False
   normalize: { norm_type: "std", norm_axis: 0 }
   batch_size: 128

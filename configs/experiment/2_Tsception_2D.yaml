@@ -20,17 +20,20 @@ seed: 12345
 
 data:
   task_name: "2D"
+  trial_type: "valid"
   ival: 1s:10s:1ms
   chans: [ "*" ]
   bands:
     - 8
-    - 40
-  loading_data_mode: "cross_subject_hpo"
+    - 30
+  loading_data_mode: "within_subject"
+  process_noisy_channels: True
+  ignore_noisy_sessions: False
+  train_val_split: False
+  cross_validation: { num_splits: 5, split_seed: 1234 }
   transform: "TSCeption"
   normalize: { norm_type: "std", norm_axis: 0 }
-  train_val_split: False
-  cross_validation: { num_splits: 3, split_seed: 1234 }
-  batch_size: 32
+  batch_size: 128
   num_workers: 4
   pin_memory: True
 
