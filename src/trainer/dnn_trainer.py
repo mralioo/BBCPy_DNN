@@ -740,16 +740,16 @@ class DnnLitModule(LightningModule):
     def init_metrics(self):
 
         if self.num_classes == 4:
-            self.train_acc = Accuracy(task="multiclass", num_classes=self.num_classes)
+            self.train_acc = Accuracy(task="multiclass", num_classes=self.num_classes, average="macro")
             self.train_f1 = F1Score(task="multiclass", num_classes=self.num_classes, average="macro")
 
             # Validation metric objects for calculating and averaging accuracy across batches
-            self.val_acc = Accuracy(task="multiclass", num_classes=self.num_classes)
+            self.val_acc = Accuracy(task="multiclass", num_classes=self.num_classes, average="macro")
             self.val_f1 = F1Score(task="multiclass", num_classes=self.num_classes, average="macro")
 
             # Testing metric objects for calculating and averaging accuracy across batches
-            self.test_acc = Accuracy(task="multiclass", num_classes=self.num_classes)
-            self.test_f1 = F1Score(task="multiclass", num_classes=self.num_classes)
+            self.test_acc = Accuracy(task="multiclass", num_classes=self.num_classes, average="macro")
+            self.test_f1 = F1Score(task="multiclass", num_classes=self.num_classes, average="macro")
 
             # Define collection that is a mix of metrics that return a scalar tensors and not
             # self.confmat = torchmetrics.classification.MulticlassConfusionMatrix(num_classes=self.num_classes)

@@ -59,7 +59,6 @@ class SklearnTrainer(object):
         self.classes_names_dict = {}
         if self.task_name == "LR":
             self.classes_names_dict = {0: "R", 1: "L"}
-
         if self.task_name == "2D":
             self.classes_names_dict = {0: "R", 1: "L", 2: "U", 3: "D"}
 
