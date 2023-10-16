@@ -740,16 +740,17 @@ class DnnLitModule(LightningModule):
     def init_metrics(self):
 
         if self.num_classes == 4:
-            self.train_acc = Accuracy(task="multiclass", num_classes=self.num_classes, average="macro")
-            self.train_f1 = F1Score(task="multiclass", num_classes=self.num_classes, average="macro")
+            average_type = "micro"
+            self.train_acc = Accuracy(task="multiclass", num_classes=self.num_classes, average=average_type)
+            self.train_f1 = F1Score(task="multiclass", num_classes=self.num_classes, average=average_type)
 
             # Validation metric objects for calculating and averaging accuracy across batches
-            self.val_acc = Accuracy(task="multiclass", num_classes=self.num_classes, average="macro")
-            self.val_f1 = F1Score(task="multiclass", num_classes=self.num_classes, average="macro")
+            self.val_acc = Accuracy(task="multiclass", num_classes=self.num_classes, average=average_type)
+            self.val_f1 = F1Score(task="multiclass", num_classes=self.num_classes, average=average_type)
 
             # Testing metric objects for calculating and averaging accuracy across batches
-            self.test_acc = Accuracy(task="multiclass", num_classes=self.num_classes, average="macro")
-            self.test_f1 = F1Score(task="multiclass", num_classes=self.num_classes, average="macro")
+            self.test_acc = Accuracy(task="multiclass", num_classes=self.num_classes, average=average_type)
+            self.test_f1 = F1Score(task="multiclass", num_classes=self.num_classes, average=average_type)
 
             # Define collection that is a mix of metrics that return a scalar tensors and not
             # self.confmat = torchmetrics.classification.MulticlassConfusionMatrix(num_classes=self.num_classes)

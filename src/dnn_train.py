@@ -134,28 +134,30 @@ def main(cfg: DictConfig) -> Optional[float]:
     # save metrics to csv file for later analysis
     model_name = cfg.model.net._target_.split(".")[-1]
     subject_name = list(cfg.data.subject_sessions_dict.keys())[0]
+    task_name = cfg.data.task_name
     os.makedirs(cfg.paths.results_dir, exist_ok=True)
-    csv_file_path = Path(f"{cfg.paths.results_dir}/{model_name}_{subject_name}.csv")
+    csv_file_path = Path(f"{cfg.paths.results_dir}/{task_name}_{model_name}_{subject_name}.csv")
 
     # Convert tensors to float values
     metrics = {key: value.item() if hasattr(value, 'item') else value for key, value in metric_dict.items()}
-    filtered_metrics = {key: value for key, value in metrics.items() if
-                        'best' in key or key.startswith('test/')}
+    log.info(f"Metrics: {metrics}")
+    # filtered_metrics = {key: value for key, value in metrics.items() if
+    #                     'best' in key or key.startswith('test/')}
     # Open the CSV file in write mode
     with open(csv_file_path, mode='w', newline='') as file:
-        writer = csv.DictWriter(file, fieldnames=filtered_metrics.keys())
-
+        writer = csv.DictWriter(file, fieldnames=metrics.keys())
         # Write the header
         writer.writeheader()
-
         # Write the metrics values
-        writer.writerow(filtered_metrics)
+        writer.writerow(metrics)
 
     # safely retrieve metric value for hydra-based hyperparameter optimization
     metric_value = utils.get_metric_value(
         metric_dict=metric_dict, metric_name=cfg.get("optimized_metric")
     )
-    print(metric_value)
+    optimized_metric = cfg.get("optimized_metric")
+
+    log.info(f"{optimized_metric}: {metric_value}")
 
     # return optimized metric
     return metric_value
