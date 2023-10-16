@@ -84,7 +84,7 @@ class DnnLitModule(LightningModule):
         logits = self.forward(x)
 
         if self.num_classes == 2:
-            probs = F.softmax(logits, dim=1)
+            probs = F.sigmoid(logits)
         if self.num_classes > 2:
             probs = F.softmax(logits, dim=1)
 
@@ -106,7 +106,7 @@ class DnnLitModule(LightningModule):
         logits = self.forward(x)
 
         if self.num_classes == 2:
-            probs = F.softmax(logits, dim=1)
+            probs = F.sigmoid(logits)
         if self.num_classes > 2:
             probs = F.softmax(logits, dim=1)
 
