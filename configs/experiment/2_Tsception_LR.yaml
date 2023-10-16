@@ -70,7 +70,7 @@ logger:
   mlflow:
     experiment_name: TSception-HPO-LR
     run_name: S1
-    tracking_uri: ${paths.log_dir}/best_runs/mlruns
+    tracking_uri: file:${paths.log_dir}/best_runs
   csv:
     _target_: lightning.pytorch.loggers.csv_logs.CSVLogger
     save_dir: ${paths.output_dir}/${logger.mlflow.experiment_name}/${logger.mlflow.run_name}
