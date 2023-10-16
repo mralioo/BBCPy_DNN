@@ -18,6 +18,8 @@ tags: [ "torcheeg", "TSCeption", "Within-Subject", "RL" ]
 
 seed: 12345
 
+optimized_metric: "val/acc_best"
+
 data:
   task_name: "LR"
   trial_type: "valid"

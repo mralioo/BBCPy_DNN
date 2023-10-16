@@ -18,6 +18,8 @@ tags: ["transformer-v1","Within-Subject", "2D"]
 
 seed: 12345
 
+optimized_metric: "val/acc_best"
+
 ata:
   task_name: "2D"
   ival: 1s:10s:1ms

@@ -18,6 +18,8 @@ tags: ["transformer-v1","Within-Subject", "RL"]
 
 seed: 12345
 
+optimized_metric: "val/acc_best"
+
 data:
   ival: 1s:10s:1ms
   chans: [ "*" ]
