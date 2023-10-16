@@ -1,3 +1,6 @@
+import os
+import csv
+from pathlib import Path
 from typing import List, Optional, Tuple
 
 import hydra
@@ -7,7 +10,8 @@ import torch
 from lightning import Callback, LightningDataModule, LightningModule, Trainer
 from lightning.pytorch.loggers import Logger
 from omegaconf import DictConfig
-from utils.device import print_gpu_info, print_memory_usage, print_cpu_cores, print_gpu_memory
+
+from utils.device import print_gpu_info
 
 pyrootutils.setup_root(__file__, indicator=".project-root", pythonpath=True)
 # ------------------------------------------------------------------------------------ #
@@ -113,6 +117,7 @@ def train(cfg: DictConfig) -> Tuple[dict, dict]:
 
     return metric_dict, object_dict
 
+
 @hydra.main(version_base="1.3", config_path="../configs", config_name="dnn_train.yaml")
 def main(cfg: DictConfig) -> Optional[float]:
     # apply extra utilities
@@ -124,6 +129,26 @@ def main(cfg: DictConfig) -> Optional[float]:
 
     # train the model
     metric_dict, _ = train(cfg)
+
+    # save metrics to csv file for later analysis
+    model_name = cfg.model.net._target_.split(".")[-1]
+    subject_name = list(cfg.data.subject_sessions_dict.keys())[0]
+    os.makedirs(cfg.paths.results_dir, exist_ok=True)
+    csv_file_path = Path(f"{cfg.paths.results_dir}/{model_name}_{subject_name}.csv")
+
+    # Convert tensors to float values
+    metrics = {key: value.item() if hasattr(value, 'item') else value for key, value in metric_dict.items()}
+    filtered_metrics = {key: value for key, value in metrics.items() if
+                        'best' in key or key.startswith('test/')}
+    # Open the CSV file in write mode
+    with open(csv_file_path, mode='w', newline='') as file:
+        writer = csv.DictWriter(file, fieldnames=filtered_metrics.keys())
+
+        # Write the header
+        writer.writeheader()
+
+        # Write the metrics values
+        writer.writerow(filtered_metrics)
 
     # safely retrieve metric value for hydra-based hyperparameter optimization
     metric_value = utils.get_metric_value(
