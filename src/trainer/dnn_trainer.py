@@ -740,7 +740,7 @@ class DnnLitModule(LightningModule):
     def init_metrics(self):
 
         if self.num_classes == 4:
-            average_type = "micro"
+            average_type = "weighted"
             self.train_acc = Accuracy(task="multiclass", num_classes=self.num_classes, average=average_type)
             self.train_f1 = F1Score(task="multiclass", num_classes=self.num_classes, average=average_type)
 
@@ -765,14 +765,15 @@ class DnnLitModule(LightningModule):
             )
 
         if self.num_classes == 2:
-            self.train_acc = Accuracy(task="binary")
-            self.train_f1 = F1Score(task="binary", average="macro")
+            average_type = "weighted"
+            self.train_acc = Accuracy(task="binary", average=average_type)
+            self.train_f1 = F1Score(task="binary", average=average_type)
 
-            self.val_acc = Accuracy(task="binary")
-            self.val_f1 = F1Score(task="binary", average="macro")
+            self.val_acc = Accuracy(task="binary", average=average_type)
+            self.val_f1 = F1Score(task="binary", average=average_type)
 
-            self.test_acc = Accuracy(task="binary")
-            self.test_f1 = F1Score(task="binary")
+            self.test_acc = Accuracy(task="binary", average=average_type)
+            self.test_f1 = F1Score(task="binary", average=average_type)
 
             # Define collection that is a mix of metrics that return a scalar tensors and not
             # self.confmat = torchmetrics.ConfusionMatrix(task="binary")
