@@ -582,9 +582,8 @@ class SMR_Data():
                                                                  norm_type=self.normalize["norm_type"],
                                                                  axis=self.normalize["norm_axis"])
 
-                self.test_trials, norm_params_test = normalize(self.test_trials,
-                                                               norm_type=self.normalize["norm_type"],
-                                                               axis=self.normalize["norm_axis"])
+                # FIXME : normalize test trials with the same parameters as train trials
+                self.test_trials, norm_params_test = normalize(self.test_trials, norm_params=norm_params_train)
 
                 logging.info("Normalized train trials")
                 print_data_info(self.train_trials)
