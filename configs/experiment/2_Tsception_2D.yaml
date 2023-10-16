@@ -22,8 +22,8 @@ optimized_metric: "val/acc_best"
 
 data:
   task_name: "2D"
-  trial_type: "valid"
-  ival: 1s:10s:1ms
+  trial_type: "forced"
+  ival: 2s:10s:1ms
   chans: [ "*" ]
   bands:
     - 8
@@ -32,7 +32,7 @@ data:
   process_noisy_channels: True
   ignore_noisy_sessions: False
   train_val_split: False
-  cross_validation: { num_splits: 5, split_seed: 1234 }
+  cross_validation: False
   transform: "TSCeption"
   normalize: { norm_type: "std", norm_axis: 0 }
   batch_size: 128
@@ -70,6 +70,11 @@ logger:
   mlflow:
     experiment_name: TSception-HPO-2D
     run_name: S1
+  csv:
+    _target_: lightning.pytorch.loggers.csv_logs.CSVLogger
+    save_dir: ${paths.output_dir}
+    name: "csv/"
+    prefix: ""
 
 callbacks:
   model_checkpoint:

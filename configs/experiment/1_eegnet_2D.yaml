@@ -23,7 +23,7 @@ optimized_metric: "val/acc_best"
 data:
   task_name: "2D"
   trial_type: "valid"
-  ival: 1s:10s:1ms
+  ival: 2s:10s:1ms
   chans: [ "*" ]
   bands:
     - 8
@@ -32,7 +32,7 @@ data:
   process_noisy_channels: True
   ignore_noisy_sessions: False
   train_val_split: False
-  cross_validation: { num_splits: 5, split_seed: 1234 }
+  cross_validation: False
   transform: False
   normalize: { norm_type: "std", norm_axis: 0 }
   batch_size: 128
@@ -44,7 +44,7 @@ model:
     _target_: torch.nn.CrossEntropyLoss
     _partial_: true
   net:
-    chunk_size: 9000
+    chunk_size: 8000
     num_classes: 4
     num_electrodes: 62
     dropout: 0.5
@@ -73,6 +73,11 @@ logger:
   mlflow:
     experiment_name: EEGNET-HPO-2D
     run_name: S6
+  csv:
+    _target_: lightning.pytorch.loggers.csv_logs.CSVLogger
+    save_dir: ${paths.output_dir}
+    name: "csv/"
+    prefix: ""
 
 callbacks:
   model_checkpoint:
