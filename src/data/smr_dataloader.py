@@ -151,12 +151,16 @@ class SRM_DataModule(LightningDataModule):
             self.train_data, self.val_data = train_valid_split(self.smr_datamodule.train_trials,
                                                                self.train_val_split)
 
-        if self.cross_validation:
+        elif self.cross_validation:
             logging.info("Cross validation strategy; k-fold")
 
             self.train_data, self.val_data = cross_validation(self.smr_datamodule.train_trials,
                                                               self.cross_validation,
                                                               self.k)
+        else:
+            logging.info("No train and validation split strategy, use the session runs split strategy")
+            self.train_data = self.smr_datamodule.train_trials
+            self.val_data = self.smr_datamodule.test_trials
 
     def setup(self, stage: Optional[str] = None):
         """Load data. Set variables: num_classes."""
@@ -244,7 +248,7 @@ class SRM_DataModule(LightningDataModule):
 
             return state_dict
 
-        if self.cross_validation:
+        elif self.cross_validation:
             return {
                 "task_name": self.task_name,
                 "subjects_info_dict": self.smr_datamodule.subjects_info_dict,
@@ -255,6 +259,17 @@ class SRM_DataModule(LightningDataModule):
                 "train_stats": self.training_set.statistical_info(),
                 "valid_stats": self.validation_set.statistical_info(),
             }
+        else:
+            state_dict = {"task_name": self.task_name,
+                          "subjects_info_dict": self.smr_datamodule.subjects_info_dict,
+                          "train_data_shape": self.training_set.data.shape,
+                          "valid_data_shape": self.validation_set.data.shape,
+                          "train_classes_weights": self.training_set.classes_weights(),
+                          "valid_classes_weights": self.validation_set.classes_weights(),
+                          "train_stats": self.training_set.statistical_info(),
+                          "valid_stats": self.validation_set.statistical_info()}
+
+            return state_dict
 
 
 class SRMDataset(Dataset):

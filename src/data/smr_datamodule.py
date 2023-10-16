@@ -81,6 +81,10 @@ class SMR_Data():
         self.process_noisy_channels = process_noisy_channels
         self.ignore_noisy_sessions = ignore_noisy_sessions
 
+        # FIXME : walkaround to fix trial length
+        self.trial_maxlen = 12000
+        self.trial_len = []
+
     @property
     def num_classes(self):
         return len(self.classes)
@@ -260,13 +264,17 @@ class SMR_Data():
                     test_idx.append(idx)
 
         # FIXME data need to be with even length
-        timepoints_train = timepoints[train_idx]
-        trial_maxlen = max([len(t[0]) for t in timepoints_train])
+        # timepoints_train = timepoints[train_idx]
+        # timepoints_test = timepoints[test_idx]
+        # trial_maxlen_train = max([len(t[0]) for t in timepoints_train])
+        # trial_maxlen_test = max([len(t[0]) for t in timepoints_test])
+        # trial_maxlen = max(trial_maxlen_train, trial_maxlen_test)
+        # self.trial_len.append(trial_maxlen)
         # FIXME : time with offset is not correct
-        time = np.arange(0, trial_maxlen) / srm_fs
+        time = np.arange(0, self.trial_maxlen)
 
         # Create SRM_Data objects for the train data
-        new_srm_train_data = ma.zeros((len(train_data), len(chans), trial_maxlen))
+        new_srm_train_data = ma.zeros((len(train_data), len(chans), self.trial_maxlen))
         # Set the mask for each row based on the sub ndarray size
         for i, sub_arr in enumerate(train_data):
             new_srm_train_data[i, :, :sub_arr.shape[-1]] = sub_arr
@@ -282,8 +290,11 @@ class SMR_Data():
                                                           mrk=mrk_train,
                                                           chans=chans)
 
+        # preprocess the data
+        epo_train_data = self.preprocess_data(epo_train_data)
+
         # Create SRM_Data objects for the test data
-        new_srm_test_data = ma.zeros((len(test_data), len(chans), trial_maxlen))
+        new_srm_test_data = ma.zeros((len(test_data), len(chans), self.trial_maxlen))
         # Set the mask for each row based on the sub ndarray size
         for i, sub_arr in enumerate(test_data):
             new_srm_test_data[i, :, :sub_arr.shape[-1]] = sub_arr
@@ -299,6 +310,8 @@ class SMR_Data():
                                                          fs=srm_fs,
                                                          mrk=mrk_test,
                                                          chans=chans)
+        # preprocess the data
+        epo_test_data = self.preprocess_data(epo_test_data)
 
         # FIXME bandpass filter the data bte 8-30 Hz in liter
         if self.bands is not None:
@@ -483,6 +496,7 @@ class SMR_Data():
         train_trials = None
         test_trials = None
         for session_name, session_data in sessions_data_dict.items():
+            # FIXME : preprocessing here if needed
             # check if the session has noisy channels
             if self.ignore_noisy_sessions and sessions_info_dict[session_name]["NoisyChannels"] is not None:
                 logging.info(f"Session {session_name} has noisy channels, the data will be skipped")
@@ -583,7 +597,9 @@ class SMR_Data():
                                                                  axis=self.normalize["norm_axis"])
 
                 # FIXME : normalize test trials with the same parameters as train trials
-                self.test_trials, norm_params_test = normalize(self.test_trials, norm_params=norm_params_train)
+                self.test_trials, norm_params_test = normalize(self.test_trials,
+                                                               norm_type=self.normalize["norm_type"],
+                                                               axis=self.normalize["norm_axis"])
 
                 logging.info("Normalized train trials")
                 print_data_info(self.train_trials)

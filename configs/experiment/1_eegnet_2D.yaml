@@ -22,7 +22,7 @@ optimized_metric: "val/acc_best"
 
 data:
   task_name: "2D"
-  trial_type: "valid"
+  trial_type: "forced"
   ival: 2s:10s:1ms
   chans: [ "*" ]
   bands:
