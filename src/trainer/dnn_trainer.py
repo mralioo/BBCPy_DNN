@@ -137,17 +137,17 @@ class DnnLitModule(LightningModule):
 
         # GET AND SAVE OUTPUTS AND TARGETS PER BATCH
         # FIXME: only support cpu
-        y_pred = preds.argmax(axis=1).cpu().numpy()
-        y_true = targets.argmax(axis=1).cpu().numpy()
+        y_pred = preds.argmax(axis=1)
+        y_true = targets.argmax(axis=1)
 
         # --> HERE STEP 2 <--
-        self.training_step_outputs.extend(y_pred)
-        self.training_step_targets.extend(y_true)
+        self.training_step_outputs.extend(y_pred.cpu().numpy())
+        self.training_step_targets.extend(y_true.cpu().numpy())
 
         # update and log metrics
         self.train_loss(loss)
-        self.train_acc(preds, targets)
-        self.train_f1(preds, targets)
+        self.train_acc(y_pred, y_true)
+        self.train_f1(y_pred, y_true)
 
         self.log("train/loss", self.train_loss, on_step=False, on_epoch=True, prog_bar=True)
         self.log("train/acc", self.train_acc, on_step=False, on_epoch=True, prog_bar=True)
@@ -195,17 +195,17 @@ class DnnLitModule(LightningModule):
 
         loss, preds, targets = self.model_step(batch)
         # GET AND SAVE OUTPUTS AND TARGETS PER BATCH
-        y_pred = preds.argmax(axis=1).cpu().numpy()
-        y_true = targets.argmax(axis=1).cpu().numpy()
+        y_pred = preds.argmax(axis=1)
+        y_true = targets.argmax(axis=1)
 
         # --> HERE STEP 2 <--
-        self.val_step_outputs.extend(y_pred)
-        self.val_step_targets.extend(y_true)
+        self.val_step_outputs.extend(y_pred.cpu().numpy())
+        self.val_step_targets.extend(y_true.cpu().numpy())
 
         # update and log metrics
         self.val_loss(loss)
-        self.val_acc(preds, targets)
-        self.val_f1(preds, targets)
+        self.val_acc(y_pred, y_true)
+        self.val_f1(y_pred, y_true)
 
         self.log("val/loss", self.val_loss, on_step=False, on_epoch=True, prog_bar=True)
         self.log("val/acc", self.val_acc, on_step=False, on_epoch=True, prog_bar=True)
@@ -312,16 +312,16 @@ class DnnLitModule(LightningModule):
 
         loss, preds, targets = self.model_step(batch)
 
-        y_pred = preds.argmax(axis=1).cpu().numpy()
-        y_true = targets.argmax(axis=1).cpu().numpy()
+        y_pred = preds.argmax(axis=1)
+        y_true = targets.argmax(axis=1)
         # --> HERE STEP 2 <--
-        self.test_step_outputs.extend(y_pred)
-        self.test_step_targets.extend(y_true)
+        self.test_step_outputs.extend(y_pred.cpu().numpy())
+        self.test_step_targets.extend(y_true.cpu().numpy())
 
         # update and log metrics
         self.test_loss(loss)
-        self.test_acc(preds, targets)
-        self.test_f1(preds, targets)
+        self.test_acc(y_pred, y_true)
+        self.test_f1(y_pred, y_true)
         self.log("test/loss", self.test_loss, on_step=False, on_epoch=True, prog_bar=True)
         self.log("test/acc", self.test_acc, on_step=False, on_epoch=True, prog_bar=True)
         self.log("test/f1", self.test_f1, on_step=False, on_epoch=True, prog_bar=True)
