@@ -2,7 +2,7 @@
 #SBATCH --job-name=eegnet-LR
 #SBATCH --partition=gpu-2d
 #SBATCH --gpus-per-node=1
-#SBATCH --mem=100GB
+#SBATCH --mem=50GB
 #SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=8
 #SBATCH --output=../jobs_outputs/eegnet-LR/%x_%j.o
@@ -22,6 +22,6 @@ for SUBJECT in "${SUBJECTS[@]}"; do
 
     # ... (rest of your script remains unchanged, but ensure to change the run_name in the apptainer command)
 
-    apptainer run -B /tmp/${SUBJECT}.sqfs:/input-data:image-src=/ ./../env_images/bbcpy_env.sif python ./src/dnn_train.py experiment=1_eegnet_LR +data.subject_sessions_dict="{$SUBJECT: "all"}" logger.mlflow.experiment_name="EEGNET-LR" logger.mlflow.run_name="${SUBJECT}-LR"
+    apptainer run --nv -B /tmp/${SUBJECT}.sqfs:/input-data:image-src=/ ./../env_images/bbcpy_env.sif python ./src/dnn_train.py experiment=1_eegnet_LR +data.subject_sessions_dict="{$SUBJECT: "all"}" logger.mlflow.experiment_name="EEGNET-LR" logger.mlflow.run_name="${SUBJECT}-LR"
 
 done
