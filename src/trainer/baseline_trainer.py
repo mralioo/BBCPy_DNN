@@ -266,10 +266,11 @@ class SklearnTrainer(object):
                         # Roc curve / average Roc curve
                         if self.task_name == "LR":
                             # Train data metrics
+                            y_pred = self.clf.predict(X_train)
                             self.compute_roc_curve(y_true=y_train, y_pred=y_pred, set_name="train")
 
                             # compute metrics on valid data
-
+                            y_pred = self.clf.predict(X_vali)
                             self.compute_roc_curve(y_true=y_vali, y_pred=y_pred, set_name="val")
                             fpr, tpr, _ = roc_curve(y_true=y_vali, y_score=y_pred)
                             val_tprs.append(np.interp(val_mean_fpr, fpr, tpr))
@@ -280,8 +281,6 @@ class SklearnTrainer(object):
                             # compute metrics on Test data
                             y_pred = self.clf.predict(test_data)
                             self.compute_roc_curve(y_true=test_data.y, y_pred=y_pred, set_name="test")
-
-                            # roc curve for test data over folds
                             fpr, tpr, _ = roc_curve(y_true=test_data.y, y_score=y_pred)
                             test_tprs.append(np.interp(test_mean_fpr, fpr, tpr))
                             test_tprs[-1][0] = 0.0  # set first value to 0 to have a better plot
@@ -305,7 +304,14 @@ class SklearnTrainer(object):
                                                     filename=f"Valid_fold-{foldNum}_roc-curve-ovo")
 
                             # ovo and ovr roc curve on test data
-                            y_pred_proba_test = self.clf.predict_proba(test_data)
+                            try:
+                                y_pred_proba_test = self.clf.predict_proba(test_data)
+                            except AttributeError:
+                                try:
+                                    y_pred_proba_test = self.clf.predict_log_proba(test_data)
+                                except AttributeError:
+                                    raise ValueError(
+                                        "Neither predict_proba nor predict_log_proba are available for the given classifier.")
                             self.plot_roc_curve_ovr(Y_ie=test_data.y, Y_pred_logits=y_pred_proba_test,
                                                     filename=f"Test_fold-{foldNum}_roc-curve-ovr")
                             self.plot_roc_curve_ovo(Y_ie=test_data.y, Y_pred_logits=y_pred_proba_test,

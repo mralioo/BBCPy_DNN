@@ -144,11 +144,9 @@ def main(cfg: DictConfig) -> Optional[float]:
         writer.writerow(metric_dict)
 
     # safely retrieve metric value for hydra-based hyperparameter optimization
-    metric_value = utils.get_metric_value(
-        metric_dict=metric_dict, metric_name=cfg.get("optimized_metric")
-    )
-    optimized_metric = cfg.get("optimized_metric")
 
+    optimized_metric = cfg.get("optimized_metric")
+    metric_value = metric_dict[optimized_metric]
     log.info(f"{optimized_metric}: {metric_value}")
 
     # return optimized metric
