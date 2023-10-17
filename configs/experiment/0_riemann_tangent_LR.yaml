@@ -43,6 +43,8 @@ paths:
   log_dir: ${oc.env:PROJECT_ROOT}/logs/best_runs/
   output_dir: ${hydra:runtime.output_dir}
   work_dir: ${hydra:runtime.cwd}
+  results_dir: ${paths.log_dir}/results # final results directory
+
 logger:
   mlflow:
     tags: ${tags}

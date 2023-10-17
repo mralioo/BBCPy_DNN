@@ -24,6 +24,7 @@ paths:
   log_dir: ${oc.env:PROJECT_ROOT}\logs
   output_dir: ${hydra:runtime.output_dir}
   work_dir: ${hydra:runtime.cwd}
+  results_dir: ${paths.log_dir}\results # final results directory
 
 # disable callbacks and loggers during debugging
 callbacks: null
@@ -38,19 +39,19 @@ logger:
     tracking_uri: ${paths.log_dir}\mlflow\mlruns
 
 data:
-  task_name: "2D"
-  trial_type: "forced"
-  ival: 2s:10s:10ms
-  chans: [ "*" ]
-  bands: [ 8, 13 ]
+#  task_name: "2D"
+#  trial_type: "forced"
+#  ival: 2s:10s:10ms
+#  chans: [ "*" ]
+#  bands: [ 8, 13 ]
   subject_sessions_dict:
-    S3: "all"
-  fallback_neighbors: 4
-  loading_data_mode: "within_subject"
-  process_noisy_channels: True
-  ignore_noisy_sessions: False
-  transform: False
-  normalize: { norm_type: "std", norm_axis: 0 }
+    S1: "all"
+#  fallback_neighbors: 4
+#  loading_data_mode: "within_subject"
+#  process_noisy_channels: True
+#  ignore_noisy_sessions: False
+#  transform: False
+#  normalize: { norm_type: "std", norm_axis: 0 }
 
 #trainer:
 #  train_val_split: False
