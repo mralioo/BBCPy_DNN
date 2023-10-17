@@ -51,4 +51,4 @@ logger:
     tags: ${tags}
     experiment_name: Riemann-v1
     run_name: S1
-    tracking_uri: file:${paths.log_dir}/mlflow/mlruns
+    tracking_uri: ${paths.log_dir}/mlflow/mlruns
