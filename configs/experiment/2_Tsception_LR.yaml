@@ -62,7 +62,7 @@ trainer:
 paths:
   root_dir: ${oc.env:PROJECT_ROOT}
   data_dir: /input-data
-  log_dir: ${oc.env:PROJECT_ROOT}/logs
+  log_dir: ${oc.env:PROJECT_ROOT}/logs/best_runs/
   output_dir: ${hydra:runtime.output_dir}
   work_dir: ${hydra:runtime.cwd}
 
@@ -70,7 +70,7 @@ logger:
   mlflow:
     experiment_name: TSception-HPO-LR
     run_name: S1
-    tracking_uri: file:${paths.log_dir}/best_runs
+    tracking_uri: file:${paths.log_dir}/mlflow/mlruns
   csv:
     _target_: lightning.pytorch.loggers.csv_logs.CSVLogger
     save_dir: ${paths.output_dir}/${logger.mlflow.experiment_name}/${logger.mlflow.run_name}
