@@ -50,4 +50,4 @@ logger:
     tags: ${tags}
     experiment_name: A-RL-S1-all
     run_name: csp
-    tracking_uri: file:${paths.log_dir}/mlflow/mlruns
+    tracking_uri: ${paths.log_dir}/mlflow/mlruns
