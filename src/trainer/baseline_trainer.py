@@ -123,12 +123,12 @@ class SklearnTrainer(object):
     def train(self, pipeline, hparams):
         # train and test data
 
-        # FIXME: New data split
-        if self.train_val_split is not None:
-            train_data, test_data = train_valid_split(self.datamodule.valid_trials, self.train_val_split)
+        train_data, test_data = self.datamodule.train_data, self.datamodule.test_data
 
-        else:
-            train_data, test_data = self.datamodule.train_trials, self.datamodule.test_trials
+        # # FIXME: New data split
+        # if self.train_val_split is not None:
+        #     train_data, val_data = train_valid_split(self.datamodule.train_data, self.train_val_split)
+
 
         # compute classes weights for imbalanced dataset
         global_classes_weights = sklearn.utils.class_weight.compute_class_weight(class_weight='balanced',
@@ -199,7 +199,7 @@ class SklearnTrainer(object):
 
                 cv_classes_weights_dict = {}
                 model_name = self.logger.mlflow.run_name
-                num_cv = self.cv.n_splits
+                num_cv = 5
 
                 for fold, (train_index, vali_index) in enumerate(self.cv.split(train_data, train_data.y)):
                     foldNum = fold + 1
@@ -787,56 +787,6 @@ def plot_roc_curve(tpr, fpr, scatter=False, ax=None):
     ax.legend(loc="lower right")
 
     # plt.show()
-
-
-# def get_all_roc_coordinates(y_real, y_proba):
-#     '''
-#     Calculates all the ROC Curve coordinates (tpr and fpr) by considering each point as a treshold for the predicion of the class.
-#
-#     Args:
-#         y_real: The list or series with the real classes.
-#         y_proba: The array with the probabilities for each class, obtained by using the `.predict_proba()` method.
-#
-#     Returns:
-#         tpr_list: The list of TPRs representing each threshold.
-#         fpr_list: The list of FPRs representing each threshold.
-#     '''
-#     tpr_list = [0]
-#     fpr_list = [0]
-#     for i in range(len(y_proba)):
-#         threshold = y_proba[i]
-#         y_pred = y_proba >= threshold
-#         tpr, fpr = calculate_tpr_fpr(y_real, y_pred)
-#         tpr_list.append(tpr)
-#         fpr_list.append(fpr)
-#     return tpr_list, fpr_list
-#
-#
-# def calculate_tpr_fpr(y_real, y_pred):
-#     '''
-#     Calculates the True Positive Rate (tpr) and the True Negative Rate (fpr) based on real and predicted observations
-#
-#     Args:
-#         y_real: The list or series with the real classes
-#         y_pred: The list or series with the predicted classes
-#
-#     Returns:
-#         tpr: The True Positive Rate of the classifier
-#         fpr: The False Positive Rate of the classifier
-#     '''
-#
-#     # Calculates the confusion matrix and recover each element
-#     cm = confusion_matrix(y_real, y_pred)
-#     TN = cm[0, 0]
-#     FP = cm[0, 1]
-#     FN = cm[1, 0]
-#     TP = cm[1, 1]
-#
-#     # Calculates tpr and fpr
-#     tpr = TP / (TP + FN + 10e-4)  # sensitivity - true positive rate
-#     fpr = 1 - TN / (TN + FP + 10e-4)  # 1-specificity - false positive rate
-#
-#     return tpr, fpr
 
 
 # TODO plot csp filter and csp patterns

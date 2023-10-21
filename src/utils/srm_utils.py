@@ -198,7 +198,7 @@ def cross_validation(data, kfold_idx):
 
 
 class RunKFold(BaseCrossValidator):
-    def __init__(self, n_splits=6):
+    def __init__(self, n_splits=5):
         self.n_splits = n_splits
 
     def get_n_splits(self, X=None, y=None, groups=None):
