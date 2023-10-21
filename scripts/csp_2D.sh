@@ -19,6 +19,6 @@ for SUBJECT in "${SUBJECTS[@]}"; do
     cp ./../squashfs_smr_data/${SUBJECT}.sqfs /tmp/
 
   # 3. bind the squashed dataset to your apptainer environment and run your script with apptainer
-  apptainer run -B /tmp/${SUBJECT}.sqfs:/input-data:image-src=/ ./../env_images/bbcpy_env.sif python ./src/baseline_train.py experiment=0_csp_2D +data.subject_sessions_dict="{$SUBJECT: "all"}" logger.mlflow.experiment_name="CSP-2D" logger.mlflow.run_name="${SUBJECT}-2D-CSP"
+  apptainer run -B /tmp/${SUBJECT}.sqfs:/input-data:image-src=/ ./../env_images/bbcpy_env_1.sif python ./src/baseline_train.py experiment=0_csp_2D +data.subject_sessions_dict="{$SUBJECT: "all"}" logger.mlflow.experiment_name="CSP-2D" logger.mlflow.run_name="${SUBJECT}-2D-CSP"
 
 done

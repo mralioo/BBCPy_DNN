@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --job-name=tsception-LR
+#SBATCH --job-name=tsce-LR
 #SBATCH --partition=gpu-2d
 #SBATCH --gpus-per-node=1
 #SBATCH --mem=50GB
