@@ -269,9 +269,9 @@ class DnnLitModule(LightningModule):
             self.plot_summary_advanced(all_results, image_name=f"val_summary_epoch_{self.current_epoch}")
 
             # Plot ROC curve ovr and ovo FIXME : test on LR
-            self.plot_roc_curve_ovr(Y_ie=self.val_step_targets_ie, Y_pred_logits=self.val_step_outputs_logits,
+            self.plot_roc_curve_ovr(Y_true_ie=self.val_step_targets_ie, Y_pred_logits=self.val_step_outputs_logits,
                                     filename=f"val_roc_ovr_epoch_{self.current_epoch}")
-            self.plot_roc_curve_ovo(Y_ie=self.val_step_targets_ie, Y_pred_logits=self.val_step_outputs_logits,
+            self.plot_roc_curve_ovo(Y_true_ie=self.val_step_targets_ie, Y_pred_logits=self.val_step_outputs_logits,
                                     filename=f"val_roc_ovo_epoch_{self.current_epoch}")
 
         # Accuracy is a metric object, so we need to call `.compute()` to get the value
@@ -348,9 +348,9 @@ class DnnLitModule(LightningModule):
         test_all_outputs = self.test_step_outputs
         test_all_targets = self.test_step_targets
 
-        cm = confusion_matrix(test_all_outputs, test_all_targets)
-        title = f"Testing Confusion matrix, forced trials"
-        self.confusion_matrix_to_png(cm, title, f"test_cm_forced_trials")
+        cm = confusion_matrix(y_true=test_all_targets,y_pred=test_all_outputs)
+        title = f"Testing Confusion matrix, Run 6"
+        self.confusion_matrix_to_png(cm, title, f"test_cm_run_6")
 
     def configure_optimizers(self):
         """Choose what optimizers and learning-rate schedulers to use in your optimization.
@@ -468,42 +468,6 @@ class DnnLitModule(LightningModule):
                                                  local_dir=tmpdirname)
                 plt.close(figure)
 
-    def calculate_sample_weights(self, y, NUM_MIN_SAMPLES=10):
-        """Calculate sample weights for unbalanced dataset"""
-        y_np = np.argmax(y.cpu().numpy(), axis=1)
-
-        num_classes = y.shape[1]
-        # If the number of samples is small, just return equal weights for all classes
-        if len(y_np) < NUM_MIN_SAMPLES:  # Define SOME_THRESHOLD as per your needs
-            return np.ones(num_classes)
-
-        # Classes present in y
-        present_classes = np.unique(y_np)
-        # All possible classes based on the shape of y
-
-        if len(present_classes) < num_classes:
-            # Compute weights for present classes
-            present_class_weights = sklearn.utils.class_weight.compute_class_weight(class_weight='balanced',
-                                                                                    classes=present_classes,
-                                                                                    y=y_np)
-
-            # Initialize weights for all classes with a high value
-            all_class_weights = np.max(present_class_weights) * np.ones(num_classes)
-
-            # Set the computed weights for the classes present in y
-            for cls, weight in zip(present_classes, present_class_weights):
-                all_class_weights[cls] = weight
-
-            return all_class_weights
-
-        else:
-            total_classes = np.arange(num_classes)
-            class_weights = sklearn.utils.class_weight.compute_class_weight(class_weight='balanced',
-                                                                            classes=total_classes,
-                                                                            y=y_np)
-
-            return class_weights
-
     def save_hparams_to_mlflow(self):
         """Log all hyperparameters to mlflow"""
 
@@ -572,7 +536,7 @@ class DnnLitModule(LightningModule):
                 self.mlflow_client.log_artifacts(self.run_id,
                                                  local_dir=tmpdirname)
 
-    def plot_roc_curve_ovr(self, Y_ie, Y_pred_logits, filename=None):
+    def plot_roc_curve_ovr(self, Y_true_ie, Y_pred_logits, filename=None):
 
         if isinstance(Y_pred_logits, list):
             Y_pred_logits = np.array(Y_pred_logits)
@@ -584,9 +548,9 @@ class DnnLitModule(LightningModule):
             # Gets the class
             # c = k
             # Prepares an auxiliar dataframe to help with the plots
-            df_aux = pd.DataFrame(Y_ie)
+            df_aux = pd.DataFrame(Y_true_ie)
 
-            df_aux['class'] = [1 if y == k else 0 for y in Y_ie]
+            df_aux['class'] = [1 if y == k else 0 for y in Y_true_ie]
             df_aux['prob'] = Y_pred_logits[:, i]
             df_aux = df_aux.reset_index(drop=True)
 
@@ -624,7 +588,7 @@ class DnnLitModule(LightningModule):
                                              local_dir=tmpdirname)
         plt.close(fig)
 
-    def plot_roc_curve_ovo(self, Y_ie, Y_pred_logits, filename=None):
+    def plot_roc_curve_ovo(self, Y_true_ie, Y_pred_logits, filename=None):
 
         if isinstance(Y_pred_logits, list):
             Y_pred_logits = np.array(Y_pred_logits)
@@ -651,9 +615,9 @@ class DnnLitModule(LightningModule):
             title = c1 + " vs " + c2
 
             # Prepares an auxiliar dataframe to help with the plots
-            df_aux = pd.DataFrame(Y_ie)
+            df_aux = pd.DataFrame(Y_true_ie)
 
-            df_aux['class'] = [self.classes_names_dict[y] for y in Y_ie]
+            df_aux['class'] = [self.classes_names_dict[y] for y in Y_true_ie]
             df_aux['prob'] = Y_pred_logits[:, c1_index]
 
             # Slices only the subset with both classes

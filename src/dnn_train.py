@@ -31,9 +31,6 @@ pyrootutils.setup_root(__file__, indicator=".project-root", pythonpath=True)
 # ------------------------------------------------------------------------------------ #
 
 from src import utils
-from utils.device import print_gpu_info
-from src.data.smr_dataloader import SRMDataset
-from src.utils.srm_utils import RunKFold
 from utils.device import print_gpu_info, print_memory_usage, print_cpu_cores, print_gpu_memory
 
 log = utils.get_pylogger(__name__)
@@ -132,8 +129,6 @@ def train_cross_validation(cfg: DictConfig) -> Tuple[dict, dict]:
     log.info(f"Instantiating model <{cfg.model._target_}>")
     model: LightningModule = hydra.utils.instantiate(cfg.model)
 
-
-
     # load data
     log.info("Loading data...")
     datamodule.load_raw_data()
@@ -152,7 +147,10 @@ def train_cross_validation(cfg: DictConfig) -> Tuple[dict, dict]:
         # Initialize a dictionary to store the metrics
         cv_metric_dict = {"train": [], "val": [], "test": []}
         log.info("Cross validation strategy; k-fold runs 1,2,3,4,5 for train/val and run 6 for test")
-        nums_folds = 5
+        # FIXME : change the number of folds
+
+        nums_folds = 2
+
         for k in range(nums_folds):
 
             log.info(f"Fold {k}...")
@@ -167,7 +165,7 @@ def train_cross_validation(cfg: DictConfig) -> Tuple[dict, dict]:
             log.info("Instantiating loggers...")
             log.info(f"Kfold: {k}")
 
-            OmegaConf.update(cfg.get("logger").mlflow, "run_name", f"{run_name}_fold_{k+1}", merge=True)
+            OmegaConf.update(cfg.get("logger").mlflow, "run_name", f"{run_name}_fold_{k + 1}", merge=True)
             logger: List[Logger] = utils.instantiate_loggers(cfg.get("logger"))
 
             log.info("Instantiating callbacks...")
@@ -209,7 +207,6 @@ def train_cross_validation(cfg: DictConfig) -> Tuple[dict, dict]:
             cv_metric_dict["train"].append(train_metrics)
             cv_metric_dict["val"].append(val_metrics)
 
-
             if cfg.get("test"):
                 log.info("Starting testing!")
                 ckpt_path = trainer.checkpoint_callback.best_model_path
@@ -226,9 +223,9 @@ def train_cross_validation(cfg: DictConfig) -> Tuple[dict, dict]:
 
         # Aggregate metrics from all folds
         final_metrics = {
-            "train": utils.aggregate_metrics(cv_metric_dict["train"]),
-            "val": utils.aggregate_metrics(cv_metric_dict["val"]),
-            "test": utils.aggregate_metrics(cv_metric_dict["test"]),
+            "mean_train": utils.utils.aggregate_metrics(cv_metric_dict["train"]),
+            "mean_val": utils.utils.aggregate_metrics(cv_metric_dict["val"]),
+            "mean_test": utils.utils.aggregate_metrics(cv_metric_dict["test"]),
         }
 
     # merge train and test metrics
@@ -253,35 +250,53 @@ def main(cfg: DictConfig) -> Optional[float]:
     os.makedirs(cfg.paths.results_dir, exist_ok=True)
     csv_file_path = Path(f"{cfg.paths.results_dir}/{task_name}_{model_name}_{subject_name}.csv")
 
+    metric_dict = {}
+
     # train the model; there is 2 options : train/val split or cross_validation
     if cfg.data.train_val_split:
         metric_dict, _ = train(cfg)
         # Convert tensors to float values
-        metrics = {key: value.item() if hasattr(value, 'item') else value for key, value in metric_dict.items()}
+        # metrics = {key: value.item() if hasattr(value, 'item') else value for key, value in metric_dict.items()}
+        convert_tensor_to_float(metric_dict)
 
     if cfg.data.cross_validation:
         metric_dict, _ = train_cross_validation(cfg)
-
-        metrics = {key: value.item() if hasattr(value, 'item') else value for key, value in metric_dict.items()}
-
+        # Convert tensors to float values
+        convert_tensor_to_float(metric_dict)
     # Open the CSV file in write mode
+
     with open(csv_file_path, mode='w', newline='') as file:
-        writer = csv.DictWriter(file, fieldnames=metrics.keys())
+        writer = csv.DictWriter(file, fieldnames=metric_dict.keys())
         # Write the header
         writer.writeheader()
         # Write the metrics values
-        writer.writerow(metrics)
+        writer.writerow(metric_dict)
 
-    # safely retrieve metric value for hydra-based hyperparameter optimization
-    metric_value = utils.get_metric_value(
-        metric_dict=metric_dict, metric_name=cfg.get("optimized_metric")
-    )
-    optimized_metric = cfg.get("optimized_metric")
+    log.info(f"Metrics saved to {csv_file_path}")
 
-    log.info(f"{optimized_metric}: {metric_value}")
+    log.info("Done!")
 
-    # return optimized metric
-    return metric_value
+    # # safely retrieve metric value for hydra-based hyperparameter optimization
+    # metric_value = utils.get_metric_value(
+    #     metric_dict=metric_dict, metric_name=cfg.get("optimized_metric")
+    # )
+    # optimized_metric = cfg.get("optimized_metric")
+    #
+    # log.info(f"{optimized_metric}: {metric_value}")
+    #
+    # # return optimized metric
+    # return metric_value
+
+
+def convert_tensor_to_float(d):
+    for key, value in d.items():
+        if isinstance(value, dict):
+            convert_tensor_to_float(value)
+        elif isinstance(value, list):
+            for item in value:
+                convert_tensor_to_float(item)
+        elif isinstance(value, torch.Tensor):
+            d[key] = float(value)
 
 
 if __name__ == "__main__":

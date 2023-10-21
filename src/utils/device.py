@@ -80,6 +80,7 @@ def print_gpu_memory():
 
 
 def print_data_info(srm_obj):
+
     print("data shape: ", srm_obj.shape)
     print("max timepoints: ", np.max(srm_obj))
     print("min timepoints: ", np.min(srm_obj))

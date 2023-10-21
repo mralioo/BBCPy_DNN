@@ -32,7 +32,7 @@ data:
   process_noisy_channels: True
   ignore_noisy_sessions: False
   train_val_split: False
-  cross_validation: False
+  cross_validation: True
   transform: False
   normalize: { norm_type: "std", norm_axis: 0 }
   batch_size: 32
@@ -65,7 +65,7 @@ trainer:
 paths:
   root_dir: ${oc.env:PROJECT_ROOT}
   data_dir: /input-data
-  log_dir: ${oc.env:PROJECT_ROOT}/logs/best_runs/
+  log_dir: ${oc.env:PROJECT_ROOT}/logs/21_10/
   output_dir: ${hydra:runtime.output_dir}
   work_dir: ${hydra:runtime.cwd}
   results_dir: ${paths.log_dir}/results # final results directory
