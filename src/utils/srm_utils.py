@@ -1,8 +1,74 @@
 import logging
 
 import numpy as np
+from sklearn.model_selection import BaseCrossValidator
 
 import bbcpy
+
+
+def normalize(data, norm_type="std", axis=None, keepdims=True, eps=10 ** -5, norm_params=None):
+    """Normalize data along a given axis.
+
+    Parameters
+    ----------
+    data : numpy.ndarray
+        Data to normalize.
+    norm_type : str
+        Type of normalization. Can be 'std' or 'minmax'.
+    axis : int
+        Axis along which to normalize.
+    keepdims : bool
+        Whether to keep the dimensions of the original data.
+    eps : float
+        Epsilon to avoid division by zero.
+    norm_params : dict
+        Dictionary containing normalization parameters. If None, they will be computed.
+
+    Returns
+    -------
+    data_norm : numpy.ndarray
+        Normalized data.
+    norm_params : dict
+        Dictionary containing normalization parameters.
+
+    """
+
+    if norm_params is not None:
+        if norm_params["norm_type"] == "std":
+            data_norm = (data - norm_params["mean"]) / norm_params["std"]
+        elif norm_params["norm_type"] == "minmax":
+            data_norm = (data - norm_params["min"]) / (norm_params["max"] - norm_params["min"])
+        else:
+            raise RuntimeError("norm type {:} does not exist".format(norm_params["norm_type"]))
+
+    else:
+        if norm_type == "std":
+            data_std = data.std(axis=axis, keepdims=keepdims)
+            data_std[data_std < eps] = eps
+            data_mean = data.mean(axis=axis, keepdims=keepdims)
+            data_norm = (data - data_mean) / data_std
+            norm_params = dict(mean=data_mean, std=data_std, norm_type=norm_type, axis=axis, keepdims=keepdims)
+        elif norm_type == "minmax":
+            data_min = data.min(axis=axis, keepdims=keepdims)
+            data_max = data.max(axis=axis, keepdims=keepdims)
+            data_max[data_max == data_min] = data_max[data_max == data_min] + eps
+            data_norm = (data - data_min) / (data_max - data_min)
+            norm_params = dict(min=data_min, max=data_max, norm_type=norm_type, axis=axis, keepdims=keepdims)
+        elif norm_type is None:
+            data_norm, norm_params = data, None
+        else:
+            data_norm, norm_params = None, None
+            ValueError("Only 'std' and 'minmax' are supported")
+
+    return data_norm, norm_params
+
+
+def unnormalize(data_norm, norm_params):
+    if norm_params["norm_type"] == "std":
+        data = data_norm * norm_params["std"] + norm_params["mean"]
+    elif norm_params["norm_type"] == "minmax":
+        data = data_norm * (norm_params["max"] - norm_params["min"]) + norm_params["min"]
+    return data
 
 
 def transform_electrodes_configurations(epo_data):
@@ -92,3 +158,62 @@ def calculate_pvc_metrics(trial_info, taskname="LR"):
     # calculate pvc
     pvc = res_dict["hits"] / (res_dict["hits"] + res_dict["misses"])
     return pvc
+
+
+def train_valid_split(data_shape, train_val_split_dict):
+    """ Split the data into train and validation sets and return indices """
+
+    random_seed = train_val_split_dict["random_seed"]
+    val_ratio = train_val_split_dict["val_size"]
+
+    # Set the random seed for reproducibility
+    np.random.seed(random_seed)
+
+    # Shuffle the data
+    indices = np.random.permutation(data_shape[0])
+
+    # Compute the index where the validation set starts
+    val_start_idx = int(len(indices) * (1 - val_ratio))
+
+    # Get the indices for training and validation sets
+    train_indices = indices[:val_start_idx]
+    val_indices = indices[val_start_idx:]
+
+    return train_indices, val_indices
+
+
+def cross_validation(data, kfold_idx):
+    kf = RunKFold(n_splits=5)
+
+    all_splits_trial_kf = [k for k in kf.split(data)]
+
+    train_indexes, val_indexes = all_splits_trial_kf[kfold_idx]
+
+    # train_indexes, val_indexes = train_indexes.tolist(), val_indexes.tolist()
+    #
+    # train_data, val_data = (data[train_indexes],
+    #                         data[val_indexes])
+
+    return train_indexes.tolist(), val_indexes.tolist()
+
+
+class RunKFold(BaseCrossValidator):
+    def __init__(self, n_splits=6):
+        self.n_splits = n_splits
+
+    def get_n_splits(self, X=None, y=None, groups=None):
+        return self.n_splits
+
+    def split(self, X, y=None, groups=None):
+        n_samples = len(X)
+        indices = np.arange(n_samples)
+        fold_sizes = np.full(self.n_splits, n_samples // self.n_splits, dtype=int)
+        fold_sizes[:n_samples % self.n_splits] += 1
+        current = 0
+
+        for fold_size in fold_sizes:
+            start, stop = current, current + fold_size
+            val_indices = indices[start:stop]
+            train_indices = np.concatenate([indices[:start], indices[stop:]])  # Define validation indices
+            yield train_indices, val_indices
+            current = stop
