@@ -2,6 +2,7 @@ import gc
 import logging
 from typing import Optional
 
+import numpy as np
 import pyrootutils
 import torch
 from lightning import LightningDataModule
@@ -11,7 +12,8 @@ pyrootutils.setup_root(__file__, indicator=".project-root", pythonpath=True)
 
 from torch.utils.data import DataLoader, Dataset
 
-from src.data.smr_datamodule import SMR_Data, cross_validation, train_valid_split
+from src.data.smr_datamodule import SMR_Data
+from src.utils.srm_utils import train_valid_split, cross_validation, normalize
 from src.utils.device import print_memory_usage, print_cpu_cores, print_gpu_info
 
 logging.getLogger().setLevel(logging.INFO)
@@ -84,15 +86,8 @@ class SRM_DataModule(LightningDataModule):
 
         self.subject_sessions_dict = subject_sessions_dict
 
-        if train_val_split:
-            self.train_val_split = dict(train_val_split)
-        else:
-            self.train_val_split = None
-
-        if cross_validation:
-            self.cross_validation = dict(cross_validation)
-        else:
-            self.cross_validation = None
+        self.train_val_split = train_val_split
+        self.cross_validation = cross_validation
 
         # this line allows to access init params with 'self.hparams' attribute
         # also ensures init params will be stored in ckpt
@@ -128,6 +123,9 @@ class SRM_DataModule(LightningDataModule):
                                        ignore_noisy_sessions=self.ignore_noisy_sessions)
 
         self.smr_datamodule.prepare_dataloader()
+        self.data = self.smr_datamodule.train_data
+        self.data_shape = self.smr_datamodule.train_data.shape
+
         # Info about resources
         print_memory_usage()
         print_cpu_cores()
@@ -143,34 +141,60 @@ class SRM_DataModule(LightningDataModule):
     def prepare_data(self):
         """ instantiate srm object. This method is called only from a single GPU."""
         # download, split, etc...
-        logging.info("Preparing data...")
 
         if self.train_val_split:
-            logging.info("Train and validation split strategy")
+            logging.info("Train and validation split strategy: runs 1,2,3,4,5 for train/val and run 6 for test")
+            # TODO train split take the middle indices for validation
 
-            self.train_data, self.val_data = train_valid_split(self.smr_datamodule.train_trials,
-                                                               self.train_val_split)
+            self.train_idx, self.val_idx = train_valid_split(self.data_shape,
+                                                             self.train_val_split)
 
         elif self.cross_validation:
-            logging.info("Cross validation strategy; k-fold")
-
-            self.train_data, self.val_data = cross_validation(self.smr_datamodule.train_trials,
-                                                              self.cross_validation,
-                                                              self.k)
-        else:
-            logging.info("No train and validation split strategy, use the session runs split strategy")
-            self.train_data = self.smr_datamodule.train_trials
-            self.val_data = self.smr_datamodule.test_trials
+            logging.info("Cross validation strategy: runs 1,2,3,4,5 for train/val and run 6 for test")
+            self.train_idx, self.val_idx = cross_validation(self.data,
+                                                            self.k)
 
     def setup(self, stage: Optional[str] = None):
         """Load data. Set variables: num_classes."""
-        # FIXME: chose data strategy concatenation or train_val_split
+
         if stage == "fit":
             # loading data and splitting into train and test sets
-            logging.info("Loading train data...")
+            logging.info("Create train and validation sets.. ")
             # load and split datasets only if not loaded already
-            self.training_set = SRMDataset(data=self.train_data)
-            self.validation_set = SRMDataset(data=self.val_data)
+            if self.train_val_split:
+                self.training_set = SRMDataset(data=self.data, indices=self.train_idx)
+                print(self.training_set.statistical_info())
+                self.training_set.normalize_data(norm_type=self.normalize["norm_type"],
+                                                 axis=self.normalize["norm_axis"])
+                logging.info("Normalized train trials")
+                print(self.training_set.statistical_info())
+
+                self.validation_set = SRMDataset(data=self.data, indices=self.val_idx)
+                print(self.validation_set.statistical_info())
+                self.validation_set.normalize_data(norm_type=self.normalize["norm_type"],
+                                                   axis=self.normalize["norm_axis"])
+                logging.info("Normalized test trials")
+                print(self.validation_set.statistical_info())
+
+            elif self.cross_validation:
+                # Create datasets with specific indices
+                logging.info(f"Train indices: {self.train_idx}")
+                self.training_set = SRMDataset(data=self.data, indices=self.train_idx)
+                logging.info("Train dataset info")
+                print(self.training_set.statistical_info())
+                self.training_set.normalize_data(norm_type=self.normalize["norm_type"],
+                                                 axis=self.normalize["norm_axis"])
+                logging.info("Train dataset info after normalization")
+                print(self.training_set.statistical_info())
+
+                logging.info(f"Val indices: {self.val_idx}")
+                self.validation_set = SRMDataset(data=self.data, indices=self.val_idx)
+                logging.info("Val dataset info")
+                print(self.validation_set.statistical_info())
+                self.validation_set.normalize_data(norm_type=self.normalize["norm_type"],
+                                                   axis=self.normalize["norm_axis"])
+                logging.info("Val dataset info after normalization")
+                print(self.validation_set.statistical_info())
 
             # Info about resources
             print_memory_usage()
@@ -178,10 +202,13 @@ class SRM_DataModule(LightningDataModule):
             print_gpu_info()
 
         if stage == "test":
-            logging.info("Loading test data...")
-            # FIXME : what is the right why to normlize data for test set?
-            # self.testing_set = SRMDataset(data=self.smr_datamodule.forced_trials)
-            self.testing_set = SRMDataset(data=self.smr_datamodule.test_trials)
+            logging.info("Create test set..")
+            test_indices = np.arange(self.smr_datamodule.test_data.shape[0]).tolist()
+            self.testing_set = SRMDataset(data=self.smr_datamodule.test_data, indices=test_indices)
+            self.testing_set.normalize_data(norm_type=self.normalize["norm_type"],
+                                            axis=self.normalize["norm_axis"])
+            logging.info("Normalized test trials")
+            print(self.testing_set.statistical_info())
 
     def train_dataloader(self):
         return DataLoader(self.training_set,
@@ -214,10 +241,18 @@ class SRM_DataModule(LightningDataModule):
         if stage == "test":
             del self.testing_set
 
-            # Delete large objects
-            if hasattr(self, 'smr_datamodule'):
-                del self.smr_datamodule
-            self.smr_datamodule = None
+            if self.train_val_split:
+                # Delete large objects
+                if hasattr(self, 'smr_datamodule'):
+                    del self.smr_datamodule
+                self.smr_datamodule = None
+
+            if self.cross_validation and self.k == 4:
+                # Delete large objects
+                if hasattr(self, 'smr_datamodule'):
+                    del self.smr_datamodule
+                self.smr_datamodule = None
+
 
             # Explicitly run garbage collection
             gc.collect()
@@ -228,38 +263,7 @@ class SRM_DataModule(LightningDataModule):
     def state_dict(self, stage: Optional[str] = None):
         """Extra things to save to checkpoint."""
 
-        if self.train_val_split:
-            state_dict = {}
-            if stage == "fit":
-                state_dict = {"task_name": self.task_name,
-                              "subjects_info_dict": self.smr_datamodule.subjects_info_dict,
-                              "train_data_shape": self.training_set.data.shape,
-                              "valid_data_shape": self.validation_set.data.shape,
-                              "train_classes_weights": self.training_set.classes_weights(),
-                              "valid_classes_weights": self.validation_set.classes_weights(),
-                              "train_stats": self.training_set.statistical_info(),
-                              "valid_stats": self.validation_set.statistical_info()}
-            if stage == "test":
-                state_dict = {"task_name": self.task_name,
-                              "subjects_info_dict": self.smr_datamodule.subjects_info_dict,
-                              "test_data_shape": self.testing_set.data.shape,
-                              "test_classes_weights": self.testing_set.classes_weights(),
-                              "test_stats": self.testing_set.statistical_info()}
-
-            return state_dict
-
-        elif self.cross_validation:
-            return {
-                "task_name": self.task_name,
-                "subjects_info_dict": self.smr_datamodule.subjects_info_dict,
-                "train_data_shape": self.training_set.data.shape,
-                "valid_data_shape": self.validation_set.data.shape,
-                "train_classes_weights": self.training_set.classes_weights(),
-                "valid_classes_weights": self.validation_set.classes_weights(),
-                "train_stats": self.training_set.statistical_info(),
-                "valid_stats": self.validation_set.statistical_info(),
-            }
-        else:
+        if stage == "fit":
             state_dict = {"task_name": self.task_name,
                           "subjects_info_dict": self.smr_datamodule.subjects_info_dict,
                           "train_data_shape": self.training_set.data.shape,
@@ -268,30 +272,74 @@ class SRM_DataModule(LightningDataModule):
                           "valid_classes_weights": self.validation_set.classes_weights(),
                           "train_stats": self.training_set.statistical_info(),
                           "valid_stats": self.validation_set.statistical_info()}
+            return state_dict
+        if stage == "test":
+            state_dict = {"task_name": self.task_name,
+                          "subjects_info_dict": self.smr_datamodule.subjects_info_dict,
+                          "test_data_shape": self.testing_set.data.shape,
+                          "test_classes_weights": self.testing_set.classes_weights(),
+                          "test_stats": self.testing_set.statistical_info()}
 
             return state_dict
 
 
 class SRMDataset(Dataset):
-    def __init__(self, data):
-        # Perform one-hot encoding on labels
-        y = data.y
+    def __init__(self, data, indices):
+        y = data[indices].y
+
         onehot_encoder = OneHotEncoder(sparse_output=False)
         integer_encoded = y.reshape(-1, 1)
         onehot_encoded = onehot_encoder.fit_transform(integer_encoded)
 
-        self.data = torch.tensor(data).float()
+        self.data = torch.tensor(data[indices]).float()
         self.y_oe = torch.tensor(onehot_encoded)
+        self.indices = indices
 
     def __getitem__(self, index):
         # fixme
         x = self.data[index].unsqueeze(dim=0)
+        # x = self.data[index]
         y = self.y_oe[index]
 
         return x, y
 
     def __len__(self):
-        return len(self.data)
+        return len(self.indices)
+
+    def normalize_data(self, norm_type="std", axis=None, keepdims=True, eps=10 ** -5, norm_params=None):
+        if norm_params is not None:
+            if norm_params["norm_type"] == "std":
+                self.data = (self.data - norm_params["mean"]) / norm_params["std"]
+            elif norm_params["norm_type"] == "minmax":
+                self.data = (self.data - norm_params["min"]) / (norm_params["max"] - norm_params["min"])
+            else:
+                raise RuntimeError("norm type {:} does not exist".format(norm_params["norm_type"]))
+        else:
+            if norm_type == "std":
+                data_std = self.data.std(axis=axis, keepdims=keepdims)
+                data_std[data_std < eps] = eps
+                data_mean = self.data.mean(axis=axis, keepdims=keepdims)
+                self.data = (self.data - data_mean) / data_std
+                self.norm_params = dict(mean=data_mean, std=data_std, norm_type=norm_type, axis=axis, keepdims=keepdims)
+            elif norm_type == "minmax":
+                data_min = self.data.min(axis=axis, keepdims=keepdims)
+                data_max = self.data.max(axis=axis, keepdims=keepdims)
+                data_max[data_max == data_min] = data_max[data_max == data_min] + eps
+                self.data = (self.data - data_min) / (data_max - data_min)
+                self.norm_params = dict(min=data_min, max=data_max, norm_type=norm_type, axis=axis, keepdims=keepdims)
+            elif norm_type is None:
+                self.data, self.norm_params = self.data, None
+            else:
+                self.data, self.norm_params = None, None
+                ValueError("Only 'std' and 'minmax' are supported")
+
+    # def unnormalize(self, data_norm, norm_params):
+    #     data = None
+    #     if norm_params["norm_type"] == "std":
+    #         data = data_norm * norm_params["std"] + norm_params["mean"]
+    #     elif norm_params["norm_type"] == "minmax":
+    #         data = data_norm * (norm_params["max"] - norm_params["min"]) + norm_params["min"]
+    #     return data
 
     def classes_weights(self):
         """Compute classes weights for imbalanced dataset."""

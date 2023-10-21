@@ -4,11 +4,11 @@ import logging
 import numpy as np
 import numpy.ma as ma
 from omegaconf import OmegaConf
-from sklearn.model_selection import KFold
 
 import bbcpy
 from src.utils.device import print_data_info
-from src.utils.srm_utils import transform_electrodes_configurations, remove_reference_channel, calculate_pvc_metrics
+from src.utils.srm_utils import transform_electrodes_configurations, remove_reference_channel, calculate_pvc_metrics, \
+    normalize
 
 logging.getLogger().setLevel(logging.INFO)
 
@@ -198,17 +198,13 @@ class SMR_Data():
 
         return srm_obj, chan_dict_info
 
-    def load_session_trials(self, session_path):
-
+    def load_session_runs(self, session_path):
+        number_of_runs = 6
         task_name_dict = {"LR": 1.0, "UD": 2.0, "2D": 3.0}
         target_map_dict = {1: "R", 2: "L", 3: "U", 4: "D"}
-        # Define the runs for training and testing
-        train_runs = [1, 2, 4, 5]
-        test_runs = [3, 6]
 
         srm_data, timepoints, srm_fs, clab, mnt, trials_info, subject_info = \
             bbcpy.load.srm_eeg.load_single_mat_session(file_path=session_path)
-
         session_info_dict = {}
         session_info_dict["subject_info"] = subject_info
         # calculate pvc
@@ -216,108 +212,31 @@ class SMR_Data():
 
         # set the EEG channels object, and remove the reference channel if exists
         chans = remove_reference_channel(clab, mnt)
-
-        # Initialize empty lists for train and test data
-        train_data = []
-        test_data = []
-        train_labels = []
-        test_labels = []
-        train_idx = []
-        test_idx = []
-
-        # Get the trials ids for the task
+        # Create SRM object for the given task
         task_trials_ids = [id for id, i in enumerate(trials_info["tasknumber"]) if i == task_name_dict[self.task_name]]
 
-        # Get the trials results for the task
-        if self.trial_type == "valid":
-            task_results = np.array(trials_info["result"])[task_trials_ids]
-            # Convert NaN to False
-            task_results[np.isnan(task_results)] = 0
-            # Convert to boolean
-            task_results = task_results.astype(bool)
-
-        elif self.trial_type == "forced":
-            # forced_trials_ids= np.setdiff1d(np.where(np.array(trials_info["forcedresult"])[task_trials_ids] == np.bool_(True))[0],
-            #                             np.array(trials_info["result"])[task_trials_ids])
-
-            task_results = np.array(trials_info["forcedresult"])[task_trials_ids]
-        else:
-            raise ValueError("trial_type should be either valid or forced")
-
-        # Get the trials targets for the task
+        raw_data = srm_data[task_trials_ids]
+        time = np.arange(0, self.trial_maxlen)
+        # Get the trials targets for each runs , we have 6 runs
         task_targets = np.array(trials_info["targetnumber"])[task_trials_ids]
         task_targets = task_targets.astype(int) - 1  # to start from 0
         class_names = np.array(["R", "L", "U", "D"])
 
-        # all trials
-        for idx, valid, target in zip(task_trials_ids, task_results, task_targets):
-            if valid:
-                trial_data = srm_data[idx]
-                run_idx = (idx % 150) // 25 + 1  # Calculate the run index
-                if run_idx in train_runs:
-                    train_data.append(trial_data)
-                    train_labels.append(target)
-                    train_idx.append(idx)
-                elif run_idx in test_runs:
-                    test_data.append(trial_data)
-                    test_labels.append(target)
-                    test_idx.append(idx)
-
-        # FIXME data need to be with even length
-        # timepoints_train = timepoints[train_idx]
-        # timepoints_test = timepoints[test_idx]
-        # trial_maxlen_train = max([len(t[0]) for t in timepoints_train])
-        # trial_maxlen_test = max([len(t[0]) for t in timepoints_test])
-        # trial_maxlen = max(trial_maxlen_train, trial_maxlen_test)
-        # self.trial_len.append(trial_maxlen)
-        # FIXME : time with offset is not correct
-        time = np.arange(0, self.trial_maxlen)
-
-        # Create SRM_Data objects for the train data
-        new_srm_train_data = ma.zeros((len(train_data), len(chans), self.trial_maxlen))
+        new_srm_train_data = ma.zeros((len(raw_data), len(chans), self.trial_maxlen))
         # Set the mask for each row based on the sub ndarray size
-        for i, sub_arr in enumerate(train_data):
+        for i, sub_arr in enumerate(raw_data):
             new_srm_train_data[i, :, :sub_arr.shape[-1]] = sub_arr
 
-        mrk_train = bbcpy.datatypes.eeg.Marker(mrk_pos=train_idx,
-                                               mrk_class=train_labels,
-                                               mrk_class_name=class_names,
-                                               mrk_fs=1,
-                                               parent_fs=srm_fs)
-        epo_train_data = bbcpy.datatypes.srm_eeg.SRM_Data(srm_data=new_srm_train_data,
-                                                          timepoints=time,
-                                                          fs=srm_fs,
-                                                          mrk=mrk_train,
-                                                          chans=chans)
-
-        # preprocess the data
-        epo_train_data = self.preprocess_data(epo_train_data)
-
-        # Create SRM_Data objects for the test data
-        new_srm_test_data = ma.zeros((len(test_data), len(chans), self.trial_maxlen))
-        # Set the mask for each row based on the sub ndarray size
-        for i, sub_arr in enumerate(test_data):
-            new_srm_test_data[i, :, :sub_arr.shape[-1]] = sub_arr
-
-        mrk_test = bbcpy.datatypes.eeg.Marker(mrk_pos=test_idx,
-                                              mrk_class=test_labels,
-                                              mrk_class_name=class_names,
-                                              mrk_fs=1,
-                                              parent_fs=srm_fs)
-
-        epo_test_data = bbcpy.datatypes.srm_eeg.SRM_Data(srm_data=new_srm_test_data,
-                                                         timepoints=time,
-                                                         fs=srm_fs,
-                                                         mrk=mrk_test,
-                                                         chans=chans)
-        # preprocess the data
-        epo_test_data = self.preprocess_data(epo_test_data)
-
-        # FIXME bandpass filter the data bte 8-30 Hz in liter
-        if self.bands is not None:
-            logging.info(f"Bandpass filtering the data between {self.bands[0]}-{self.bands[1]} Hz")
-            epo_train_data = epo_train_data.lfilter(self.bands)
-            epo_test_data = epo_test_data.lfilter(self.bands)
+        mrk = bbcpy.datatypes.eeg.Marker(mrk_pos=task_trials_ids,
+                                         mrk_class=task_targets,
+                                         mrk_class_name=class_names,
+                                         mrk_fs=1,
+                                         parent_fs=srm_fs)
+        epo_data = bbcpy.datatypes.srm_eeg.SRM_Data(srm_data=new_srm_train_data,
+                                                    timepoints=time,
+                                                    fs=srm_fs,
+                                                    mrk=mrk,
+                                                    chans=chans)
 
         # if noisy channels are present, remove them from the data
         if subject_info["noisechan"] is not None:
@@ -328,140 +247,67 @@ class SMR_Data():
                              f"each channel will be averaged with {self.fallback_neighbors} neighbors")
                 session_info_dict["noisechans"] = {}
                 for noisy_chans_id in noisy_chans_id_list:
-                    epo_train_data, chan_dict_info = self.referencing(epo_train_data.copy(),
-                                                                      noisy_chans_id,
-                                                                      noisy_chans_id_list,
-                                                                      mode="average")
-                    epo_test_data, _ = self.referencing(epo_test_data.copy(),
-                                                        noisy_chans_id,
-                                                        noisy_chans_id_list,
-                                                        mode="average")
-
-                    noise_chans_name = str(epo_train_data.chans[noisy_chans_id])
-                    session_info_dict["noisechans"][noise_chans_name] = chan_dict_info
-            else:
-                session_info_dict["noisechans"] = noisy_chans_id_list
-
-        else:
-            session_info_dict["noisechans"] = None
-
-        # channels configurations transformation for TSCeption model
-        if self.transform == "TSCeption":
-            epo_train_data = transform_electrodes_configurations(epo_train_data.copy())
-            epo_test_data = transform_electrodes_configurations(epo_test_data.copy())
-
-        # save subject info shapes
-        session_info_dict["shapes"] = {"train": epo_train_data.shape, "test": epo_test_data.shape}
-
-        return epo_train_data, epo_test_data, session_info_dict
-
-    def reshape_raw_srm_data(self, srm_obj):
-        pass
-
-    def load_trials(self, session_path, load_forced_trials=False):
-
-        srm_data, timepoints, srm_fs, clab, mnt, trial_info, subject_info = \
-            bbcpy.load.srm_eeg.load_single_mat_session(file_path=session_path)
-
-        session_info_dict = {}
-        session_info_dict["subject_info"] = subject_info
-        # calculate pvc
-        session_info_dict["pvc"] = calculate_pvc_metrics(trial_info, taskname=self.task_name)
-
-        # set the EEG channels object, and remove the reference channel if exists
-        chans = remove_reference_channel(clab, mnt)
-
-        # true labels
-        # target_map_dict = {1: "R", 2: "L", 3: "U", 4: "D"}
-        mrk_class = np.array(trial_info["targetnumber"])
-        mrk_class = mrk_class.astype(int) - 1  # to start from 0
-        class_names = np.array(["R", "L", "U", "D"])
-
-        # all trials
-        # FIXME : not sure what to pass for mrk_pos
-        # mrk pos here is the results of all trials
-        # 1 =correct target selected, 0=incorrect target selected,NaN=no target selected; timeout
-        trialresult = trial_info["result"]
-
-        mrk = bbcpy.datatypes.eeg.Marker(mrk_pos=trialresult,
-                                         mrk_class=mrk_class,
-                                         mrk_class_name=class_names,
-                                         mrk_fs=1,
-                                         parent_fs=srm_fs)
-
-        # create SRM_Data object for the session
-        epo_data = bbcpy.datatypes.srm_eeg.SRM_Data(srm_data=srm_data,
-                                                    timepoints=timepoints.reshape(-1, 1),
-                                                    fs=srm_fs,
-                                                    mrk=mrk,
-                                                    chans=chans)
-        # print("before bandpass filter")
-        # print_data_info(epo_data)
-
-        # FIXME bandpass filter the data bte 8-30 Hz in liter
-        if self.bands is not None:
-            epo_data = epo_data.lfilter(self.bands)
-
-        # print("after bandpass filter")
-        # print_data_info(epo_data)
-
-        # if noisy channels are present, remove them from the data
-        if subject_info["noisechan"] is not None:
-            # shift to left becasue of REF. channel removal
-            noisy_chans_id_list = [int(chan) - 1 for chan in subject_info["noisechan"]]
-
-            if self.process_noisy_channels:
-                session_info_dict["noisechans"] = {}
-                for noisy_chans_id in noisy_chans_id_list:
                     epo_data, chan_dict_info = self.referencing(epo_data.copy(),
                                                                 noisy_chans_id,
                                                                 noisy_chans_id_list,
+
                                                                 mode="average")
 
                     noise_chans_name = str(epo_data.chans[noisy_chans_id])
                     session_info_dict["noisechans"][noise_chans_name] = chan_dict_info
             else:
                 session_info_dict["noisechans"] = noisy_chans_id_list
-
         else:
             session_info_dict["noisechans"] = None
 
-        # print("after referencing")
-        # print_data_info(epo_data)
-
-        # channels configurations transformation
+        # channels configurations transformation for TSCeption model
         if self.transform == "TSCeption":
             epo_data = transform_electrodes_configurations(epo_data.copy())
 
-        # valid trials are defined as the trials where labeles are correct (true) in trialresult
-
-        valid_trials_idx = np.where(epo_data.mrk == np.bool_(True))[0]
-        valid_trials = epo_data[valid_trials_idx].copy()
-
-        forced_trials = np.array(None)
+        # FIXME bandpass filter the data bte 8-30 Hz in liter
+        if self.bands is not None:
+            logging.info(f"Bandpass filtering the data between {self.bands[0]}-{self.bands[1]} Hz")
+            epo_data = epo_data.lfilter(self.bands)
 
         # preprocess the data
-        valid_trials = self.preprocess_data(valid_trials)
+        logging.info(f"Preprocessing the data ...")
+        logging.info(f"Data shape before preprocessing: {epo_data.shape}")
+        epo_data = epo_data[:, self.select_chans, self.select_timepoints].copy()
+        logging.info(f"Data shape after preprocessing: {epo_data.shape}")
 
-        if load_forced_trials:
-            # forced trials are defined as the trials where labeles are correct (true) in forcedresult
-            # and not in valid trials
-            forced_trials = trial_info["forcedresult"]
+        # divide the trials into 6 runs and get the trials ids for each run
+        task_trials_ids_runs = np.array_split(task_trials_ids, 6)
+        trial_ids_runs = np.array_split(np.arange(len(task_trials_ids)), 6)
+        runs_data = {}
+        for i, (task_idx, trial_idx) in enumerate(zip(task_trials_ids_runs, trial_ids_runs)):
+            run_name = f"run_{i + 1}"
+            runs_data[run_name] = {}
+            if self.trial_type == "valid":
+                task_results = np.array(trials_info["result"])[task_idx]
+                # Convert NaN to False
+                task_results[np.isnan(task_results)] = 0
+                # Convert to boolean
+                task_results = task_results.astype(bool)
+            elif self.trial_type == "forced":
+                task_results = np.array(trials_info["forcedresult"])[task_idx]
+            else:
+                raise ValueError("trial_type should be either valid or forced")
 
-            forced_trials_idx = np.setdiff1d(np.where(forced_trials == np.bool_(True))[0], valid_trials_idx)
+            # all trials
+            runs_data[run_name]["ids"] = []
+            runs_data[run_name]["tidx"] = []
+            for idx, tidx, valid in zip(task_idx, trial_idx, task_results):
+                if valid:
+                    runs_data[run_name]["ids"].append(idx)
+                    runs_data[run_name]["tidx"].append(tidx)
 
-            # TODO IMPORTANT repalce y to forced y trials
-            forced_trials = epo_data[forced_trials_idx].copy()
+        for run_name, run_data in runs_data.items():
+            runs_data[run_name]["data"] = epo_data[run_data["tidx"], :, :].copy()
+            print(run_name, runs_data[run_name]["data"].shape)
 
-            forced_trials = self.preprocess_data(forced_trials)
+        return runs_data, session_info_dict
 
-        # save subject info
-        session_info_dict["shapes"] = {"valid_trials": valid_trials.shape,
-                                       "forced_trials": forced_trials.shape}
-
-        return valid_trials, forced_trials, session_info_dict
-
-    def load_sessions(self, subject_path_dict):
+    def load_sessions_runs(self, subject_path_dict):
         """ Create a subject object from the SRM data sessions"""
         # FIXME : not completed
 
@@ -470,46 +316,64 @@ class SMR_Data():
         for i, (session_name, session_path) in enumerate(subject_path_dict.items()):
             # load data
             logging.info(f"Loading session {session_name} ...")
-            epo_train_data, epo_test_data, session_info_dict = \
-                self.load_session_trials(session_path)
+            run_data_dict, session_info_dict = self.load_session_runs(session_path)
 
-            logging.info(f"Train trials shape: {epo_train_data.shape},"
-                         f"Test trials shape: {epo_test_data.shape}")
             logging.info(f"{i + 1}/{len(subject_path_dict)} sessions loaded")
 
             # add to the loaded sessions dict
-            loaded_subject_sessions[session_name] = [epo_train_data, epo_test_data]
+            loaded_subject_sessions[session_name] = run_data_dict
 
             # add to the loaded sessions dict
             subject_info["sessions_info"][session_name] = {}
-            subject_info["sessions_info"][session_name]["shapes"] = session_info_dict["shapes"]
             subject_info["sessions_info"][session_name]["pvc"] = session_info_dict["pvc"]
             subject_info["sessions_info"][session_name]["NoisyChannels"] = session_info_dict["noisechans"]
             subject_info["subject_info"] = session_info_dict["subject_info"]
 
         return loaded_subject_sessions, subject_info
 
-    def append_sessions(self, sessions_data_dict, sessions_info_dict):
+    def append_sessions_across_runs(self, sessions_data_dict, sessions_info_dict):
         """ Append all the subjects sessions , this includes train and test trials"""
 
         # FIXME : not completed: check how many noisy channels has a sessions
-        train_trials = None
-        test_trials = None
+
+        run_1 = None
+        run_2 = None
+        run_3 = None
+        run_4 = None
+        run_5 = None
+        run_6 = None
+
         for session_name, session_data in sessions_data_dict.items():
+
             # FIXME : preprocessing here if needed
             # check if the session has noisy channels
             if self.ignore_noisy_sessions and sessions_info_dict[session_name]["NoisyChannels"] is not None:
-                logging.info(f"Session {session_name} has noisy channels, the data will be skipped")
+                logging.info(f"Session {session_name} has noisy channels, the session will be skipped")
                 continue
             else:
-                if train_trials is None and test_trials is None:
-                    train_trials = session_data[0].copy()
-                    test_trials = session_data[1].copy()
+                if run_1 is None and run_2 is None and run_3 is None and run_4 is None and run_5 is None and run_6 is None:
+                    run_1 = session_data["run_1"]["data"]
+                    run_2 = session_data["run_2"]["data"]
+                    run_3 = session_data["run_3"]["data"]
+                    run_4 = session_data["run_4"]["data"]
+                    run_5 = session_data["run_5"]["data"]
+                    run_6 = session_data["run_6"]["data"]
                 else:
-                    train_trials = train_trials.append(session_data[0], axis=0)
-                    test_trials = test_trials.append(session_data[1], axis=0)
+                    run_1 = run_1.append(session_data["run_1"]["data"], axis=0)
+                    run_2 = run_2.append(session_data["run_2"]["data"], axis=0)
+                    run_3 = run_3.append(session_data["run_3"]["data"], axis=0)
+                    run_4 = run_4.append(session_data["run_4"]["data"], axis=0)
+                    run_5 = run_5.append(session_data["run_5"]["data"], axis=0)
+                    run_6 = run_6.append(session_data["run_6"]["data"], axis=0)
 
-        return train_trials, test_trials
+        logging.info(f"Run 1 shape: {run_1.shape}")
+        logging.info(f"Run 2 shape: {run_2.shape}")
+        logging.info(f"Run 3 shape: {run_3.shape}")
+        logging.info(f"Run 4 shape: {run_4.shape}")
+        logging.info(f"Run 5 shape: {run_5.shape}")
+        logging.info(f"Run 6 shape: {run_6.shape}")
+
+        return [run_1, run_2, run_3, run_4, run_5, run_6]
 
     def load_subjects_sessions(self, subject_sessions_path_dict):
         """ Load all the subjects sessions and concatenate them """
@@ -524,7 +388,7 @@ class SMR_Data():
             logging.info(f"Subject {subject_name} loading...")
 
             subject_data_dict[subject_name], subject_info = \
-                self.load_sessions(subject_path_dict)
+                self.load_sessions_runs(subject_path_dict)
 
             # calculate the mean pvc for all the sessions
             pvc_list = []
@@ -547,29 +411,30 @@ class SMR_Data():
 
         subjects_data_dict, subjects_info_dict = self.load_subjects_sessions(subjects_sessions_path_dict)
 
-        train_trials_list = []
-        test_trials_list = []
-
+        runs_trials_list = [[] for _ in range(6)]
+        runs_res_list = []
         for subject_name, subject_data in subjects_data_dict.items():
             loaded_subject_sessions_info = subjects_info_dict[subject_name]["sessions_info"]
             # append the sessions
-            train_trials, test_trials = self.append_sessions(subject_data,
-                                                             loaded_subject_sessions_info)
+            run_list = self.append_sessions_across_runs(subject_data,
+                                                        loaded_subject_sessions_info)
 
-            if train_trials is not None and test_trials is not None:
-                train_trials_list.append(train_trials)
-                test_trials_list.append(test_trials)
+            for i, run_data in enumerate(run_list):
+                if run_data is not None:
+                    runs_trials_list[i].append(run_data)
 
-        train_trials = train_trials_list[0]
-        test_trials = test_trials_list[0]
-        for train_trials_i, test_trials_i in zip(train_trials_list[1:], test_trials_list[1:]):
-            train_trials = train_trials.append(train_trials_i, axis=0)
-            test_trials = test_trials.append(test_trials_i, axis=0)
+        for i, run_data in enumerate(runs_trials_list):
 
-        return train_trials, test_trials, subjects_info_dict
+            run_obj = run_data[0]
+            for run_obj_i in run_data[1:]:
+                run_obj = run_obj.append(run_obj_i, axis=0)
+
+            runs_res_list.append(run_obj)
+
+        return runs_res_list, subjects_info_dict
 
     def prepare_dataloader(self):
-        """ Prepare the data for the classification """
+        """ Prepare the data for the datamodule """
 
         # load subject paths
         subjects_sessions_path_dict = self.collect_subject_sessions(self.subject_sessions_dict)
@@ -577,182 +442,33 @@ class SMR_Data():
         if self.loading_data_mode == "within_subject":
             # load the subject sessions dict
             subject_data_dict, subjects_info_dict = self.load_subjects_sessions(subjects_sessions_path_dict)
-
             subject_name = list(subject_data_dict.keys())[0]
 
-            loaded_subject_sessions = subject_data_dict[subject_name]
-            loaded_subject_sessions_info = subjects_info_dict[subject_name]["sessions_info"]
-
             # append the sessions
-            self.train_trials, self.test_trials = self.append_sessions(loaded_subject_sessions,
-                                                                       loaded_subject_sessions_info)
+            self.runs_data_list = self.append_sessions_across_runs(subject_data_dict[subject_name],
+                                                                   subjects_info_dict[subject_name]["sessions_info"])
+
+            logging.info("Preparing data...")
+            # FIXME : take portion from run 3 and run 6 for test
+            self.test_data = self.runs_data_list[-1]
+
+            # train data is the rest of the runs
+            self.train_data = self.runs_data_list[0]
+            for i in range(1, len(self.runs_data_list) - 1):
+                self.train_data = self.train_data.append(self.runs_data_list[i], axis=0)
+
             logging.info("Raw train trials")
-            print_data_info(self.train_trials)
+            print_data_info(self.train_data)
             logging.info("Raw test trials")
-            print_data_info(self.test_trials)
+            print_data_info(self.test_data)
 
-            if self.normalize:
-                self.train_trials, norm_params_train = normalize(self.train_trials,
-                                                                 norm_type=self.normalize["norm_type"],
-                                                                 axis=self.normalize["norm_axis"])
-
-                # FIXME : normalize test trials with the same parameters as train trials
-                self.test_trials, norm_params_test = normalize(self.test_trials,
-                                                               norm_type=self.normalize["norm_type"],
-                                                               axis=self.normalize["norm_axis"])
-
-                logging.info("Normalized train trials")
-                print_data_info(self.train_trials)
-                logging.info("Normalized test trials")
-                print_data_info(self.test_trials)
 
             # subject info dict
             self.subjects_info_dict[subject_name] = subjects_info_dict[subject_name]
 
+            # delete the subject data dict
             del subject_data_dict, subjects_info_dict
             gc.collect()
-
-
-        elif self.loading_data_mode == "cross_subject_hpo":
-
-            # append subjects data
-            self.train_trials, self.test_trials, self.subjects_info_dict = self.append_subjects(
-                subjects_sessions_path_dict)
-
-            logging.info("Raw train trials")
-            print_data_info(self.train_trials)
-            logging.info("Raw test trials")
-            print_data_info(self.test_trials)
-
-            if self.normalize:
-                self.train_trials, norm_params_train = normalize(self.train_trials,
-                                                                 norm_type=self.normalize["norm_type"],
-                                                                 axis=self.normalize["norm_axis"])
-
-                self.test_trials, norm_params_test = normalize(self.test_trials,
-                                                               norm_type=self.normalize["norm_type"],
-                                                               axis=self.normalize["norm_axis"])
-
-                logging.info("Normalized train trials")
-                print_data_info(self.train_trials)
-                logging.info("Normalized test trials")
-                print_data_info(self.test_trials)
-
-            gc.collect()
-
-        elif self.loading_data_mode == "cross_subject":
-
-            pass  # TODO : not implemented yet
-
-        else:
-            raise Exception(f"Loading data mode {self.loading_data_mode} not supported")
-
-
-def train_valid_split(data, train_val_split_dict):
-    """ Split the data into train and validation sets """
-
-    random_seed = train_val_split_dict["random_seed"]
-    val_ratio = train_val_split_dict["val_size"]
-
-    # Set the random seed for reproducibility
-    np.random.seed(random_seed)
-
-    # Shuffle the data
-    # TODO : Shuffle the SMR data object
-    indices = np.random.permutation(len(data))
-    data = data[indices]
-    data.y = data.y[indices]
-
-    # Compute the index where the validation set starts
-    val_start_idx = int(len(data) * (1 - val_ratio))
-
-    # Split the data into training and validation sets
-    train_data = data[:val_start_idx]
-    val_data = data[val_start_idx:]
-
-    return train_data, val_data
-
-
-def cross_validation(data, cross_validation_dict, kfold_idx):
-    kf = KFold(n_splits=cross_validation_dict["num_splits"],
-               shuffle=True,
-               random_state=cross_validation_dict["split_seed"])
-
-    all_splits_trial_kf = [k for k in kf.split(data)]
-
-    train_indexes, val_indexes = all_splits_trial_kf[kfold_idx]
-
-    train_indexes, val_indexes = train_indexes.tolist(), val_indexes.tolist()
-
-    train_data, val_data = (data[train_indexes],
-                            data[val_indexes])
-
-    return train_data, val_data
-
-
-def normalize(data, norm_type="std", axis=None, keepdims=True, eps=10 ** -5, norm_params=None):
-    """Normalize data along a given axis.
-
-    Parameters
-    ----------
-    data : numpy.ndarray
-        Data to normalize.
-    norm_type : str
-        Type of normalization. Can be 'std' or 'minmax'.
-    axis : int
-        Axis along which to normalize.
-    keepdims : bool
-        Whether to keep the dimensions of the original data.
-    eps : float
-        Epsilon to avoid division by zero.
-    norm_params : dict
-        Dictionary containing normalization parameters. If None, they will be computed.
-
-    Returns
-    -------
-    data_norm : numpy.ndarray
-        Normalized data.
-    norm_params : dict
-        Dictionary containing normalization parameters.
-
-    """
-
-    if norm_params is not None:
-        if norm_params["norm_type"] == "std":
-            data_norm = (data - norm_params["mean"]) / norm_params["std"]
-        elif norm_params["norm_type"] == "minmax":
-            data_norm = (data - norm_params["min"]) / (norm_params["max"] - norm_params["min"])
-        else:
-            raise RuntimeError("norm type {:} does not exist".format(norm_params["norm_type"]))
-
-    else:
-        if norm_type == "std":
-            data_std = data.std(axis=axis, keepdims=keepdims)
-            data_std[data_std < eps] = eps
-            data_mean = data.mean(axis=axis, keepdims=keepdims)
-            data_norm = (data - data_mean) / data_std
-            norm_params = dict(mean=data_mean, std=data_std, norm_type=norm_type, axis=axis, keepdims=keepdims)
-        elif norm_type == "minmax":
-            data_min = data.min(axis=axis, keepdims=keepdims)
-            data_max = data.max(axis=axis, keepdims=keepdims)
-            data_max[data_max == data_min] = data_max[data_max == data_min] + eps
-            data_norm = (data - data_min) / (data_max - data_min)
-            norm_params = dict(min=data_min, max=data_max, norm_type=norm_type, axis=axis, keepdims=keepdims)
-        elif norm_type is None:
-            data_norm, norm_params = data, None
-        else:
-            data_norm, norm_params = None, None
-            ValueError("Only 'std' and 'minmax' are supported")
-
-    return data_norm, norm_params
-
-
-def unnormalize(data_norm, norm_params):
-    if norm_params["norm_type"] == "std":
-        data = data_norm * norm_params["std"] + norm_params["mean"]
-    elif norm_params["norm_type"] == "minmax":
-        data = data_norm * (norm_params["max"] - norm_params["min"]) + norm_params["min"]
-    return data
 
 
 if "__main__" == __name__:

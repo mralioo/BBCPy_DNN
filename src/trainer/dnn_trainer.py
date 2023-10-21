@@ -75,6 +75,12 @@ class DnnLitModule(LightningModule):
         self.init_metrics()
 
     def forward(self, x: torch.Tensor):
+
+        # FIXME
+        if x.dim() <= 3:
+            x = x.unsqueeze(dim=0)
+
+
         return self.net(x)
 
     def model_step(self, batch: Any):
@@ -91,6 +97,9 @@ class DnnLitModule(LightningModule):
         # FIXME : add class weights
         # classes_weights_tensor = torch.tensor(self.calculate_sample_weights(y)).to(self.device)
         # loss = self.criterion(weight=classes_weights_tensor)(logits, y)
+
+        if y.dim() == 1 :
+            y = y.unsqueeze(dim=0)
 
         loss = self.criterion()(probs, y)
 
@@ -110,6 +119,9 @@ class DnnLitModule(LightningModule):
         if self.num_classes > 2:
             probs = F.softmax(logits, dim=1)
 
+        if y.dim() == 1 :
+            y = y.unsqueeze(dim=0)
+
         loss = self.criterion()(probs, y)
 
         return loss, probs, torch.argmax(y, dim=1)
@@ -123,6 +135,11 @@ class DnnLitModule(LightningModule):
 
         # log hyperparameters
         self.save_hparams_to_mlflow()
+
+        # # Cross validation
+        # if self.trainer.datamodule.cross_validation:
+        #     self.tracker = MaxMetric(num_classes=self.num_classes)
+        #     self.tracker.reset()
 
         # reset metrics
         self.val_loss.reset()
@@ -287,7 +304,7 @@ class DnnLitModule(LightningModule):
         hparams = {}
         state_dict = self.trainer.datamodule.state_dict(stage="test")
         # FIXME
-        hparams["data_type"] = "Run 3 & 6"
+        hparams["data_type"] = "Run 6"
         hparams["test_data_shape"] = state_dict["test_data_shape"]
         hparams["test_classes_weights"] = state_dict["test_classes_weights"]
         hparams["test_stats"] = state_dict["test_stats"]
