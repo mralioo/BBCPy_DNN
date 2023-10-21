@@ -36,11 +36,11 @@ logger:
 #    run_name: riemann
 #    run_name: csp
 #    run_name: mbcsp
-    tracking_uri: ${paths.log_dir}\mlflow\mlruns
+    tracking_uri: ${paths.log_dir}/test/mlruns
 
 data:
 #  task_name: "2D"
-#  trial_type: "forced"
+  trial_type: "valid"
 #  ival: 2s:10s:10ms
 #  chans: [ "*" ]
 #  bands: [ 8, 13 ]

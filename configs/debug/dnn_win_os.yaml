@@ -30,7 +30,7 @@ logger:
     experiment_name: DEBUG-DNN-TRAIN
     #    run_name: EEGNet-v1
     #    run_name: TSCeption-v1
-    tracking_uri: file:${paths.log_dir}/best_runs
+    tracking_uri: file:${paths.log_dir}/test/mlruns
 #    tags: ${tags}
   csv:
     _target_: lightning.pytorch.loggers.csv_logs.CSVLogger
@@ -38,12 +38,12 @@ logger:
     name: "csv/"
     prefix: ""
 
-#model:
+model:
 #  net:
 ##    chunk_size: 900
 #    num_classes: 4
-#  plots_settings:
-#    plot_every_n_epoch: 1
+  plots_settings:
+    plot_every_n_epoch: 1
 
 data:
   #  task_name: "2D"
