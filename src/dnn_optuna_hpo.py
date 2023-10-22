@@ -9,6 +9,8 @@ from lightning.pytorch.loggers import Logger
 from omegaconf import DictConfig
 from omegaconf import OmegaConf
 
+import src.utils.srm_utils
+
 pyrootutils.setup_root(__file__, indicator=".project-root", pythonpath=True)
 # ------------------------------------------------------------------------------------ #
 # the setup_root above is equivalent to:
@@ -79,7 +81,7 @@ def train(cfg: DictConfig) -> Tuple[dict, dict]:
         log.info("Starting hyperparameter optimization!")
 
         cv_score = []
-        nums_folds = cfg.data.cross_validation["num_splits"]
+        nums_folds = src.utils.srm_utils.cross_validation["num_splits"]
         for k in range(nums_folds):
             print(f"Fold {k}...")
 

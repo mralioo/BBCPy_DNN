@@ -116,3 +116,30 @@ def get_metric_value(metric_dict: dict, metric_name: str) -> float:
     log.info(f"Retrieved metric value! <{metric_name}={metric_value}>")
 
     return metric_value
+
+def aggregate_metrics(metrics_list):
+    """
+    Aggregate metrics from multiple folds.
+
+    Args:
+        metrics_list (list): List of dictionaries, where each dictionary contains metrics for one fold.
+
+    Returns:
+        dict: Aggregated metrics.
+    """
+    aggregated_metrics = {}
+
+    if not metrics_list:
+        return aggregated_metrics
+
+    # Get the metrics keys from the first fold
+    metrics_keys = metrics_list[0].keys()
+
+    for metric_key in metrics_keys:
+        # Get the values for this metric from all folds
+        metric_values = [fold_metrics[metric_key] for fold_metrics in metrics_list]
+
+        # Calculate the mean
+        aggregated_metrics[metric_key] = sum(metric_values) / len(metric_values)
+
+    return aggregated_metrics

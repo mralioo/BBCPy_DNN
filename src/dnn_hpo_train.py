@@ -11,8 +11,7 @@ from omegaconf import OmegaConf
 
 from hydra.core.hydra_config import HydraConfig
 
-
-
+import src.utils.srm_utils
 
 pyrootutils.setup_root(__file__, indicator=".project-root", pythonpath=True)
 # ------------------------------------------------------------------------------------ #
@@ -81,7 +80,7 @@ def train(cfg: DictConfig) -> Tuple[dict, dict]:
         datamodule.load_raw_data()
 
         cv_score = []
-        nums_folds = cfg.data.cross_validation["num_splits"]
+        nums_folds = src.utils.srm_utils.cross_validation["num_splits"]
         for k in range(nums_folds):
 
             log.info(f"Fold {k}...")

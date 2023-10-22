@@ -13,34 +13,40 @@ defaults:
 # all parameters below will be merged with parameters from default configurations set above
 # this allows you to overwrite only specified parameters
 
-tags: [ "baseline" , "alpha_band" , "Within-Subject" , "LR"]
+tags: [ "baseline" , "alpha_band" , "Within-Subject" , "riemann" , "LR"]
 
 seed: 12345
 
 data:
   task_name: "LR"
-  ival: 1s:10s:1ms
-  bands:
-    - 8
-    - 13
+  trial_type: "forced"
+  ival: 2s:10s:1ms
   chans: [ "*" ]
+  bands: [ 8, 13 ]
+  fallback_neighbors: 4
   loading_data_mode: "within_subject"
+  process_noisy_channels: True
+  ignore_noisy_sessions: False
+  transform: False
   normalize: { norm_type: "std", norm_axis: 0 }
-  transform: None
 
 trainer:
-  train_val_split: { val_size: 0.2, random_seed: 1234 }
+  train_val_split: False
+  cv:
+    _target_: src.utils.srm_utils.RunKFold
+    n_splits: 5
 
 paths:
   root_dir: ${oc.env:PROJECT_ROOT}
   data_dir: /input-data
-  log_dir: ${oc.env:PROJECT_ROOT}/logs
+  log_dir: ${oc.env:PROJECT_ROOT}/logs/23_10
   output_dir: ${hydra:runtime.output_dir}
   work_dir: ${hydra:runtime.cwd}
+  results_dir: ${paths.log_dir}/results # final results directory
 
 logger:
   mlflow:
     tags: ${tags}
     experiment_name: Riemann-v1
     run_name: S1
-
+    tracking_uri: ${paths.log_dir}/mlflow/mlruns

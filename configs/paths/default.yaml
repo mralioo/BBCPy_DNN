@@ -7,7 +7,7 @@ root_dir: ${oc.env:PROJECT_ROOT}
 data_dir: ${paths.root_dir}\data\SMR\raw\
 
 # path to logging directory
-log_dir: ${paths.root_dir}\logs\
+log_dir: ${paths.root_dir}\logs\best_runs\
 
 # path to output directory, created dynamically by hydra
 # path generation pattern is specified in `configs/hydra/default.yaml`
@@ -16,3 +16,6 @@ output_dir: ${hydra:runtime.output_dir}
 
 # path to working directory
 work_dir: ${hydra:runtime.cwd}
+
+# final results directory
+results_dir: ${paths.root_dir}\logs\results\

@@ -15,28 +15,10 @@ steps_config: # use yaml list syntax to preserve to order
   Transformation:
     var:
       applied: True
-      axis: 2
+      axis: 1
     log:
       applied: True
   Classification:
     LDA:
       applied: True
       solver: 'svd'
-
-#  - CSP:
-#      _target_: bbcpy.functions.spatial.CSP
-#      scoring:
-#        _partial_: true
-#        _target_: bbcpy.functions.helpers.evscoring_EV
-#      select:
-#        _partial_: true
-#        _target_: bbcpy.functions.helpers.evselect_best_csp
-#  - var:
-#      _target_: bbcpy.functions.base.ImportFunc
-#      func: numpy.var
-#      axis: 2
-#  - log:
-#      _target_: bbcpy.functions.base.ImportFunc
-#      func: numpy.log
-#  - LDA:
-#      _target_: sklearn.discriminant_analysis.LinearDiscriminantAnalysis

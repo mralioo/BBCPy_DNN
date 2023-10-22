@@ -1,8 +1,10 @@
 _target_: src.data.smr_datamodule.SMR_Data
 data_dir: ${paths.data_dir}
 task_name: "RL"
+trial_type: "valid"
 ival: "all"
 chans: [ "*" ]
-fallback_neighbors: 3
+fallback_neighbors: 4
 loading_data_mode: within_subject
 process_noisy_channels : True
+ignore_noisy_sessions : False

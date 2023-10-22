@@ -75,6 +75,12 @@ class DnnLitModule(LightningModule):
         self.init_metrics()
 
     def forward(self, x: torch.Tensor):
+
+        # FIXME
+        if x.dim() <= 3:
+            x = x.unsqueeze(dim=0)
+
+
         return self.net(x)
 
     def model_step(self, batch: Any):
@@ -84,13 +90,16 @@ class DnnLitModule(LightningModule):
         logits = self.forward(x)
 
         if self.num_classes == 2:
-            probs = F.softmax(logits, dim=1)
+            probs = F.sigmoid(logits)
         if self.num_classes > 2:
             probs = F.softmax(logits, dim=1)
 
         # FIXME : add class weights
         # classes_weights_tensor = torch.tensor(self.calculate_sample_weights(y)).to(self.device)
         # loss = self.criterion(weight=classes_weights_tensor)(logits, y)
+
+        if y.dim() == 1 :
+            y = y.unsqueeze(dim=0)
 
         loss = self.criterion()(probs, y)
 
@@ -106,9 +115,12 @@ class DnnLitModule(LightningModule):
         logits = self.forward(x)
 
         if self.num_classes == 2:
-            probs = F.softmax(logits, dim=1)
+            probs = F.sigmoid(logits)
         if self.num_classes > 2:
             probs = F.softmax(logits, dim=1)
+
+        if y.dim() == 1 :
+            y = y.unsqueeze(dim=0)
 
         loss = self.criterion()(probs, y)
 
@@ -124,6 +136,11 @@ class DnnLitModule(LightningModule):
         # log hyperparameters
         self.save_hparams_to_mlflow()
 
+        # # Cross validation
+        # if self.trainer.datamodule.cross_validation:
+        #     self.tracker = MaxMetric(num_classes=self.num_classes)
+        #     self.tracker.reset()
+
         # reset metrics
         self.val_loss.reset()
         self.val_acc.reset()
@@ -137,17 +154,17 @@ class DnnLitModule(LightningModule):
 
         # GET AND SAVE OUTPUTS AND TARGETS PER BATCH
         # FIXME: only support cpu
-        y_pred = preds.argmax(axis=1).cpu().numpy()
-        y_true = targets.argmax(axis=1).cpu().numpy()
+        y_pred = preds.argmax(axis=1)
+        y_true = targets.argmax(axis=1)
 
         # --> HERE STEP 2 <--
-        self.training_step_outputs.extend(y_pred)
-        self.training_step_targets.extend(y_true)
+        self.training_step_outputs.extend(y_pred.cpu().numpy())
+        self.training_step_targets.extend(y_true.cpu().numpy())
 
         # update and log metrics
         self.train_loss(loss)
-        self.train_acc(preds, targets)
-        self.train_f1(preds, targets)
+        self.train_acc(y_pred, y_true)
+        self.train_f1(y_pred, y_true)
 
         self.log("train/loss", self.train_loss, on_step=False, on_epoch=True, prog_bar=True)
         self.log("train/acc", self.train_acc, on_step=False, on_epoch=True, prog_bar=True)
@@ -195,17 +212,17 @@ class DnnLitModule(LightningModule):
 
         loss, preds, targets = self.model_step(batch)
         # GET AND SAVE OUTPUTS AND TARGETS PER BATCH
-        y_pred = preds.argmax(axis=1).cpu().numpy()
-        y_true = targets.argmax(axis=1).cpu().numpy()
+        y_pred = preds.argmax(axis=1)
+        y_true = targets.argmax(axis=1)
 
         # --> HERE STEP 2 <--
-        self.val_step_outputs.extend(y_pred)
-        self.val_step_targets.extend(y_true)
+        self.val_step_outputs.extend(y_pred.cpu().numpy())
+        self.val_step_targets.extend(y_true.cpu().numpy())
 
         # update and log metrics
         self.val_loss(loss)
-        self.val_acc(preds, targets)
-        self.val_f1(preds, targets)
+        self.val_acc(y_pred, y_true)
+        self.val_f1(y_pred, y_true)
 
         self.log("val/loss", self.val_loss, on_step=False, on_epoch=True, prog_bar=True)
         self.log("val/acc", self.val_acc, on_step=False, on_epoch=True, prog_bar=True)
@@ -252,9 +269,9 @@ class DnnLitModule(LightningModule):
             self.plot_summary_advanced(all_results, image_name=f"val_summary_epoch_{self.current_epoch}")
 
             # Plot ROC curve ovr and ovo FIXME : test on LR
-            self.plot_roc_curve_ovr(Y_ie=self.val_step_targets_ie, Y_pred_logits=self.val_step_outputs_logits,
+            self.plot_roc_curve_ovr(Y_true_ie=self.val_step_targets_ie, Y_pred_logits=self.val_step_outputs_logits,
                                     filename=f"val_roc_ovr_epoch_{self.current_epoch}")
-            self.plot_roc_curve_ovo(Y_ie=self.val_step_targets_ie, Y_pred_logits=self.val_step_outputs_logits,
+            self.plot_roc_curve_ovo(Y_true_ie=self.val_step_targets_ie, Y_pred_logits=self.val_step_outputs_logits,
                                     filename=f"val_roc_ovo_epoch_{self.current_epoch}")
 
         # Accuracy is a metric object, so we need to call `.compute()` to get the value
@@ -287,7 +304,7 @@ class DnnLitModule(LightningModule):
         hparams = {}
         state_dict = self.trainer.datamodule.state_dict(stage="test")
         # FIXME
-        hparams["data_type"] = "forced_trials"
+        hparams["data_type"] = "Run 6"
         hparams["test_data_shape"] = state_dict["test_data_shape"]
         hparams["test_classes_weights"] = state_dict["test_classes_weights"]
         hparams["test_stats"] = state_dict["test_stats"]
@@ -312,16 +329,16 @@ class DnnLitModule(LightningModule):
 
         loss, preds, targets = self.model_step(batch)
 
-        y_pred = preds.argmax(axis=1).cpu().numpy()
-        y_true = targets.argmax(axis=1).cpu().numpy()
+        y_pred = preds.argmax(axis=1)
+        y_true = targets.argmax(axis=1)
         # --> HERE STEP 2 <--
-        self.test_step_outputs.extend(y_pred)
-        self.test_step_targets.extend(y_true)
+        self.test_step_outputs.extend(y_pred.cpu().numpy())
+        self.test_step_targets.extend(y_true.cpu().numpy())
 
         # update and log metrics
         self.test_loss(loss)
-        self.test_acc(preds, targets)
-        self.test_f1(preds, targets)
+        self.test_acc(y_pred, y_true)
+        self.test_f1(y_pred, y_true)
         self.log("test/loss", self.test_loss, on_step=False, on_epoch=True, prog_bar=True)
         self.log("test/acc", self.test_acc, on_step=False, on_epoch=True, prog_bar=True)
         self.log("test/f1", self.test_f1, on_step=False, on_epoch=True, prog_bar=True)
@@ -331,9 +348,9 @@ class DnnLitModule(LightningModule):
         test_all_outputs = self.test_step_outputs
         test_all_targets = self.test_step_targets
 
-        cm = confusion_matrix(test_all_outputs, test_all_targets)
-        title = f"Testing Confusion matrix, forced trials"
-        self.confusion_matrix_to_png(cm, title, f"test_cm_forced_trials")
+        cm = confusion_matrix(y_true=test_all_targets,y_pred=test_all_outputs)
+        title = f"Testing Confusion matrix, Run 6"
+        self.confusion_matrix_to_png(cm, title, f"test_cm_run_6")
 
     def configure_optimizers(self):
         """Choose what optimizers and learning-rate schedulers to use in your optimization.
@@ -451,42 +468,6 @@ class DnnLitModule(LightningModule):
                                                  local_dir=tmpdirname)
                 plt.close(figure)
 
-    def calculate_sample_weights(self, y, NUM_MIN_SAMPLES=10):
-        """Calculate sample weights for unbalanced dataset"""
-        y_np = np.argmax(y.cpu().numpy(), axis=1)
-
-        num_classes = y.shape[1]
-        # If the number of samples is small, just return equal weights for all classes
-        if len(y_np) < NUM_MIN_SAMPLES:  # Define SOME_THRESHOLD as per your needs
-            return np.ones(num_classes)
-
-        # Classes present in y
-        present_classes = np.unique(y_np)
-        # All possible classes based on the shape of y
-
-        if len(present_classes) < num_classes:
-            # Compute weights for present classes
-            present_class_weights = sklearn.utils.class_weight.compute_class_weight(class_weight='balanced',
-                                                                                    classes=present_classes,
-                                                                                    y=y_np)
-
-            # Initialize weights for all classes with a high value
-            all_class_weights = np.max(present_class_weights) * np.ones(num_classes)
-
-            # Set the computed weights for the classes present in y
-            for cls, weight in zip(present_classes, present_class_weights):
-                all_class_weights[cls] = weight
-
-            return all_class_weights
-
-        else:
-            total_classes = np.arange(num_classes)
-            class_weights = sklearn.utils.class_weight.compute_class_weight(class_weight='balanced',
-                                                                            classes=total_classes,
-                                                                            y=y_np)
-
-            return class_weights
-
     def save_hparams_to_mlflow(self):
         """Log all hyperparameters to mlflow"""
 
@@ -555,7 +536,7 @@ class DnnLitModule(LightningModule):
                 self.mlflow_client.log_artifacts(self.run_id,
                                                  local_dir=tmpdirname)
 
-    def plot_roc_curve_ovr(self, Y_ie, Y_pred_logits, filename=None):
+    def plot_roc_curve_ovr(self, Y_true_ie, Y_pred_logits, filename=None):
 
         if isinstance(Y_pred_logits, list):
             Y_pred_logits = np.array(Y_pred_logits)
@@ -567,9 +548,9 @@ class DnnLitModule(LightningModule):
             # Gets the class
             # c = k
             # Prepares an auxiliar dataframe to help with the plots
-            df_aux = pd.DataFrame(Y_ie)
+            df_aux = pd.DataFrame(Y_true_ie)
 
-            df_aux['class'] = [1 if y == k else 0 for y in Y_ie]
+            df_aux['class'] = [1 if y == k else 0 for y in Y_true_ie]
             df_aux['prob'] = Y_pred_logits[:, i]
             df_aux = df_aux.reset_index(drop=True)
 
@@ -607,7 +588,7 @@ class DnnLitModule(LightningModule):
                                              local_dir=tmpdirname)
         plt.close(fig)
 
-    def plot_roc_curve_ovo(self, Y_ie, Y_pred_logits, filename=None):
+    def plot_roc_curve_ovo(self, Y_true_ie, Y_pred_logits, filename=None):
 
         if isinstance(Y_pred_logits, list):
             Y_pred_logits = np.array(Y_pred_logits)
@@ -634,9 +615,9 @@ class DnnLitModule(LightningModule):
             title = c1 + " vs " + c2
 
             # Prepares an auxiliar dataframe to help with the plots
-            df_aux = pd.DataFrame(Y_ie)
+            df_aux = pd.DataFrame(Y_true_ie)
 
-            df_aux['class'] = [self.classes_names_dict[y] for y in Y_ie]
+            df_aux['class'] = [self.classes_names_dict[y] for y in Y_true_ie]
             df_aux['prob'] = Y_pred_logits[:, c1_index]
 
             # Slices only the subset with both classes
@@ -740,16 +721,17 @@ class DnnLitModule(LightningModule):
     def init_metrics(self):
 
         if self.num_classes == 4:
-            self.train_acc = Accuracy(task="multiclass", num_classes=self.num_classes)
-            self.train_f1 = F1Score(task="multiclass", num_classes=self.num_classes, average="macro")
+            average_type = "weighted"
+            self.train_acc = Accuracy(task="multiclass", num_classes=self.num_classes, average=average_type)
+            self.train_f1 = F1Score(task="multiclass", num_classes=self.num_classes, average=average_type)
 
             # Validation metric objects for calculating and averaging accuracy across batches
-            self.val_acc = Accuracy(task="multiclass", num_classes=self.num_classes)
-            self.val_f1 = F1Score(task="multiclass", num_classes=self.num_classes, average="macro")
+            self.val_acc = Accuracy(task="multiclass", num_classes=self.num_classes, average=average_type)
+            self.val_f1 = F1Score(task="multiclass", num_classes=self.num_classes, average=average_type)
 
             # Testing metric objects for calculating and averaging accuracy across batches
-            self.test_acc = Accuracy(task="multiclass", num_classes=self.num_classes)
-            self.test_f1 = F1Score(task="multiclass", num_classes=self.num_classes)
+            self.test_acc = Accuracy(task="multiclass", num_classes=self.num_classes, average=average_type)
+            self.test_f1 = F1Score(task="multiclass", num_classes=self.num_classes, average=average_type)
 
             # Define collection that is a mix of metrics that return a scalar tensors and not
             # self.confmat = torchmetrics.classification.MulticlassConfusionMatrix(num_classes=self.num_classes)
@@ -764,14 +746,15 @@ class DnnLitModule(LightningModule):
             )
 
         if self.num_classes == 2:
-            self.train_acc = Accuracy(task="binary")
-            self.train_f1 = F1Score(task="binary", average="macro")
+            average_type = "weighted"
+            self.train_acc = Accuracy(task="binary", average=average_type)
+            self.train_f1 = F1Score(task="binary", average=average_type)
 
-            self.val_acc = Accuracy(task="binary")
-            self.val_f1 = F1Score(task="binary", average="macro")
+            self.val_acc = Accuracy(task="binary", average=average_type)
+            self.val_f1 = F1Score(task="binary", average=average_type)
 
-            self.test_acc = Accuracy(task="binary")
-            self.test_f1 = F1Score(task="binary")
+            self.test_acc = Accuracy(task="binary", average=average_type)
+            self.test_f1 = F1Score(task="binary", average=average_type)
 
             # Define collection that is a mix of metrics that return a scalar tensors and not
             # self.confmat = torchmetrics.ConfusionMatrix(task="binary")

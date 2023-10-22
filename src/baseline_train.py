@@ -1,15 +1,15 @@
-from typing import Optional, Tuple, Any
+import csv
+import gc
+import os
+from pathlib import Path
+from typing import Optional, Tuple
 
 import hydra
 import numpy as np
 import pyrootutils
-from lightning import Callback
 from omegaconf import DictConfig
-import gc
 
 import bbcpy
-
-
 from trainer.baseline_trainer import SklearnTrainer
 
 pyrootutils.setup_root(__file__, indicator=".project-root", pythonpath=True)
@@ -126,14 +126,28 @@ def main(cfg: DictConfig) -> Optional[float]:
     # train the model
     metric_dict, _ = train(cfg)
 
-    # TODO: save metrics fro later
-    # subject_name =list(cfg.data.subject_sessions_dict.keys())[0]
-    #
+    # save metrics to csv file for later analysis
+    model_name = cfg.get("tags")[-2]
+    subject_name = list(cfg.data.subject_sessions_dict.keys())[0]
+    task_name = cfg.data.task_name
+    os.makedirs(cfg.paths.results_dir, exist_ok=True)
+    csv_file_path = Path(f"{cfg.paths.results_dir}/{task_name}_{model_name}_{subject_name}.csv")
 
-    # # safely retrieve metric value for hydra-based hyperparameter optimization
-    # metric_value = utils.get_metric_value(
-    #     metric_dict=metric_dict, metric_name=cfg.get("optimized_metric")
-    # )
+    # Convert tensors to float values
+    # metrics = {key: value.item() if hasattr(value, 'item') else value for key, value in metric_dict.items()}
+    # Open the CSV file in write mode
+    with open(csv_file_path, mode='w', newline='') as file:
+        writer = csv.DictWriter(file, fieldnames=metric_dict.keys())
+        # Write the header
+        writer.writeheader()
+        # Write the metrics values
+        writer.writerow(metric_dict)
+
+    # safely retrieve metric value for hydra-based hyperparameter optimization
+
+    optimized_metric = cfg.get("optimized_metric")
+    metric_value = metric_dict[optimized_metric]
+    log.info(f"{optimized_metric}: {metric_value}")
 
     # return optimized metric
     return metric_dict

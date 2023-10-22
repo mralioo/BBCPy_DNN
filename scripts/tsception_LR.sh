@@ -1,8 +1,8 @@
 #!/bin/bash
-#SBATCH --job-name=tsception-LR
+#SBATCH --job-name=tsce-LR
 #SBATCH --partition=gpu-2d
 #SBATCH --gpus-per-node=1
-#SBATCH --mem=100G        # Some buffer above 30GB
+#SBATCH --mem=50GB
 #SBATCH --ntasks-per-node=1   # One main task that runs the trial and manages CV
 #SBATCH --cpus-per-task=6 # Assuming you want to run each CV fold in parallel
 #SBATCH --output=../jobs_outputs/tsception-LR/%x_%j.o
@@ -21,6 +21,6 @@ for SUBJECT in "${SUBJECTS[@]}"; do
     cp ./../squashfs_smr_data/${SUBJECT}.sqfs /tmp/
     # ... (rest of your script remains unchanged, but ensure to change the run_name in the apptainer command)
 
-    apptainer run -B /tmp/${SUBJECT}.sqfs:/input-data:image-src=/ ./../env_images/bbcpy_en.sif python ./src/baseline_train.py experiment=2_Tsception_LR +data.subject_sessions_dict="{$SUBJECT: "all"}" logger.mlflow.experiment_name="Tsception-LR" logger.mlflow.run_name="${SUBJECT}-LR"
+    apptainer run --nv -B /tmp/${SUBJECT}.sqfs:/input-data:image-src=/ ./../env_images/bbcpy_env.sif python ./src/dnn_train.py experiment=2_Tsception_LR +data.subject_sessions_dict="{$SUBJECT: "all"}" logger.mlflow.experiment_name="Tsception-LR" logger.mlflow.run_name="${SUBJECT}-LR-tsception"
 
 done

@@ -19,8 +19,14 @@ def classifier_pipeline(steps_config):
             for algo_name, algo_config in step_config.items():
 
                 if algo_name == 'CSP' and algo_config.applied == True:
+
+                    if algo_config.excllev == "None":
+                        excllev = None
+                    else:
+                        excllev = algo_config.excllev
+
                     csp_step = CSP(n_cmps=algo_config.n_cmps,
-                                   excllev=algo_config.excllev,
+                                   excllev=excllev,
                                    estimator=algo_config.estimator,
                                    scoring=helpers.evscoring_medvar,
                                    select=helpers.evselect_directorscut)
