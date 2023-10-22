@@ -14,6 +14,8 @@ def get_subject_info(subject_name, srm_data_path):
     sessions_group_path = bbcpy.load.srm_eeg.list_all_files(srm_data_path,
                                                             pattern=f"{subject_name}_*.mat")[subject_name]
 
+    print(sessions_group_path)
+
     for session_name in sessions_group_path.keys():
         _, _, _, _, _, trials_info, subject_info = \
             bbcpy.load.srm_eeg.load_single_mat_session(file_path=sessions_group_path[session_name])
@@ -48,15 +50,20 @@ def get_subject_info(subject_name, srm_data_path):
             subject_dict[session_name]["all_pvc"][task_name] = (np.sum(
                 np.array(trials_info["result"])[task_ids] == True)) / 150
 
-    local_path = os.path.dirname(os.path.abspath(__file__))
-    print(local_path)
+        print(subject_dict[session_name].keys())
 
-    metadata_path = os.path.join(local_path, "metadata")
+    # local_path =
+    # print(local_path)
+    #
+    # metadata_path = os.path.join(local_path, "metadata")
+    #
+    # if not os.path.exists(os.path.dirname(metadata_path)):
+    #     os.makedirs(os.path.dirname(metadata_path), exist_ok=True)
 
-    if not os.path.exists(os.path.dirname(metadata_path)):
-        os.makedirs(os.path.dirname(metadata_path))
-
-    file_name = f"{subject_name}.json"
+    file_name = f"metadata/{subject_name}.json"
+    # file_name = f"/home/ali_alouane/MA_BCI/metadata/{subject_name}.json"
+    #
+    # print(metadata_path)
 
     # Convert numpy bools to Python bools
     def convert_bool(obj):
@@ -72,7 +79,7 @@ def get_subject_info(subject_name, srm_data_path):
     # Apply the conversion
     data = convert_bool(subject_dict)
 
-    with open(os.path.join(metadata_path, file_name), "w") as f:
+    with open(file_name, "w") as f:
         json.dump(data, f)
 
 
@@ -82,4 +89,7 @@ if __name__ == "__main__":
     parser.add_argument('--srm_data_path', type=str, default="/input-data", help='Path to SRM data')
     args = parser.parse_args()
 
-    get_subject_info(args.subject_name, args.srm_data_path, args.verbose)
+    print(args.subject_name)
+    print(args.srm_data_path)
+
+    get_subject_info(args.subject_name, args.srm_data_path)
