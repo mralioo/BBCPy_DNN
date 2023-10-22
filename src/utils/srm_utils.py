@@ -160,26 +160,31 @@ def calculate_pvc_metrics(trial_info, taskname="LR"):
     return pvc
 
 
-def train_valid_split(data_shape, train_val_split_dict):
-    """ Split the data into train and validation sets and return indices """
-
-    random_seed = train_val_split_dict["random_seed"]
-    val_ratio = train_val_split_dict["val_size"]
+def train_valid_split(data_runs_list, val_ratio=0.1, random_seed=42):
+    """ Split the data into train and validation sets and return indices
+    Split is done as follow take 10 % for each the 5 runs """
 
     # Set the random seed for reproducibility
     np.random.seed(random_seed)
+    val_runs_list = []
+    train_runs_list = []
+    for run in data_runs_list:
+        data_shape = run.shape
 
-    # Shuffle the data
-    indices = np.random.permutation(data_shape[0])
+        # Shuffle the data
+        indices = np.random.permutation(data_shape[0])
 
-    # Compute the index where the validation set starts
-    val_start_idx = int(len(indices) * (1 - val_ratio))
+        # Compute the index where the validation set starts
+        val_start_idx = int(len(indices) * (1 - val_ratio))
 
-    # Get the indices for training and validation sets
-    train_indices = indices[:val_start_idx]
-    val_indices = indices[val_start_idx:]
+        # Get the indices for training and validation sets
+        train_indices = indices[:val_start_idx]
+        val_indices = indices[val_start_idx:]
 
-    return train_indices, val_indices
+        val_runs_list.append(run[val_indices])
+        train_runs_list.append(run[train_indices])
+
+    return train_runs_list, val_runs_list
 
 
 def cross_validation(data, kfold_idx):

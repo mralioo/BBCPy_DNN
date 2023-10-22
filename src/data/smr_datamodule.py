@@ -451,16 +451,14 @@ class SMR_Data():
             logging.info("Preparing data...")
             # FIXME : take portion from run 3 and run 6 for test
             self.test_data = self.runs_data_list[-1]
+            self.train_data_list = self.runs_data_list[0:-1]
 
-            # train data is the rest of the runs
-            self.train_data = self.runs_data_list[0]
-            for i in range(1, len(self.runs_data_list) - 1):
-                self.train_data = self.train_data.append(self.runs_data_list[i], axis=0)
-
-            logging.info("Raw train trials")
-            print_data_info(self.train_data)
-            logging.info("Raw test trials")
-            print_data_info(self.test_data)
+            # # train data is the rest of the runs
+            #
+            # logging.info("Raw train trials")
+            # print_data_info(self.train_data)
+            # logging.info("Raw test trials")
+            # print_data_info(self.test_data)
 
 
             # subject info dict

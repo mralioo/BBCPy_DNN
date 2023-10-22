@@ -2,7 +2,6 @@ import gc
 import logging
 from typing import Optional
 
-import numpy as np
 import pyrootutils
 import torch
 from lightning import LightningDataModule
@@ -123,8 +122,10 @@ class SRM_DataModule(LightningDataModule):
                                        ignore_noisy_sessions=self.ignore_noisy_sessions)
 
         self.smr_datamodule.prepare_dataloader()
-        self.data = self.smr_datamodule.train_data
-        self.data_shape = self.smr_datamodule.train_data.shape
+
+        self.data = self.smr_datamodule.train_data_list[0]
+        for i in range(1, len(self.smr_datamodule.train_data_list) - 1):
+            self.data = self.data.append(self.smr_datamodule.train_data_list[i], axis=0)
 
         # Info about resources
         print_memory_usage()
@@ -146,11 +147,18 @@ class SRM_DataModule(LightningDataModule):
             logging.info("Train and validation split strategy: runs 1,2,3,4,5 for train/val and run 6 for test")
             # TODO train split take the middle indices for validation
 
-            self.train_idx, self.val_idx = train_valid_split(self.data_shape,
-                                                             self.train_val_split)
+            train_runs_list, val_runs_list = train_valid_split(self.smr_datamodule.runs_data_list,
+                                                               val_ratio=0.1,
+                                                               random_seed=42)
+            self.train_data = train_runs_list[0]
+            self.val_data = val_runs_list[0]
+            for i in range(1, 4):
+                self.train_data = self.train_data.append(train_runs_list[i], axis=0)
+                self.val_data = self.val_data.append(val_runs_list[i], axis=0)
 
         elif self.cross_validation:
             logging.info("Cross validation strategy: runs 1,2,3,4,5 for train/val and run 6 for test")
+
             self.train_idx, self.val_idx = cross_validation(self.data,
                                                             self.k)
 
@@ -162,14 +170,14 @@ class SRM_DataModule(LightningDataModule):
             logging.info("Create train and validation sets.. ")
             # load and split datasets only if not loaded already
             if self.train_val_split:
-                self.training_set = SRMDataset(data=self.data[self.train_idx])
+                self.training_set = SRMDataset(data=self.train_data)
                 print(self.training_set.statistical_info())
                 self.training_set.normalize_data(norm_type=self.normalize["norm_type"],
                                                  axis=self.normalize["norm_axis"])
                 logging.info("Normalized train trials")
                 print(self.training_set.statistical_info())
 
-                self.validation_set = SRMDataset(data=self.data[self.val_idx])
+                self.validation_set = SRMDataset(data=self.val_data)
                 print(self.validation_set.statistical_info())
                 self.validation_set.normalize_data(norm_type=self.normalize["norm_type"],
                                                    axis=self.normalize["norm_axis"])
@@ -252,7 +260,6 @@ class SRM_DataModule(LightningDataModule):
                     del self.smr_datamodule
                 self.smr_datamodule = None
 
-
             # Explicitly run garbage collection
             gc.collect()
             # If using CUDA
@@ -291,7 +298,6 @@ class SRMDataset(Dataset):
 
         self.data = torch.tensor(data).float()
         self.y_oe = torch.tensor(onehot_encoded)
-
 
     def __getitem__(self, index):
         x = self.data[index].unsqueeze(dim=0)
