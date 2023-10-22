@@ -13,12 +13,12 @@ defaults:
 # all parameters below will be merged with parameters from default configurations set above
 # this allows you to overwrite only specified parameters
 
-tags: [ "baseline" , "alpha_band" , "Within-Subject", "csp-base"  , "LR"]
+tags: [ "baseline" , "alpha_band" , "Within-Subject", "csp"  , "2D"]
 
 seed: 12345
 
 data:
-  task_name: "LR"
+  task_name: "2D"
   trial_type: "forced"
   ival: 2s:10s:1ms
   chans: [ "*" ]
