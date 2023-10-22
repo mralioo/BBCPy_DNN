@@ -162,14 +162,14 @@ class SRM_DataModule(LightningDataModule):
             logging.info("Create train and validation sets.. ")
             # load and split datasets only if not loaded already
             if self.train_val_split:
-                self.training_set = SRMDataset(data=self.data, indices=self.train_idx)
+                self.training_set = SRMDataset(data=self.data[self.train_idx])
                 print(self.training_set.statistical_info())
                 self.training_set.normalize_data(norm_type=self.normalize["norm_type"],
                                                  axis=self.normalize["norm_axis"])
                 logging.info("Normalized train trials")
                 print(self.training_set.statistical_info())
 
-                self.validation_set = SRMDataset(data=self.data, indices=self.val_idx)
+                self.validation_set = SRMDataset(data=self.data[self.val_idx])
                 print(self.validation_set.statistical_info())
                 self.validation_set.normalize_data(norm_type=self.normalize["norm_type"],
                                                    axis=self.normalize["norm_axis"])
@@ -179,7 +179,7 @@ class SRM_DataModule(LightningDataModule):
             elif self.cross_validation:
                 # Create datasets with specific indices
                 logging.info(f"Train indices: {self.train_idx}")
-                self.training_set = SRMDataset(data=self.data, indices=self.train_idx)
+                self.training_set = SRMDataset(data=self.data[self.train_idx])
                 logging.info("Train dataset info")
                 print(self.training_set.statistical_info())
                 self.training_set.normalize_data(norm_type=self.normalize["norm_type"],
@@ -188,7 +188,7 @@ class SRM_DataModule(LightningDataModule):
                 print(self.training_set.statistical_info())
 
                 logging.info(f"Val indices: {self.val_idx}")
-                self.validation_set = SRMDataset(data=self.data, indices=self.val_idx)
+                self.validation_set = SRMDataset(data=self.data[self.val_idx])
                 logging.info("Val dataset info")
                 print(self.validation_set.statistical_info())
                 self.validation_set.normalize_data(norm_type=self.normalize["norm_type"],
@@ -203,8 +203,7 @@ class SRM_DataModule(LightningDataModule):
 
         if stage == "test":
             logging.info("Create test set..")
-            test_indices = np.arange(self.smr_datamodule.test_data.shape[0]).tolist()
-            self.testing_set = SRMDataset(data=self.smr_datamodule.test_data, indices=test_indices)
+            self.testing_set = SRMDataset(data=self.smr_datamodule.test_data)
             self.testing_set.normalize_data(norm_type=self.normalize["norm_type"],
                                             axis=self.normalize["norm_axis"])
             logging.info("Normalized test trials")
@@ -284,27 +283,24 @@ class SRM_DataModule(LightningDataModule):
 
 
 class SRMDataset(Dataset):
-    def __init__(self, data, indices):
-        y = data[indices].y
-
+    def __init__(self, data):
+        y = data.y
         onehot_encoder = OneHotEncoder(sparse_output=False)
         integer_encoded = y.reshape(-1, 1)
         onehot_encoded = onehot_encoder.fit_transform(integer_encoded)
 
-        self.data = torch.tensor(data[indices]).float()
+        self.data = torch.tensor(data).float()
         self.y_oe = torch.tensor(onehot_encoded)
-        self.indices = indices
+
 
     def __getitem__(self, index):
-        # fixme
         x = self.data[index].unsqueeze(dim=0)
-        # x = self.data[index]
         y = self.y_oe[index]
 
         return x, y
 
     def __len__(self):
-        return len(self.indices)
+        return self.data.shape[0]
 
     def normalize_data(self, norm_type="std", axis=None, keepdims=True, eps=10 ** -5, norm_params=None):
         if norm_params is not None:

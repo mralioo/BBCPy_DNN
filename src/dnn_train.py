@@ -149,7 +149,7 @@ def train_cross_validation(cfg: DictConfig) -> Tuple[dict, dict]:
         log.info("Cross validation strategy; k-fold runs 1,2,3,4,5 for train/val and run 6 for test")
         # FIXME : change the number of folds
 
-        nums_folds = 2
+        nums_folds = 5
 
         for k in range(nums_folds):
 
