@@ -3,10 +3,13 @@ import logging
 
 import numpy as np
 import numpy.ma as ma
+import pyrootutils
 from omegaconf import OmegaConf
 
 import bbcpy
-from src.utils.device import print_data_info
+
+pyrootutils.setup_root(__file__, indicator=".project-root", pythonpath=True)
+
 from src.utils.srm_utils import transform_electrodes_configurations, remove_reference_channel, calculate_pvc_metrics, \
     normalize
 
@@ -220,18 +223,19 @@ class SMR_Data():
         # Get the trials targets for each runs , we have 6 runs
         task_targets = np.array(trials_info["targetnumber"])[task_trials_ids]
         task_targets = task_targets.astype(int) - 1  # to start from 0
-        class_names = np.array(["R", "L", "U", "D"])
 
         new_srm_train_data = ma.zeros((len(raw_data), len(chans), self.trial_maxlen))
         # Set the mask for each row based on the sub ndarray size
         for i, sub_arr in enumerate(raw_data):
             new_srm_train_data[i, :, :sub_arr.shape[-1]] = sub_arr
 
-        mrk = bbcpy.datatypes.eeg.Marker(mrk_pos=task_trials_ids,
-                                         mrk_class=task_targets,
-                                         mrk_class_name=class_names,
-                                         mrk_fs=1,
-                                         parent_fs=srm_fs)
+        # FIXME : walkaround to fix trial length
+        mrk = bbcpy.datatypes.srm_eeg.SRM_Marker(mrk_pos=task_trials_ids,
+                                                 mrk_class=task_targets,
+                                                 mrk_class_name=self.classes,
+                                                 mrk_fs=1,
+                                                 parent_fs=srm_fs)
+
         epo_data = bbcpy.datatypes.srm_eeg.SRM_Data(srm_data=new_srm_train_data,
                                                     timepoints=time,
                                                     fs=srm_fs,
@@ -452,14 +456,6 @@ class SMR_Data():
             # FIXME : take portion from run 3 and run 6 for test
             self.test_data = self.runs_data_list[-1]
             self.train_data_list = self.runs_data_list[0:-1]
-
-            # # train data is the rest of the runs
-            #
-            # logging.info("Raw train trials")
-            # print_data_info(self.train_data)
-            # logging.info("Raw test trials")
-            # print_data_info(self.test_data)
-
 
             # subject info dict
             self.subjects_info_dict[subject_name] = subjects_info_dict[subject_name]

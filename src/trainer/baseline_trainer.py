@@ -70,7 +70,7 @@ class SklearnTrainer(object):
     def search_hyperparams(self, pipeline, hparams):
 
         # FIXME : new data split
-        train_data, test_data = train_valid_split(self.datamodule.valid_trials, self.train_val_split)
+        train_data, test_data = self.datamodule.train_data, self.datamodule.test_data
 
         # compute classes weights for imbalanced dataset
         # global_classes_weights = sklearn.utils.class_weight.compute_class_weight(class_weight='balanced',
