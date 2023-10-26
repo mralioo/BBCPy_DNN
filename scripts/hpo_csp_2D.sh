@@ -2,7 +2,7 @@
 #SBATCH --job-name=csp-hpo-2D
 #SBATCH --partition=cpu-2h
 #SBATCH --gpus-per-node=0
-#SBATCH --ntasks-per-node=2
+#SBATCH --ntasks-per-node=8
 #SBATCH --output=logs/job-%j.out
 #SBATCH --output=../jobs_outputs/csp-hpo-2D/%x_%j.o
 #SBATCH --error=../jobs_outputs/csp-hpo-2D/%x_%j.e

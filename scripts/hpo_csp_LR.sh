@@ -2,7 +2,7 @@
 #SBATCH --job-name=csp-S9
 #SBATCH --partition=cpu-2h
 #SBATCH --gpus-per-node=0
-#SBATCH --ntasks-per-node=2
+#SBATCH --ntasks-per-node=8
 #SBATCH --output=logs/job-%j.out
 #SBATCH --output=../jobs_outputs/csp-S9/%x_%j.o
 #SBATCH --error=../jobs_outputs/csp-S9/%x_%j.e
