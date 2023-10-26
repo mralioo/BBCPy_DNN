@@ -32,7 +32,7 @@ data:
 trainer:
   train_val_split: False
   cv:
-    _target_: src.utils.srm_utils.RunKFold
+    _target_: sklearn.model_selection.KFold
     n_splits: 5
 
 paths:

@@ -373,6 +373,7 @@ class SMR_Data():
                     run_5 = run_5.append(session_data["run_5"]["data"], axis=0)
                     run_6 = run_6.append(session_data["run_6"]["data"], axis=0)
 
+        logging.info(f"Sesssion {session_name} appended, final shapes for each run:")
         logging.info(f"Run 1 shape: {run_1.shape}")
         logging.info(f"Run 2 shape: {run_2.shape}")
         logging.info(f"Run 3 shape: {run_3.shape}")

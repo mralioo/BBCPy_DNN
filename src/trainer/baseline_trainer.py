@@ -191,7 +191,6 @@ class SklearnTrainer(object):
 
                 cv_classes_weights_dict = {}
                 model_name = self.logger.mlflow.run_name
-                num_cv = 5
 
                 for fold, (train_index, vali_index) in enumerate(self.cv.split(self.train_data, self.train_data.y)):
                     foldNum = fold + 1
@@ -319,7 +318,7 @@ class SklearnTrainer(object):
                 log.info(f"Training completed!, Computing mean and std of metrics...")
                 # log the train mean confusion matrix to mlflow parent run
                 self.plot_confusion_matrix(train_cm_list,
-                                           title=f"cv-{num_cv}_train-avg-cm_{model_name}",
+                                           title=f"cv_train-avg-cm_{model_name}",
                                            type="mean")
 
                 # log the validation mean confusion matrix to mlflow parent run
@@ -328,7 +327,7 @@ class SklearnTrainer(object):
                 mlflow.log_metric("mean_val/f1", mean_f1_score_vali)
                 mlflow.log_metric("mean_val/acc", mean_acc_score_vali)
                 self.plot_confusion_matrix(val_cm_list,
-                                           title=f"cv-{num_cv}_val-avg-cm_{model_name}",
+                                           title=f"cv_val-avg-cm_{model_name}",
                                            type="mean")
 
                 # log the test mean confusion matrix to mlflow parent run
@@ -337,7 +336,7 @@ class SklearnTrainer(object):
                 mlflow.log_metric(f"mean_test/f1", mean_f1_score_test)
                 mlflow.log_metric(f"mean_test/acc", mean_acc_score_test)
                 self.plot_confusion_matrix(test_cm_list,
-                                           title=f"cv-{num_cv}_{test_set_name}-avg-cm_{model_name}",
+                                           title=f"cv_{test_set_name}-avg-cm_{model_name}",
                                            type="mean")
 
                 if self.task_name == "LR":
