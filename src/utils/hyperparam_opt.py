@@ -77,6 +77,12 @@ def optimize_hyperparams(cfg, pipeline):
     if cfg.hyperparam_opt.scoring == 'evscoring_medvar':
         from bbcpy.functions.helpers import evscoring_medvar
         scorer = make_scorer(evscoring_medvar)
+    elif cfg.hyperparam_opt.scoring == 'evselect_best_csp':
+        from bbcpy.functions.helpers import evselect_best_csp
+        scorer = make_scorer(evselect_best_csp)
+    elif cfg.hyperparam_opt.scoring == 'evselect_best':
+        from bbcpy.functions.helpers import evselect_best
+        scorer = make_scorer(evselect_best)
     else:
         scorer = cfg.hyperparam_opt.scoring
 

@@ -15,13 +15,13 @@ defaults:
 #  - override /hparams_search: hpo_csp.yaml
 
 
-tune: False
+tune: True
 train: True
 
 paths:
   root_dir: ${oc.env:PROJECT_ROOT}
   data_dir: D:\SMR\
-  log_dir: ${oc.env:PROJECT_ROOT}\logs
+  log_dir: ${oc.env:PROJECT_ROOT}\logs\26_10
   output_dir: ${hydra:runtime.output_dir}
   work_dir: ${hydra:runtime.cwd}
   results_dir: ${paths.log_dir}\results # final results directory
@@ -30,13 +30,13 @@ paths:
 callbacks: null
 logger:
   mlflow:
-    #    experiment_name: DEBUG-HPO
+#        experiment_name: DEBUG-HPO
     experiment_name: DEBUG-TRAIN
 #    run_name: riemann_tangent
 #    run_name: riemann
 #    run_name: csp
 #    run_name: mbcsp
-    tracking_uri: ${paths.log_dir}/test/mlruns
+    tracking_uri: ${paths.log_dir}\mlflow\mlruns
 
 data:
 #  task_name: "2D"

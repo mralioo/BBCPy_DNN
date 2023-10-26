@@ -23,12 +23,8 @@ plots_settings:
 
 net:
   _target_: src.models.components.EEG-Conformer.Conformer
+  emb_kernel_size_1: [1,25]
+  emb_kernel_size_2: [22,1]
   emb_size: 40
-  emb_kernel_size_1:
-    - 1
-    - 22
-  emb_kernel_size_2:
-    - 5
-    - 1
   depth: 3
   n_classes: 2

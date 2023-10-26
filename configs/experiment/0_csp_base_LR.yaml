@@ -21,7 +21,7 @@ data:
   task_name: "LR"
   trial_type: "forced"
   ival: 2s:10s:1ms
-  chans: [ "*" ]
+  chans: ['C?,~*3,~*4', 'FC*,~*3,~*4']
   bands: [ 8, 13 ]
   fallback_neighbors: 4
   loading_data_mode: "within_subject"
@@ -54,16 +54,17 @@ model:
 trainer:
   train_val_split: False
   cv:
-    _target_: src.utils.srm_utils.RunKFold
+    _target_: sklearn.model_selection.KFold
     n_splits: 5
 
 paths:
   root_dir: ${oc.env:PROJECT_ROOT}
   data_dir: /input-data
-  log_dir: ${oc.env:PROJECT_ROOT}/logs/23_10
+  log_dir: ${oc.env:PROJECT_ROOT}/logs/25_10
   output_dir: ${hydra:runtime.output_dir}
   work_dir: ${hydra:runtime.cwd}
   results_dir: ${paths.log_dir}/results # final results directory
+
 
 
 logger:

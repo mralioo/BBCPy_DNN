@@ -147,7 +147,7 @@ class SRM_DataModule(LightningDataModule):
             logging.info("Train and validation split strategy: runs 1,2,3,4,5 for train/val and run 6 for test")
             # TODO train split take the middle indices for validation
 
-            train_runs_list, val_runs_list = train_valid_split(self.smr_datamodule.runs_data_list,
+            train_runs_list, val_runs_list = train_valid_split(self.smr_datamodule.train_data_list,
                                                                val_ratio=0.1,
                                                                random_seed=42)
             self.train_data = train_runs_list[0]

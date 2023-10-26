@@ -9,7 +9,6 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import pyrootutils
-import sklearn
 import torch
 import torch.nn.functional as F
 import torchmetrics
@@ -80,7 +79,6 @@ class DnnLitModule(LightningModule):
         if x.dim() <= 3:
             x = x.unsqueeze(dim=0)
 
-
         return self.net(x)
 
     def model_step(self, batch: Any):
@@ -98,7 +96,7 @@ class DnnLitModule(LightningModule):
         # classes_weights_tensor = torch.tensor(self.calculate_sample_weights(y)).to(self.device)
         # loss = self.criterion(weight=classes_weights_tensor)(logits, y)
 
-        if y.dim() == 1 :
+        if y.dim() == 1:
             y = y.unsqueeze(dim=0)
 
         loss = self.criterion()(probs, y)
@@ -119,7 +117,7 @@ class DnnLitModule(LightningModule):
         if self.num_classes > 2:
             probs = F.softmax(logits, dim=1)
 
-        if y.dim() == 1 :
+        if y.dim() == 1:
             y = y.unsqueeze(dim=0)
 
         loss = self.criterion()(probs, y)
@@ -348,7 +346,7 @@ class DnnLitModule(LightningModule):
         test_all_outputs = self.test_step_outputs
         test_all_targets = self.test_step_targets
 
-        cm = confusion_matrix(y_true=test_all_targets,y_pred=test_all_outputs)
+        cm = confusion_matrix(y_true=test_all_targets, y_pred=test_all_outputs)
         title = f"Testing Confusion matrix, Run 6"
         self.confusion_matrix_to_png(cm, title, f"test_cm_run_6")
 

@@ -7,9 +7,8 @@ hyperparam_opt:
       csp__estimator: [ "scm", "lwf"]
   scoring: accuracy
   cv:
-    _target_: sklearn.model_selection.KFold
-    n_splits: 10
-    shuffle: True
+    _target_: src.utils.srm_utils.RunKFold
+    n_splits: 5
 #  n_jobs: 4 # FIXME -1 is not working parallel jobs causes error in  SRM_Data module line 486
     #_target_: sklearn.model_selection.GridSearchCV
     #_partial_: true

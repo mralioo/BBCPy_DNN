@@ -91,20 +91,16 @@ def train(cfg: DictConfig) -> Tuple[dict, dict]:
 
     if cfg.get("tune"):
         log.info("Starting hyperparameter search!")
-        metric_dict = trainer.search_hyperparams(pipeline=pipeline,
-                                                 hparams=hparams)
+        hpo_metric_dict = trainer.search_hyperparams(pipeline=pipeline,
+                                                     hparams=hparams)
+        metric_dict.update(hpo_metric_dict)
         log.info("Hyperparameter search finished!")
 
     if cfg.get("train"):
         log.info("Starting training!")
-        metric_dict = trainer.train(pipeline=pipeline,
-                                    hparams=hparams)
-        log.info("Training finished!")
-
-    if cfg.get("test"):
-        log.info("Starting testing!")
-        metric_dict = trainer.test(pipeline=pipeline,
-                                   datamodule=datamodule)
+        train_metric_dict = trainer.train(pipeline=pipeline,
+                                          hparams=hparams)
+        metric_dict.update(train_metric_dict)
         log.info("Training finished!")
 
     # clean up
