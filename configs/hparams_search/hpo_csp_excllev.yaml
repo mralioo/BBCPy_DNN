@@ -2,8 +2,8 @@ hyperparam_opt:
   class: sklearn.model_selection.GridSearchCV
   params:
     param_grid:
-      csp__excllev: [ 1.2 , 1.8, 4, 6, 8, 10, 20, 40, 100 ]
-#      csp__n_cmps: [ 4, 6, 8 ]
+#      csp__excllev: [ 1.2 , 1.8, 4, 6, 8, 10, 20, 40, 100 ]
+      csp__n_cmps: [ "None", 6, 8 ]
   scoring: accuracy
   cv:
     _target_: sklearn.model_selection.KFold
