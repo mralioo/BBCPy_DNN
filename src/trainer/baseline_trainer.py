@@ -109,8 +109,9 @@ class SklearnTrainer(object):
             self.log_to_mlflow(hparams, parent_run, self.train_data, self.test_data, None, None)
 
             log.info("Hyperparameter search completed!")
+
             # clean up
-            gc.collect()
+            # gc.collect()
 
         return metrics
 

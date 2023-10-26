@@ -21,7 +21,7 @@ train: True
 paths:
   root_dir: ${oc.env:PROJECT_ROOT}
   data_dir: D:\SMR\
-  log_dir: ${oc.env:PROJECT_ROOT}\logs\25_10
+  log_dir: ${oc.env:PROJECT_ROOT}\logs\26_10
   output_dir: ${hydra:runtime.output_dir}
   work_dir: ${hydra:runtime.cwd}
   results_dir: ${paths.log_dir}\results # final results directory
@@ -36,7 +36,7 @@ logger:
 #    run_name: riemann
 #    run_name: csp
 #    run_name: mbcsp
-    tracking_uri: ${paths.log_dir}/mlflow
+    tracking_uri: ${paths.log_dir}\mlflow\mlruns
 
 data:
 #  task_name: "2D"
