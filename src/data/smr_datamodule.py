@@ -13,6 +13,9 @@ pyrootutils.setup_root(__file__, indicator=".project-root", pythonpath=True)
 from src.utils.srm_utils import transform_electrodes_configurations, remove_reference_channel, calculate_pvc_metrics, \
     normalize
 
+from src.utils.device import print_memory_usage, print_cpu_cores, print_gpu_info, print_gpu_memory, print_data_info
+
+
 logging.getLogger().setLevel(logging.INFO)
 
 
@@ -456,6 +459,56 @@ class SMR_Data():
             # FIXME : take portion from run 3 and run 6 for test
             self.test_data = self.runs_data_list[-1]
             self.train_data_list = self.runs_data_list[0:-1]
+
+            # subject info dict
+            self.subjects_info_dict[subject_name] = subjects_info_dict[subject_name]
+
+            # delete the subject data dict
+            del subject_data_dict, subjects_info_dict
+            gc.collect()
+
+    def prepare_dataloader_baseline(self):
+        # load subject paths
+        subjects_sessions_path_dict = self.collect_subject_sessions(self.subject_sessions_dict)
+
+        if self.loading_data_mode == "within_subject":
+            # load the subject sessions dict
+            subject_data_dict, subjects_info_dict = self.load_subjects_sessions(subjects_sessions_path_dict)
+            subject_name = list(subject_data_dict.keys())[0]
+
+            # append the sessions
+            self.runs_data_list = self.append_sessions_across_runs(subject_data_dict[subject_name],
+                                                                   subjects_info_dict[subject_name]["sessions_info"])
+
+            logging.info("Preparing data...")
+            # FIXME : take portion from run 3 and run 6 for test
+            train_data_list = self.runs_data_list[0:-1]
+            self.train_data = train_data_list[0]
+            for i in range(len(train_data_list) - 1):
+                self.train_data = self.train_data.append(train_data_list[i], axis=0)
+            logging.info("Train data info:")
+            print_data_info(self.train_data)
+            logging.info("Test data info:")
+            self.test_data = self.runs_data_list[-1]
+
+            # Normalize the data
+            if self.normalize is not None:
+                logging.info("Normalizing the data...")
+                self.train_data, self.norm_params = normalize(self.train_data,
+                                                              norm_type=self.normalize["norm_type"],
+                                                              axis=self.normalize["norm_axis"],
+                                                              keepdims=True)
+                logging.info("Train data info:")
+                print_data_info(self.train_data)
+
+                self.test_data, _ = normalize(self.test_data,
+                                              norm_type=self.normalize["norm_type"],
+                                              axis=self.normalize["norm_axis"],
+                                              keepdims=True,
+                                              norm_params=self.norm_params)
+                logging.info("Test data info:")
+                print_data_info(self.test_data)
+
 
             # subject info dict
             self.subjects_info_dict[subject_name] = subjects_info_dict[subject_name]
