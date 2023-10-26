@@ -482,15 +482,17 @@ class SMR_Data():
                                                                    subjects_info_dict[subject_name]["sessions_info"])
 
             logging.info("Preparing data...")
-            # FIXME : take portion from run 3 and run 6 for test
+            # FIXME : avoid append , use the list to cv
             train_data_list = self.runs_data_list[0:-1]
             self.train_data = train_data_list[0]
             for i in range(len(train_data_list) - 1):
                 self.train_data = self.train_data.append(train_data_list[i], axis=0)
             logging.info("Train data info:")
             print_data_info(self.train_data)
-            logging.info("Test data info:")
+
             self.test_data = self.runs_data_list[-1]
+            logging.info("Test data info:")
+            print_data_info(self.test_data)
 
             # Normalize the data
             if self.normalize is not None:
