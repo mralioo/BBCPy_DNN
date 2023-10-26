@@ -1,0 +1,70 @@
+# @package _global_
+
+# to execute this experiment run:
+# python train.py experiment=example
+defaults:
+  - override /data: smr_datamodule.yaml
+  - override /model: eegconformer.yaml
+  - override /trainer: gpu.yaml
+  - override /paths: default.yaml
+  - override /extras: default.yaml
+  - override /hydra: default.yaml
+  - override /callbacks: default.yaml
+
+# all parameters below will be merged with parameters from default configurations set above
+# this allows you to overwrite only specified parameters
+
+tags: ["transformer-v1","Within-Subject", "RL"]
+
+seed: 12345
+
+optimized_metric: "val/acc_best"
+
+data:
+  task_name: "LR"
+  trial_type: "forced"
+  ival: 2s:10s:1ms
+  chans: [ "*" ]
+  bands:
+    - 8
+    - 30
+  loading_data_mode: "within_subject"
+  process_noisy_channels: True
+  ignore_noisy_sessions: False
+  train_val_split: True
+  cross_validation: False
+  transform: False
+  normalize: { norm_type: "std", norm_axis: 0 }
+  batch_size: 32
+  num_workers: 4
+  pin_memory: True
+
+model:
+  plots_settings:
+    plot_every_n_epoch: 10
+  net:
+    emb_kernel_size_1: [ 1,25 ]
+    emb_kernel_size_2: [ 22,1 ]
+    emb_size: 40
+    depth: 3
+    n_classes: 2
+
+trainer:
+  min_epochs: 10
+  max_epochs: 50
+  check_val_every_n_epoch: 1
+
+paths:
+  root_dir: ${oc.env:PROJECT_ROOT}
+  data_dir: /input-data
+  log_dir: ${oc.env:PROJECT_ROOT}/logs/dnn
+  output_dir: ${hydra:runtime.output_dir}
+  work_dir: ${hydra:runtime.cwd}
+
+logger:
+  mlflow:
+#    tags: ${tags}
+    experiment_name: Transformer-v1
+    run_name: S1
+
+
