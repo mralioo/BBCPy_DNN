@@ -21,7 +21,7 @@ data:
   task_name: "2D"
   trial_type: "forced"
   ival: 2s:10s:1ms
-  chans: [ "*" ]
+  chans: ['C?,~*3,~*4', 'FC*,~*3,~*4']
   bands: [ 8, 13 ]
   loading_data_mode: "within_subject"
   process_noisy_channels: True

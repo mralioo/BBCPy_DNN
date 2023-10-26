@@ -4,11 +4,9 @@
 #SBATCH --gpus-per-node=0
 #SBATCH --ntasks-per-node=8
 #SBATCH --output=logs/job-%j.out
-#SBATCH --output=../jobs_outputs/csp-S9/%x_%j.o
-#SBATCH --error=../jobs_outputs/csp-S9/%x_%j.e
+#SBATCH --output=../jobs_outputs/csp-hpo-LR/%x_%j.o
+#SBATCH --error=../jobs_outputs/csp-hpo-LR/%x_%j.e
 
-echo "I am a job with ID $SLURM_JOB_ID"
-echo "current working directory is $(pwd)"
 
 SUBJECTS=( "S5" "S60" "S57" )
 

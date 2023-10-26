@@ -7,8 +7,6 @@
 #SBATCH --output=../jobs_outputs/csp-hpo-2D/%x_%j.o
 #SBATCH --error=../jobs_outputs/csp-hpo-2D/%x_%j.e
 
-echo "I am a job with ID $SLURM_JOB_ID"
-echo "current working directory is $(pwd)"
 
 SUBJECTS=( "S5" "S60" "S57" )
 

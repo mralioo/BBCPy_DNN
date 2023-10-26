@@ -6,6 +6,5 @@ hyperparam_opt:
 #      csp__n_cmps: [ 4, 6, 8 ]
   scoring: accuracy
   cv:
-    _target_: sklearn.model_selection.KFold
+    _target_: src.utils.srm_utils.RunKFold
     n_splits: 5
-    shuffle: True
