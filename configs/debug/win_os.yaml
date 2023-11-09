@@ -15,7 +15,7 @@ defaults:
 #  - override /hparams_search: hpo_csp.yaml
 
 
-tune: True
+tune: False
 train: True
 
 paths:
@@ -41,7 +41,7 @@ logger:
 data:
 #  task_name: "2D"
   trial_type: "valid"
-#  ival: 2s:10s:10ms
+  ival: 0s:10s:3ms
 #  chans: [ "*" ]
 #  bands: [ 8, 13 ]
   subject_sessions_dict:
