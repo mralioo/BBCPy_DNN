@@ -78,6 +78,7 @@ def train(cfg: DictConfig) -> Tuple[dict, dict]:
                                                       hyperparameter_search=hyperparameter_search)
 
     metric_dict = {}
+    best_params = {}
 
     object_dict = {
         "cfg": cfg,
@@ -89,7 +90,7 @@ def train(cfg: DictConfig) -> Tuple[dict, dict]:
     }
 
     hparams = utils.log_sklearn_hyperparameters(object_dict)
-    best_params = {}
+
     if cfg.get("tune"):
         log.info("Starting hyperparameter search!")
         hpo_metric_dict, best_params["best_params"] = trainer.search_hyperparams(pipeline=pipeline,
@@ -143,7 +144,7 @@ def main(cfg: DictConfig) -> Optional[float]:
     df = pd.DataFrame([flat_dict])
 
     # Add best hyperparams after tuning to the DataFrame if they exist
-    if not bool(best_params):
+    if bool(best_params):
         for key, value in best_params["best_params"].items():
             new_key = f"{model_name}@{key}"
             df[new_key] = value
