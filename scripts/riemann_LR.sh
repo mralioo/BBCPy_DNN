@@ -8,7 +8,8 @@
 
 # List of subjects
 #SUBJECTS=("S57" "S39" "S30" "S52" "S51" "S49" "S36")
-SUBJECTS=( "S52" "S51" "S38" "S39" "S57")
+#SUBJECTS=( "S52" "S51" "S38" "S39" "S57")
+SUBJECTS=( "S52" "S51" "S38" "S39" "S57" "S9" "S49" "S30" "S36" "S20" "S60" "S4" "S23" "S28" "S5" "S8" "S2" "S29" "S26" "S1" )
 
 # Loop through each subject
 for SUBJECT in "${SUBJECTS[@]}"; do

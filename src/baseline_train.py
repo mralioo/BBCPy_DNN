@@ -141,10 +141,13 @@ def main(cfg: DictConfig) -> Optional[float]:
             flat_dict[key] = value
     # Convert to pandas DataFrame
     df = pd.DataFrame([flat_dict])
-    # Add hyperparameters to the DataFrame
-    for key, value in best_params["best_params"].items():
-        new_key = f"{model_name}@{key}"
-        df[new_key] = value
+
+    # Add best hyperparams after tuning to the DataFrame if they exist
+    if not bool(best_params):
+        for key, value in best_params["best_params"].items():
+            new_key = f"{model_name}@{key}"
+            df[new_key] = value
+
     # Open the CSV file in write mode
     with open(csv_file_path, mode='w', newline='') as file:
         df.to_csv(file, index=False)
