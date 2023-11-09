@@ -1,4 +1,3 @@
-import gc
 import itertools
 import json
 import os
@@ -106,7 +105,7 @@ class SklearnTrainer(object):
 
             # log dataset dict to mlflow parent run
             _, metrics, _, _ = fetch_logged_data(parent_run.info.run_id)
-            self.log_to_mlflow(hparams, parent_run, self.train_data, self.test_data, None, None)
+            self.log_to_mlflow(hparams, parent_run, self.train_data, self.test_data)
 
             log.info("Hyperparameter search completed!")
 
@@ -116,7 +115,7 @@ class SklearnTrainer(object):
         return metrics
 
     def train(self, pipeline, hparams):
-        # train and test data
+        """Train the model."""
 
         # # FIXME: New data split
         # if self.train_val_split is not None:
@@ -224,12 +223,12 @@ class SklearnTrainer(object):
                         # train confusion matrix & metrics
                         y_pred = self.clf.predict(X_train)
 
-                        cm_train = confusion_matrix(y_train, y_pred)
+                        cm_train = calculate_extended_cm(y_train, y_pred, self.classes_names_dict)
                         train_cm_list.append(compute_percentages_cm(cm_train))
 
                         # validation confusion matrix & metrics
                         y_pred = self.clf.predict(X_vali)
-                        cm_vali = confusion_matrix(y_vali, y_pred)
+                        cm_vali = calculate_extended_cm(y_vali, y_pred, self.classes_names_dict)
                         self.plot_confusion_matrix(cm_vali, title="cm_validation_fold_{}".format(foldNum))
                         val_cm_list.append(compute_percentages_cm(cm_vali))
 
@@ -242,7 +241,7 @@ class SklearnTrainer(object):
                         # test confusion matrix & metrics
                         test_set_name = "test_valid"
                         y_pred = self.clf.predict(self.test_data)
-                        cm_test = confusion_matrix(self.test_data.y, y_pred)
+                        cm_test = calculate_extended_cm(self.test_data.y, y_pred, self.classes_names_dict)
                         self.plot_confusion_matrix(conf_mat=cm_test,
                                                    title="cm_{}_fold_{}".format(test_set_name, foldNum))
                         test_cm_list.append(compute_percentages_cm(cm_test))
@@ -280,33 +279,10 @@ class SklearnTrainer(object):
 
                         if self.task_name == "2D":
                             # ovo and ovr roc curve on validation data
-                            try:
-                                y_pred_proba_val = self.clf.predict_proba(X_vali)
-                            except AttributeError:
-                                try:
-                                    y_pred_proba_val = self.clf.predict_log_proba(X_vali)
-                                except AttributeError:
-                                    raise ValueError(
-                                        "Neither predict_proba nor predict_log_proba are available for the given classifier.")
-
-                            self.plot_roc_curve_ovr(Y_ie=y_vali, Y_pred_logits=y_pred_proba_val,
-                                                    filename=f"Valid_fold-{foldNum}_roc-curve-ovr")
-                            self.plot_roc_curve_ovo(Y_ie=y_vali, Y_pred_logits=y_pred_proba_val,
-                                                    filename=f"Valid_fold-{foldNum}_roc-curve-ovo")
+                            self.predict_prob(X_vali, y_vali, foldNum=foldNum, test_data_type="vali")
 
                             # ovo and ovr roc curve on test data
-                            try:
-                                y_pred_proba_test = self.clf.predict_proba(self.test_data)
-                            except AttributeError:
-                                try:
-                                    y_pred_proba_test = self.clf.predict_log_proba(self.test_data)
-                                except AttributeError:
-                                    raise ValueError(
-                                        "Neither predict_proba nor predict_log_proba are available for the given classifier.")
-                            self.plot_roc_curve_ovr(Y_ie=self.test_data.y, Y_pred_logits=y_pred_proba_test,
-                                                    filename=f"Test_fold-{foldNum}_roc-curve-ovr")
-                            self.plot_roc_curve_ovo(Y_ie=self.test_data.y, Y_pred_logits=y_pred_proba_test,
-                                                    filename=f"Test_fold-{foldNum}_roc-curve-ovo")
+                            self.predict_prob(self.test_data, self.test_data.y, foldNum=foldNum, test_data_type="test")
 
                         # fetch logged data from child run
                         child_run_id = child_run.info.run_id
@@ -366,6 +342,59 @@ class SklearnTrainer(object):
                 log.info(f"Training completed!")
 
         return metrics
+
+    def predict_prob(self, X, y, foldNum, test_data_type="vali"):
+        """Predict probabilities for each class for each sample."""
+
+        try:
+            y_pred_proba = self.clf.predict_proba(X)
+        except AttributeError:
+            try:
+                y_pred_proba = self.clf.predict_log_proba(X)
+            except AttributeError:
+                raise ValueError(
+                    "Neither predict_proba nor predict_log_proba are available for the given classifier.")
+
+        if y_pred_proba.shape[1] != len(self.classes_names_dict):
+            # Number of samples
+            n_samples = y_pred_proba.shape[0]
+            # Create an empty array to hold the adjusted probabilities
+            adjusted_probs = np.zeros((n_samples, len(self.classes_names_dict)))
+
+            # Fill the adjusted predict_proba output
+            for idx, class_label in self.classes_names_dict.items():
+                if idx in self.clf.classes_:
+                    # Find the index of the current class in the trained classes
+                    trained_class_idx = list(self.clf.classes_).index(idx)
+                    # Assign the corresponding probabilities
+                    adjusted_probs[:, idx] = y_pred_proba[:, trained_class_idx]
+        else:
+            adjusted_probs = y_pred_proba
+
+        self.plot_roc_curve_ovr(Y_ie=y, Y_pred_logits=adjusted_probs,
+                                filename=f"{test_data_type}_fold-{foldNum}_roc-curve-ovr")
+
+        self.plot_roc_curve_ovo(Y_ie=y, Y_pred_logits=adjusted_probs,
+                                filename=f"{test_data_type}_fold-{foldNum}_roc-curve-ovo")
+
+    def predict_test_data(self, clf, test_data, test_data_type):
+
+        y_pred = clf.predict(test_data)
+
+        test_acc = sklearn.metrics.accuracy_score(test_data.y, y_pred)
+        test_f1 = sklearn.metrics.f1_score(test_data.y, y_pred, average='weighted')
+        test_recall = sklearn.metrics.recall_score(test_data.y, y_pred, average='weighted')
+        test_forced_precision = sklearn.metrics.precision_score(test_data.y, y_pred, average='weighted')
+
+        test_cm_title = f"cm_{test_data_type}_trials"
+        mlflow.log_metric(f"test_{test_data_type}/acc", test_acc)
+        mlflow.log_metric(f"test_{test_data_type}/f1", test_f1)
+        mlflow.log_metric(f"test_{test_data_type}/recall", test_recall)
+        mlflow.log_metric(f"test_{test_data_type}/precision", test_forced_precision)
+
+        cm_vali = confusion_matrix(test_data.y, y_pred)
+        self.plot_confusion_matrix(conf_mat=cm_vali,
+                                   title=test_cm_title)
 
     def compute_metrics(self, y_true, y_pred, set_name="val"):
         """Compute metrics for classification task.
@@ -435,6 +464,7 @@ class SklearnTrainer(object):
             for i in range(len(self.classes_names)):
                 for j in range(len(self.classes_names)):
                     group_counts.append("{}/{}".format(conf_mat[i, j], conf_mat.sum(axis=1)[i]))
+
             group_percentages = np.around(conf_mat.astype('float') / conf_mat.sum(axis=1)[:, np.newaxis], decimals=2)
             labels = [f"{v1} \n {v2 * 100: .4}%" for v1, v2 in zip(group_counts, group_percentages.flatten())]
             labels = np.asarray(labels).reshape(len(self.classes_names), len(self.classes_names))
@@ -674,8 +704,9 @@ class SklearnTrainer(object):
                 ax_bottom.set_title("ROC Curve OvO")
 
             # Calculates the ROC AUC OvO
+            # roc_auc_ovo[title] = roc_auc_score(df_aux['class'], df_aux['prob'], multi_class='ovo')
             roc_auc_ovo[title] = roc_auc_score(df_aux['class'], df_aux['prob'])
-        # plt.tight_layout()
+            # plt.tight_layout()
 
         # Use a temporary directory to save the plot
         with tempfile.TemporaryDirectory() as tmpdirname:
@@ -728,25 +759,6 @@ class SklearnTrainer(object):
 
                 mlflow.log_artifacts(tmpdirname)
 
-    def predict_test_data(self, clf, test_data, test_data_type):
-
-        y_pred = clf.predict(test_data)
-
-        test_acc = sklearn.metrics.accuracy_score(test_data.y, y_pred)
-        test_f1 = sklearn.metrics.f1_score(test_data.y, y_pred, average='weighted')
-        test_recall = sklearn.metrics.recall_score(test_data.y, y_pred, average='weighted')
-        test_forced_precision = sklearn.metrics.precision_score(test_data.y, y_pred, average='weighted')
-
-        test_cm_title = f"cm_{test_data_type}_trials"
-        mlflow.log_metric(f"test_{test_data_type}/acc", test_acc)
-        mlflow.log_metric(f"test_{test_data_type}/f1", test_f1)
-        mlflow.log_metric(f"test_{test_data_type}/recall", test_recall)
-        mlflow.log_metric(f"test_{test_data_type}/precision", test_forced_precision)
-
-        cm_vali = confusion_matrix(test_data.y, y_pred)
-        self.plot_confusion_matrix(conf_mat=cm_vali,
-                                   title=test_cm_title)
-
 
 def plot_roc_curve(tpr, fpr, scatter=False, ax=None):
     '''
@@ -774,6 +786,27 @@ def plot_roc_curve(tpr, fpr, scatter=False, ax=None):
     ax.legend(loc="lower right")
 
     # plt.show()
+
+
+def calculate_extended_cm(y_true_ie, y_pred_ie, class_names_dict):
+    # Get the list of unique class names from the dictionary
+    class_names = list(class_names_dict.values())
+
+    # Initialize an empty confusion matrix with the size of the number of unique classes
+    extended_cm = np.zeros((len(class_names), len(class_names)), dtype=int)
+
+    # Compute the confusion matrix from the true and predicted labels
+    cm = sklearn.metrics.confusion_matrix(y_true_ie, y_pred_ie, labels=list(class_names_dict.keys()))
+
+    # Map the computed confusion matrix to the correct place in the extended matrix
+    for i, row in enumerate(cm):
+        for j, count in enumerate(row):
+            # Find the class index for true and predicted from the dictionary
+            true_class_index = class_names.index(class_names_dict[i])
+            pred_class_index = class_names.index(class_names_dict[j])
+            extended_cm[true_class_index, pred_class_index] = count
+
+    return extended_cm
 
 
 # TODO plot csp filter and csp patterns
