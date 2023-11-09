@@ -8,7 +8,7 @@
 #SBATCH --error=../jobs_outputs/csp-hpo-LR/%x_%j.e
 
 
-SUBJECTS=( "S5" "S60" "S57" )
+SUBJECTS=( "S52" "S51" "S38" "S39" "S57")
 
 # Loop through each subject
 for SUBJECT in "${SUBJECTS[@]}"; do
@@ -20,6 +20,6 @@ for SUBJECT in "${SUBJECTS[@]}"; do
     cp ./../squashfs_smr_data/${SUBJECT}.sqfs /tmp/
 
   # 3. bind the squashed dataset to your apptainer environment and run your script with apptainer
-  apptainer run -B /tmp/${SUBJECT}.sqfs:/input-data:image-src=/ ./../env_images/bbcpy_env.sif python ./src/baseline_train.py tune=True experiment=0_csp_LR hparams_search=hpo_csp_excllev +data.subject_sessions_dict="{$SUBJECT: "all"}" logger.mlflow.experiment_name="HPO-CSP-LR" logger.mlflow.run_name="${SUBJECT}-LR-CSP"
+  apptainer run -B /tmp/${SUBJECT}.sqfs:/input-data:image-src=/ ./../env_images/bbcpy_env.sif python ./src/baseline_train.py tune=True experiment=0_csp_LR hparams_search=hpo_csp +data.subject_sessions_dict="{$SUBJECT: "all"}" logger.mlflow.experiment_name="HPO-CSP-LR" logger.mlflow.run_name="${SUBJECT}-LR-CSP"
 
 done

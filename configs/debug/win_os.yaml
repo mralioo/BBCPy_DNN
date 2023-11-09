@@ -15,7 +15,7 @@ defaults:
 #  - override /hparams_search: hpo_csp.yaml
 
 
-tune: False
+tune: True
 train: True
 
 paths:
@@ -45,7 +45,7 @@ data:
 #  chans: [ "*" ]
 #  bands: [ 8, 13 ]
   subject_sessions_dict:
-    S1: "all"
+    S3: "all"
 #  fallback_neighbors: 4
 #  loading_data_mode: "within_subject"
 #  process_noisy_channels: True

@@ -46,10 +46,10 @@ trainer:
 paths:
   root_dir: ${oc.env:PROJECT_ROOT}
   data_dir: /input-data
-  log_dir: ${oc.env:PROJECT_ROOT}/logs/8_11
+  log_dir: ${oc.env:PROJECT_ROOT}/logs/9_11
   output_dir: ${hydra:runtime.output_dir}
   work_dir: ${hydra:runtime.cwd}
-  results_dir: ${paths.log_dir}/results # final results directory
+  results_dir: results # final results directory
 
 
 logger:

@@ -8,7 +8,7 @@
 #SBATCH --error=../jobs_outputs/riemann-hpo-LR/%x_%j.e
 
 
-SUBJECTS=( "S5" "S60" "S57" )
+SUBJECTS=( "S52" "S51" "S38" "S39" "S57")
 
 # Loop through each subject
 for SUBJECT in "${SUBJECTS[@]}"; do

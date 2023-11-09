@@ -1,11 +1,11 @@
 #!/bin/bash
-#SBATCH --job-name=TRiemann-hpo-LR
+#SBATCH --job-name=riemann-hpo-LR
 #SBATCH --partition=cpu-2h
 #SBATCH --gpus-per-node=0
 #SBATCH --ntasks-per-node=8
 #SBATCH --output=logs/job-%j.out
-#SBATCH --output=../jobs_outputs/TRiemann-hpo-LR/%x_%j.o
-#SBATCH --error=../jobs_outputs/TRiemann-hpo-LR/%x_%j.e
+#SBATCH --output=../jobs_outputs/riemann-hpo-2D/%x_%j.o
+#SBATCH --error=../jobs_outputs/riemann-hpo-2D/%x_%j.e
 
 
 SUBJECTS=( "S52" "S51" "S38" "S39" "S57")
@@ -20,6 +20,6 @@ for SUBJECT in "${SUBJECTS[@]}"; do
     cp ./../squashfs_smr_data/${SUBJECT}.sqfs /tmp/
 
   # 3. bind the squashed dataset to your apptainer environment and run your script with apptainer
-  apptainer run -B /tmp/${SUBJECT}.sqfs:/input-data:image-src=/ ./../env_images/bbcpy_env.sif python ./src/baseline_train.py tune=True experiment=0_riemann_tangent_LR hparams_search=hpo_riemann_tangent +data.subject_sessions_dict="{$SUBJECT: "all"}" logger.mlflow.experiment_name="HPO-TRiemann-LR" logger.mlflow.run_name="${SUBJECT}-LR-TRiemann"
+  apptainer run -B /tmp/${SUBJECT}.sqfs:/input-data:image-src=/ ./../env_images/bbcpy_env.sif python ./src/baseline_train.py tune=True experiment=0_riemann_2D hparams_search=hpo_riemann +data.subject_sessions_dict="{$SUBJECT: "all"}" logger.mlflow.experiment_name="HPO-RIEMANN-2D" logger.mlflow.run_name="${SUBJECT}-2D-RIEMANN"
 
 done

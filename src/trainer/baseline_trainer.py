@@ -112,7 +112,7 @@ class SklearnTrainer(object):
             # clean up
             # gc.collect()
 
-        return metrics
+        return metrics, self.best_params
 
     def train(self, pipeline, hparams):
         """Train the model."""

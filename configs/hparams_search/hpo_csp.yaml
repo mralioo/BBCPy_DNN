@@ -2,9 +2,9 @@ hyperparam_opt:
   class: sklearn.model_selection.GridSearchCV
   params:
     param_grid:
-      csp__n_cmps: [ 4, 6, 8 ]
-      csp__excllev: [ 1.2, 1.5, 1.8 ]
-      csp__estimator: [ "scm", "lwf"]
+      csp__n_cmps: [ 4, 6, 8, 10, 12, 14, 16]
+      csp__excllev: [ null, 1.8, 4, 10, 20, 100 ]
+      csp__estimator: [ "scm", "lwf" ]
   scoring: f1_weighted
   cv:
     _target_: sklearn.model_selection.StratifiedKFold
