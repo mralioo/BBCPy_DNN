@@ -128,7 +128,7 @@ def main(cfg: DictConfig) -> Optional[float]:
     model_name = cfg.get("tags")[-2]
     subject_name = list(cfg.data.subject_sessions_dict.keys())[0]
     task_name = cfg.data.task_name
-    os.makedirs(cfg.paths.results_dir, exist_ok=True)
+    os.makedirs(cfg.paths.log_dir/cfg.paths.results_dir, exist_ok=True)
     csv_file_path = Path(f"{cfg.paths.log_dir}/{cfg.paths.results_dir}/{task_name}_{model_name}_{subject_name}.csv")
 
     # Flatten the nested dictionary
