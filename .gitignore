@@ -146,7 +146,8 @@ configs/db/default.yaml
 
 # venv folder
 /bbcpy_env/
-
+/notebooks/.ipynb_checkpoints/
+/notebooks/results_csv/
 # apptainer containers
 *.sif
 *.sqfs
