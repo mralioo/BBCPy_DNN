@@ -13,15 +13,15 @@ defaults:
 # all parameters below will be merged with parameters from default configurations set above
 # this allows you to overwrite only specified parameters
 
-tags: [ "baseline" , "alpha_band" , "Within-Subject" , "csp-MNE" , "2D"]
+tags: [ "baseline" , "alpha_band" , "Within-Subject" , "csp-MNE" , "2D" ]
 
 seed: 12345
 
 data:
   task_name: "2D"
   trial_type: "forced"
-  ival: 2s:10s:1ms
-  chans: ['C?,~*3,~*4', 'FC*,~*3,~*4']
+  ival: 2s:10s:2ms
+  chans: [ "*" ]
   bands: [ 8, 20 ]
   loading_data_mode: "within_subject"
   process_noisy_channels: True

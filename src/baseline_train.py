@@ -130,8 +130,6 @@ def main(cfg: DictConfig) -> Optional[float]:
     os.makedirs(cfg.paths.results_dir, exist_ok=True)
     csv_file_path = Path(f"{cfg.paths.results_dir}/{task_name}_{model_name}_{subject_name}.csv")
 
-    # Convert tensors to float values
-    # metrics = {key: value.item() if hasattr(value, 'item') else value for key, value in metric_dict.items()}
     # Flatten the nested dictionary
     flat_dict = {}
     for key, value in metric_dict.items():

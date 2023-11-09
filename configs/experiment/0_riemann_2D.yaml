@@ -20,10 +20,9 @@ seed: 12345
 data:
   task_name: "2D"
   trial_type: "forced"
-  ival: 2s:10s:1ms
+  ival: 2s:10s:2ms
   chans: [ "*" ]
   bands: [ 8, 20 ]
-  fallback_neighbors: 4
   loading_data_mode: "within_subject"
   process_noisy_channels: True
   ignore_noisy_sessions: False
