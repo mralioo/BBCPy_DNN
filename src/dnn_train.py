@@ -1,10 +1,10 @@
-import csv
 import os
 from pathlib import Path
 from typing import List, Optional, Tuple
 
 import hydra
 import lightning as L
+import pandas as pd
 import pyrootutils
 import torch
 from lightning import Callback, LightningDataModule, LightningModule, Trainer
@@ -265,27 +265,23 @@ def main(cfg: DictConfig) -> Optional[float]:
         convert_tensor_to_float(metric_dict)
     # Open the CSV file in write mode
 
+    flat_dict = {}
+    for key, value in metric_dict.items():
+        if isinstance(value, dict):
+            for inner_key, inner_value in value.items():
+                flat_key = f"{key}@{inner_key}"
+                flat_dict[flat_key] = inner_value
+        else:
+            flat_dict[key] = value
+    # Convert to pandas DataFrame
+    df = pd.DataFrame([flat_dict])
+    # Open the CSV file in write mode
     with open(csv_file_path, mode='w', newline='') as file:
-        writer = csv.DictWriter(file, fieldnames=metric_dict.keys())
-        # Write the header
-        writer.writeheader()
-        # Write the metrics values
-        writer.writerow(metric_dict)
+        df.to_csv(file, index=False)
 
     log.info(f"Metrics saved to {csv_file_path}")
 
     log.info("Done!")
-
-    # # safely retrieve metric value for hydra-based hyperparameter optimization
-    # metric_value = utils.get_metric_value(
-    #     metric_dict=metric_dict, metric_name=cfg.get("optimized_metric")
-    # )
-    # optimized_metric = cfg.get("optimized_metric")
-    #
-    # log.info(f"{optimized_metric}: {metric_value}")
-    #
-    # # return optimized metric
-    # return metric_value
 
 
 def convert_tensor_to_float(d):

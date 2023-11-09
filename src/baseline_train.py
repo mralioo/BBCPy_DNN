@@ -3,6 +3,7 @@ import gc
 import os
 from pathlib import Path
 from typing import Optional, Tuple
+import pandas as pd
 
 import hydra
 import numpy as np
@@ -131,13 +132,20 @@ def main(cfg: DictConfig) -> Optional[float]:
 
     # Convert tensors to float values
     # metrics = {key: value.item() if hasattr(value, 'item') else value for key, value in metric_dict.items()}
+    # Flatten the nested dictionary
+    flat_dict = {}
+    for key, value in metric_dict.items():
+        if isinstance(value, dict):
+            for inner_key, inner_value in value.items():
+                flat_key = f"{key}@{inner_key}"
+                flat_dict[flat_key] = inner_value
+        else:
+            flat_dict[key] = value
+    # Convert to pandas DataFrame
+    df = pd.DataFrame([flat_dict])
     # Open the CSV file in write mode
     with open(csv_file_path, mode='w', newline='') as file:
-        writer = csv.DictWriter(file, fieldnames=metric_dict.keys())
-        # Write the header
-        writer.writeheader()
-        # Write the metrics values
-        writer.writerow(metric_dict)
+        df.to_csv(file, index=False)
 
     # safely retrieve metric value for hydra-based hyperparameter optimization
 
