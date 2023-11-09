@@ -7,21 +7,27 @@
 _target_: src.models.baseline_models.classifier_pipeline
 steps_config: # use yaml list syntax to preserve to order
   FeatureExtraction:
-    CSP:
+    MNE-CSP:
       applied: True
-      n_cmps: 4 #int, default=4 ; Number of components to decompose M/EEG signals.
-      excllev: 1.8 #float, default=1.8 ; Exclusion level for variance estimation.
-      estimator: 'scm' #str, default='scm' ; Covariance estimator to use. Can be 'scm' (sample covariance matrix), 'lwf' (Ledoit-Wolf) or 'oas' (Oracle Approximating Shrinkage).
+      n_cmps: 4
+      reg: 0.2 #float | str | None (default None)allow regularization for covariance estimation|If float (between 0 and 1), shrinkage is used/
+      log: False  # None | bool (default None)
+      cov_est: 'concat' #‘concat’ | ‘epoch’ (default ‘concat’)
+      transform_into: 'average_power' #‘average_power’ : the average power of each spatial filter| ‘csp_space’ :  the data in CSP space(default ‘average_power’)
+      norm_trace: True # bool (default False) Normalize class covariance by its trace.
+      cov_method_params: None #dict | None Parameters to pass to mne.compute_covariance().
+      rank: None #None | ‘info’ | ‘full’ | dict
+      component_order: 'mutual_info' #‘mutual_info’ | ‘alternate’ (default ‘mutual_info’)
   Transformation:
     var:
       applied: True
-      axis: 2 #int, default=0 ; Axis along which variance is computed. If 0, compute variance across features, if 1, compute variance across samples, if 2, compute variance across channels.
+      axis: 2
     log:
       applied: True
   Classification:
     LDA:
       applied: True
-      solver: 'svd' #str, default='svd' ; Solver to use, possible values: 'svd', 'lsqr', 'eigen'.
+      solver: 'svd'
       shrinkage: 'auto' #'auto' or float, default=None ; Shrinkage parameter, possible values between 0 and 1. If None, no shrinkage is performed.
       priors: null #array, shape (n_classes,), default=None ; Class priors.
       n_components: null #int, default=None ; Number of components for dimensionality reduction.
