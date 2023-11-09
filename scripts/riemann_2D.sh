@@ -7,7 +7,8 @@
 #SBATCH --error=../jobs_outputs/riemann-LR/%x_%j.e
 
 # List of subjects
-SUBJECTS=("S57" "S39" "S30" "S52" "S51" "S49" "S36")
+#SUBJECTS=("S57" "S39" "S30" "S52" "S51" "S49" "S36")
+SUBJECTS=( "S52" "S51" "S38" "S39" "S57")
 
 # Loop through each subject
 for SUBJECT in "${SUBJECTS[@]}"; do
