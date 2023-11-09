@@ -21,8 +21,8 @@ steps_config: # use yaml list syntax to preserve to order
   Classification:
     LDA:
       applied: True
-      solver: 'svd' #str, default='svd' ; Solver to use, possible values: 'svd', 'lsqr', 'eigen'.
-      shrinkage: 'auto' #'auto' or float, default=None ; Shrinkage parameter, possible values between 0 and 1. If None, no shrinkage is performed.
+      solver: svd
+      shrinkage: null #'auto' or float, default=None ; Shrinkage parameter, possible values between 0 and 1. If None, no shrinkage is performed.
       priors: null #array, shape (n_classes,), default=None ; Class priors.
       n_components: null #int, default=None ; Number of components for dimensionality reduction.
       store_covariance: False #bool, default=False ; If True, explicitely compute the weighted within-class covariance matrix when solver is 'svd'. The matrix is always computed and stored for the other solvers.
