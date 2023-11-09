@@ -89,10 +89,10 @@ def train(cfg: DictConfig) -> Tuple[dict, dict]:
     }
 
     hparams = utils.log_sklearn_hyperparameters(object_dict)
-
+    best_params = {}
     if cfg.get("tune"):
         log.info("Starting hyperparameter search!")
-        hpo_metric_dict, best_params = trainer.search_hyperparams(pipeline=pipeline,
+        hpo_metric_dict, best_params["best_params"] = trainer.search_hyperparams(pipeline=pipeline,
                                                      hparams=hparams)
         metric_dict.update(hpo_metric_dict)
         log.info("Hyperparameter search finished!")
@@ -142,8 +142,8 @@ def main(cfg: DictConfig) -> Optional[float]:
     # Convert to pandas DataFrame
     df = pd.DataFrame([flat_dict])
     # Add hyperparameters to the DataFrame
-    for key, value in best_params.items():
-        new_key = f"{model_name}_param_{key}"
+    for key, value in best_params["best_params"].items():
+        new_key = f"{model_name}@{key}"
         df[new_key] = value
     # Open the CSV file in write mode
     with open(csv_file_path, mode='w', newline='') as file:
