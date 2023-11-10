@@ -77,7 +77,7 @@ def train(cfg: DictConfig) -> Tuple[dict, dict]:
                                                       hyperparameter_search=hyperparameter_search)
 
     metric_dict = {}
-    best_params = {}
+
 
     object_dict = {
         "cfg": cfg,
@@ -109,7 +109,7 @@ def train(cfg: DictConfig) -> Tuple[dict, dict]:
 
     gc.collect()
 
-    return metric_dict
+    return metric_dict, object_dict
 
 
 @hydra.main(version_base="1.3", config_path="../configs", config_name="baseline_train.yaml")
@@ -121,7 +121,7 @@ def main(cfg: DictConfig) -> Optional[float]:
     utils.extras(cfg)
 
     # train the model
-    metric_dict = train(cfg)
+    metric_dict, _ = train(cfg)
 
     # save metrics to csv file for later analysis
     model_name = cfg.get("tags")[-2]
