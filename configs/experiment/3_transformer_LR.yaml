@@ -63,7 +63,6 @@ paths:
 
 logger:
   mlflow:
-#    tags: ${tags}
     experiment_name: Transformer-v1
     run_name: S1
 

@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH --job-name=csp-LR
-#SBATCH --partition=cpu-2h
+#SBATCH --partition=cpu-5h
 #SBATCH --gpus-per-node=0
 #SBATCH --ntasks-per-node=8
 #SBATCH --output=../jobs_outputs/csp-LR/%x_%j.o

@@ -1,12 +1,11 @@
-import csv
 import gc
 import os
 from pathlib import Path
 from typing import Optional, Tuple
-import pandas as pd
 
 import hydra
 import numpy as np
+import pandas as pd
 import pyrootutils
 from omegaconf import DictConfig
 
@@ -93,7 +92,7 @@ def train(cfg: DictConfig) -> Tuple[dict, dict]:
 
     if cfg.get("tune"):
         log.info("Starting hyperparameter search!")
-        hpo_metric_dict, best_params["best_params"] = trainer.search_hyperparams(pipeline=pipeline,
+        hpo_metric_dict = trainer.search_hyperparams(pipeline=pipeline,
                                                      hparams=hparams)
         metric_dict.update(hpo_metric_dict)
         log.info("Hyperparameter search finished!")
@@ -110,7 +109,7 @@ def train(cfg: DictConfig) -> Tuple[dict, dict]:
 
     gc.collect()
 
-    return metric_dict, best_params
+    return metric_dict
 
 
 @hydra.main(version_base="1.3", config_path="../configs", config_name="baseline_train.yaml")
@@ -122,13 +121,13 @@ def main(cfg: DictConfig) -> Optional[float]:
     utils.extras(cfg)
 
     # train the model
-    metric_dict, best_params = train(cfg)
+    metric_dict = train(cfg)
 
     # save metrics to csv file for later analysis
     model_name = cfg.get("tags")[-2]
     subject_name = list(cfg.data.subject_sessions_dict.keys())[0]
     task_name = cfg.data.task_name
-    os.makedirs(cfg.paths.log_dir/cfg.paths.results_dir, exist_ok=True)
+    os.makedirs(cfg.paths.log_dir / cfg.paths.results_dir, exist_ok=True)
     csv_file_path = Path(f"{cfg.paths.log_dir}/{cfg.paths.results_dir}/{task_name}_{model_name}_{subject_name}.csv")
 
     # Flatten the nested dictionary
@@ -142,12 +141,6 @@ def main(cfg: DictConfig) -> Optional[float]:
             flat_dict[key] = value
     # Convert to pandas DataFrame
     df = pd.DataFrame([flat_dict])
-
-    # Add best hyperparams after tuning to the DataFrame if they exist
-    if bool(best_params):
-        for key, value in best_params["best_params"].items():
-            new_key = f"{model_name}@{key}"
-            df[new_key] = value
 
     # Open the CSV file in write mode
     with open(csv_file_path, mode='w', newline='') as file:
