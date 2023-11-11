@@ -48,13 +48,13 @@ model:
 data:
   #  task_name: "2D"
   #  trial_type: "forced"
-  #  ival: 1s:10s:10ms
-  #  chans: [ "*" ]
+  ival: 0s:10s:10ms
+#    chans: [ "*" ]
   #  loading_data_mode: "within_subject"
   #  process_noisy_channels: True
   #  ignore_noisy_sessions: False
   subject_sessions_dict:
-    S5: "all"
+    S1: "all"
   #    S5: "all"
   #  transform: "TSCeption"
   #  normalize: { norm_type: "std", norm_axis: 0 }
