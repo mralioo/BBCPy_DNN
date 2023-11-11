@@ -223,12 +223,13 @@ class SklearnTrainer(object):
                         # train confusion matrix & metrics
                         y_pred = self.clf.predict(X_train)
 
-                        cm_train = calculate_extended_cm(y_train, y_pred, self.classes_names_dict)
+                        cm_train = confusion_matrix(y_true=y_train, y_pred=y_pred,
+                                                    labels=list(self.classes_names_dict.keys()))
                         train_cm_list.append(compute_percentages_cm(cm_train))
 
                         # validation confusion matrix & metrics
                         y_pred = self.clf.predict(X_vali)
-                        cm_vali = calculate_extended_cm(y_vali, y_pred, self.classes_names_dict)
+                        cm_vali = confusion_matrix(y_true=y_vali, y_pred=y_pred, labels=list(self.classes_names_dict.keys()))
                         self.plot_confusion_matrix(cm_vali, title="cm_validation_fold_{}".format(foldNum))
                         val_cm_list.append(compute_percentages_cm(cm_vali))
 
@@ -241,7 +242,7 @@ class SklearnTrainer(object):
                         # test confusion matrix & metrics
                         test_set_name = "test_valid"
                         y_pred = self.clf.predict(self.test_data)
-                        cm_test = calculate_extended_cm(self.test_data.y, y_pred, self.classes_names_dict)
+                        cm_test = confusion_matrix(y_true=self.test_data.y, y_pred=y_pred, labels=self.classes_names_dict)
                         self.plot_confusion_matrix(conf_mat=cm_test,
                                                    title="cm_{}_fold_{}".format(test_set_name, foldNum))
                         test_cm_list.append(compute_percentages_cm(cm_test))
@@ -472,7 +473,7 @@ class SklearnTrainer(object):
             # set the font size of the text in the confusion matrix
             for i, j in itertools.product(range(conf_mat.shape[0]), range(conf_mat.shape[1])):
                 color = "red"
-                plt.text(j, i, labels[i, j], horizontalalignment="center", color=color, fontsize=15)
+                plt.text(j, i, labels[i, j], horizontalalignment="center", color=color, fontsize=12)
 
             plt.tight_layout()
             plt.ylabel('True label', fontsize=10)
@@ -509,7 +510,7 @@ class SklearnTrainer(object):
             # thresh = mean_cm_val.max() / 2.0
             for i, j in itertools.product(range(mean_cm_val.shape[0]), range(mean_cm_val.shape[1])):
                 color = "red"
-                plt.text(j, i, labels[i, j], horizontalalignment="center", color=color, fontsize=15)
+                plt.text(j, i, labels[i, j], horizontalalignment="center", color=color, fontsize=10)
 
             plt.tight_layout()
             plt.ylabel('True label', fontsize=10)
@@ -786,27 +787,6 @@ def plot_roc_curve(tpr, fpr, scatter=False, ax=None):
     ax.legend(loc="lower right")
 
     # plt.show()
-
-
-def calculate_extended_cm(y_true_ie, y_pred_ie, class_names_dict):
-    # Get the list of unique class names from the dictionary
-    class_names = list(class_names_dict.values())
-
-    # Initialize an empty confusion matrix with the size of the number of unique classes
-    extended_cm = np.zeros((len(class_names), len(class_names)), dtype=int)
-
-    # Compute the confusion matrix from the true and predicted labels
-    cm = sklearn.metrics.confusion_matrix(y_true_ie, y_pred_ie, labels=list(class_names_dict.keys()))
-
-    # Map the computed confusion matrix to the correct place in the extended matrix
-    for i, row in enumerate(cm):
-        for j, count in enumerate(row):
-            # Find the class index for true and predicted from the dictionary
-            true_class_index = class_names.index(class_names_dict[i])
-            pred_class_index = class_names.index(class_names_dict[j])
-            extended_cm[true_class_index, pred_class_index] = count
-
-    return extended_cm
 
 
 # TODO plot csp filter and csp patterns
