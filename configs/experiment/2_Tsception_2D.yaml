@@ -44,7 +44,7 @@ model:
     _target_: torch.nn.CrossEntropyLoss
     _partial_: true
   plots_settings:
-    plot_every_n_epoch: 20
+    plot_every_n_epoch: 10
   net:
     num_classes: 4
     num_electrodes: 54

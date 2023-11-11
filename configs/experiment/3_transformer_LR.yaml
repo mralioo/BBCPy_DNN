@@ -40,14 +40,26 @@ data:
   pin_memory: True
 
 model:
+  criterion:
+    _target_: torch.nn.BCEWithLogitsLoss
+    _partial_: true
   plots_settings:
     plot_every_n_epoch: 10
   net:
-    emb_kernel_size_1: [ 1,25 ]
-    emb_kernel_size_2: [ 22,1 ]
-    emb_size: 40
-    depth: 3
-    n_classes: 2
+    n_outputs: 2  # (int) – Number of outputs of the model. This is the number of classes in the case of classification.
+    n_chans: 62   # (int) – Number of EEG channels.
+    n_times: 1000 # (int) – Number of time samples of the input window.
+    n_filters_time: 40 # (int) – Number of temporal filters, defines also embedding size.
+    filter_time_length: 25  # (int) – Length of the temporal filter.
+    pool_time_length: 75 # (int) – Length of temporal pooling filter.
+    pool_time_stride: 15 # (int) – Length of stride between temporal pooling filters.
+    drop_prob: 0.5 #(float) – Dropout rate of the convolutional layer.
+    att_depth: 3 #(int) – Number of self-attention layers.
+    att_heads: 10 #(int) – Number of attention heads.
+    att_drop_prob: 0.5 #(float) – Dropout rate of the self-attention layer.
+    final_fc_length: auto #(int | str) – The dimension of the fully connected layer.
+    return_features: False #(bool) – If True, the forward method returns the features before the last classification layer. Defaults to False.
+    add_log_softmax: False #(bool)
 
 trainer:
   min_epochs: 10

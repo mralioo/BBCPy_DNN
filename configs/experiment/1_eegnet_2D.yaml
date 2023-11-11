@@ -54,7 +54,7 @@ model:
     F2: 32
     D: 2
   plots_settings:
-    plot_every_n_epoch: 20
+    plot_every_n_epoch: 10
 
 trainer:
   min_epochs: 50
