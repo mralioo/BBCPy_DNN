@@ -25,9 +25,7 @@ data:
   trial_type: "forced"
   ival: 2s:10s:1ms
   chans: [ "*" ]
-  bands:
-    - 8
-    - 30
+  bands: [ 8, 20 ]
   loading_data_mode: "within_subject"
   process_noisy_channels: True
   ignore_noisy_sessions: False
@@ -48,7 +46,7 @@ model:
   net:
     n_outputs: 2  # (int) – Number of outputs of the model. This is the number of classes in the case of classification.
     n_chans: 62   # (int) – Number of EEG channels.
-    n_times: 1000 # (int) – Number of time samples of the input window.
+    n_times: 8000 # (int) – Number of time samples of the input window.
     n_filters_time: 40 # (int) – Number of temporal filters, defines also embedding size.
     filter_time_length: 25  # (int) – Length of the temporal filter.
     pool_time_length: 75 # (int) – Length of temporal pooling filter.
@@ -69,9 +67,11 @@ trainer:
 paths:
   root_dir: ${oc.env:PROJECT_ROOT}
   data_dir: /input-data
-  log_dir: ${oc.env:PROJECT_ROOT}/logs/dnn
+  log_dir: ${oc.env:PROJECT_ROOT}/logs/11_11
   output_dir: ${hydra:runtime.output_dir}
   work_dir: ${hydra:runtime.cwd}
+  results_dir: ${paths.log_dir}/results # final results directory
+
 
 logger:
   mlflow:

@@ -9,7 +9,8 @@
 #SBATCH --error=../jobs_outputs/transformer-2D/%x_%j.e
 
 # List of subjects
-SUBJECTS=("S57")
+CATEGORY="2D-C1"
+SUBJECTS=( "S52" "S51" "S38" "S39" "S57" "S9" "S49" "S30" "S36" "S20" "S60" "S4" "S23" "S28" "S5" "S8" "S2" "S29" "S26" "S1" )
 
 # Loop through each subject
 for SUBJECT in "${SUBJECTS[@]}"; do
@@ -21,6 +22,6 @@ for SUBJECT in "${SUBJECTS[@]}"; do
     cp ./../squashfs_smr_data/${SUBJECT}.sqfs /tmp/
     # ... (rest of your script remains unchanged, but ensure to change the run_name in the apptainer command)
 
-    apptainer run --nv -B /tmp/${SUBJECT}.sqfs:/input-data:image-src=/ ./../env_images/bbcpy_env.sif python ./src/dnn_train.py experiment=3_transformer_2D +data.subject_sessions_dict="{$SUBJECT: "all"}" logger.mlflow.experiment_name="transformer-2D" logger.mlflow.run_name="${SUBJECT}-2D-transformer"
+    apptainer run --nv -B /tmp/${SUBJECT}.sqfs:/input-data:image-src=/ ./../env_images/bbcpy_env.sif python ./src/dnn_train.py experiment=3_transformer_2D +data.subject_sessions_dict="{$SUBJECT: "all"}" logger.mlflow.experiment_name="${CATEGORY}" logger.mlflow.run_name="${SUBJECT}-transformer"
 
 done

@@ -9,7 +9,8 @@
 #SBATCH --error=../jobs_outputs/eegnet-LR/%x_%j.e
 
 # List of subjects
-SUBJECTS=("S57" "S39" "S30" "S52" "S51" "S49" "S36")
+CATEGORY="LR-C1"
+SUBJECTS=( "S5" "S60" "S57" "S39" "S9" "S49" "S30" "S51" "S52" "S8" "S36" "S20" "S50" "S4" "S38" "S2" "S43" "S28" )
 
 # Loop through each subject
 for SUBJECT in "${SUBJECTS[@]}"; do
@@ -22,6 +23,6 @@ for SUBJECT in "${SUBJECTS[@]}"; do
 
     # ... (rest of your script remains unchanged, but ensure to change the run_name in the apptainer command)
 
-    apptainer run --nv -B /tmp/${SUBJECT}.sqfs:/input-data:image-src=/ ./../env_images/bbcpy_env.sif python ./src/dnn_train.py experiment=1_eegnet_LR +data.subject_sessions_dict="{$SUBJECT: "all"}" logger.mlflow.experiment_name="EEGNET-LR" logger.mlflow.run_name="${SUBJECT}-LR-EEGNET"
+    apptainer run --nv -B /tmp/${SUBJECT}.sqfs:/input-data:image-src=/ ./../env_images/bbcpy_env.sif python ./src/dnn_train.py experiment=1_eegnet_LR +data.subject_sessions_dict="{$SUBJECT: "all"}" logger.mlflow.experiment_name="${CATEGORY}" logger.mlflow.run_name="${SUBJECT}-EEGNET"
 
 done

@@ -8,6 +8,7 @@
 
 # List of subjects
 #  Category 1 : 'S52', 'S51', 'S38', 'S39', 'S57', 'S9', 'S49', 'S30', 'S36', 'S20', 'S60', 'S4', 'S23', 'S28', 'S5', 'S8', 'S2', 'S29', 'S26', 'S1'
+CATEGORY="2D-C1"
 SUBJECTS=( "S52" "S51" "S38" "S39" "S57" "S9" "S49" "S30" "S36" "S20" "S60" "S4" "S23" "S28" "S5" "S8" "S2" "S29" "S26" "S1" )
 #SUBJECTS=( "S52" "S51" "S38" "S39" "S57")
 # category 2 : 'S53', 'S61', 'S14', 'S35', 'S54', 'S41', 'S45', 'S50', 'S11', 'S42', 'S25', 'S17', 'S32'
@@ -25,6 +26,6 @@ for SUBJECT in "${SUBJECTS[@]}"; do
     cp ./../squashfs_smr_data/${SUBJECT}.sqfs /tmp/
 
   # 3. bind the squashed dataset to your apptainer environment and run your script with apptainer
-  apptainer run -B /tmp/${SUBJECT}.sqfs:/input-data:image-src=/ ./../env_images/bbcpy_env.sif python ./src/baseline_train.py experiment=0_csp_2D +data.subject_sessions_dict="{$SUBJECT: "all"}" logger.mlflow.experiment_name="CSP-2D" logger.mlflow.run_name="${SUBJECT}-2D-CSP"
+  apptainer run -B /tmp/${SUBJECT}.sqfs:/input-data:image-src=/ ./../env_images/bbcpy_env.sif python ./src/baseline_train.py experiment=0_csp_2D +data.subject_sessions_dict="{$SUBJECT: "all"}" logger.mlflow.experiment_name="${CATEGORY}" logger.mlflow.run_name="${SUBJECT}-CSP"
 
 done

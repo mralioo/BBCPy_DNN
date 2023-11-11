@@ -7,7 +7,9 @@
 #SBATCH --error=../jobs_outputs/csp-LR/%x_%j.e
 
 # List of subjects
+
 # category 1 : 'S5', 'S60', 'S57', 'S39', 'S9', 'S49', 'S30', 'S51', 'S52', 'S8', 'S36', 'S20', 'S50', 'S4', 'S38', 'S2', 'S43', 'S28'
+CATEGORY="LR-C1"
 SUBJECTS=( "S5" "S60" "S57" "S39" "S9" "S49" "S30" "S51" "S52" "S8" "S36" "S20" "S50" "S4" "S38" "S2" "S43" "S28" )
 #SUBJECTS=( "S52" "S51" "S38" "S39" "S57")
 # category 2 : 'S29', 'S26', 'S23', 'S19', 'S53', 'S41', 'S35', 'S61', 'S45', 'S14', 'S15', 'S11', 'S25', 'S1'
@@ -25,6 +27,6 @@ for SUBJECT in "${SUBJECTS[@]}"; do
     cp ./../squashfs_smr_data/${SUBJECT}.sqfs /tmp/
 
   # 3. bind the squashed dataset to your apptainer environment and run your script with apptainer
-  apptainer run -B /tmp/${SUBJECT}.sqfs:/input-data:image-src=/ ./../env_images/bbcpy_env.sif python ./src/baseline_train.py experiment=0_csp_LR +data.subject_sessions_dict="{$SUBJECT: "all"}" logger.mlflow.experiment_name="CSP-LR" logger.mlflow.run_name="${SUBJECT}-LR-CSP"
+  apptainer run -B /tmp/${SUBJECT}.sqfs:/input-data:image-src=/ ./../env_images/bbcpy_env.sif python ./src/baseline_train.py experiment=0_csp_LR +data.subject_sessions_dict="{$SUBJECT: "all"}" logger.mlflow.experiment_name="${CATEGORY}" logger.mlflow.run_name="${SUBJECT}-CSP"
 
 done

@@ -48,7 +48,7 @@ model:
 data:
   #  task_name: "2D"
   #  trial_type: "forced"
-  ival: 0s:10s:10ms
+#  ival: 0s:10s:10ms
 #    chans: [ "*" ]
   #  loading_data_mode: "within_subject"
   #  process_noisy_channels: True
