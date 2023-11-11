@@ -7,6 +7,7 @@ import lightning as L
 import pandas as pd
 import pyrootutils
 import torch
+from hydra.core.hydra_config import HydraConfig
 from lightning import Callback, LightningDataModule, LightningModule, Trainer
 from lightning.pytorch.loggers import Logger
 from omegaconf import DictConfig
@@ -232,6 +233,93 @@ def train_cross_validation(cfg: DictConfig) -> Tuple[dict, dict]:
     metric_dict = {**final_metrics, **cv_metric_dict}
 
     return metric_dict, object_dict
+
+
+@utils.task_wrapper
+def tune(cfg: DictConfig) -> Tuple[dict, dict]:
+    """Performs hyperparameter optimization. using optuna."""
+
+    # set seed for random number generators in pytorch, numpy and python.random
+    if cfg.get("seed"):
+        L.seed_everything(cfg.seed, workers=True)
+
+    log.info(f"Instantiating model <{cfg.model._target_}>")
+    model: LightningModule = hydra.utils.instantiate(cfg.model)
+
+    log.info("Instantiating callbacks...")
+    callbacks: List[Callback] = utils.instantiate_callbacks(cfg.get("callbacks"))
+
+    log.info(f"Instantiating datamodule <{cfg.data._target_}>")
+    datamodule: LightningDataModule = hydra.utils.instantiate(cfg.data)
+
+    avg_metrics = {}
+    object_dict = {}
+
+    run_name = cfg.get("logger").mlflow.run_name
+
+    if cfg.get("tune"):
+        log.info("Starting hyperparameter optimization!")
+
+        trial_id = HydraConfig.get().job.id
+        log.info(f"Hydra Job ID: {trial_id}")
+
+        # load data
+        log.info("Loading data...")
+        datamodule.load_raw_data()
+
+        cv_score = []
+        nums_folds = 5
+        for k in range(nums_folds):
+
+            log.info(f"Fold {k}...")
+
+            # print memory usage
+            print_memory_usage()
+            # print cpu cores
+            print_cpu_cores()
+            # print gpu info
+            print_gpu_memory()
+
+            datamodule.update_kfold_index(k)
+            # here we train the model on given split...
+            # inti trainer again
+            log.info("Instantiating loggers...")
+            OmegaConf.update(cfg.get("logger").mlflow, "run_name", f"T{trial_id}_CV_{k}_{run_name}", merge=True)
+            logger: List[Logger] = utils.instantiate_loggers(cfg.get("logger"))
+
+            log.info(f"Instantiating trainer <{cfg.trainer._target_}>")
+            trainer: Trainer = hydra.utils.instantiate(cfg.trainer,
+                                                       callbacks=callbacks,
+                                                       logger=logger)
+
+            object_dict = {
+                "cfg": cfg,
+                "model": model,
+                "datamodule": datamodule,
+                "callbacks": callbacks,
+                "logger": logger,
+                "trainer": trainer,
+            }
+
+            if logger:
+                log.info("Logging hyperparameters!")
+                utils.log_hyperparameters(object_dict)
+
+            trainer.fit(model,
+                        datamodule=datamodule,
+                        ckpt_path=cfg.get("ckpt_path"))
+
+            train_metrics = trainer.callback_metrics
+
+            cv_score.append(train_metrics)
+
+        for key in cv_score[0].keys():
+            avg_metrics[f"avg_{key}"] = sum([fold[key].item() for fold in cv_score]) / len(cv_score)
+
+        for key, value in avg_metrics.items():
+            trainer.logger.log_metrics({f"{key}": value})
+
+    return avg_metrics, object_dict
 
 
 @hydra.main(version_base="1.3", config_path="../configs", config_name="dnn_train.yaml")
