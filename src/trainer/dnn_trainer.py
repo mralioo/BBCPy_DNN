@@ -276,11 +276,11 @@ class DnnLitModule(LightningModule):
             self.roc.compute()
             self.plot_summary_advanced(all_results, image_name=f"val_summary_epoch_{self.current_epoch}")
 
-            # Plot ROC curve ovr and ovo FIXME : test on LR
-            self.plot_roc_curve_ovr(Y_true_ie=self.val_step_targets_ie, Y_pred_logits=self.val_step_outputs_logits,
-                                    filename=f"val_roc_ovr_epoch_{self.current_epoch}")
-            self.plot_roc_curve_ovo(Y_true_ie=self.val_step_targets_ie, Y_pred_logits=self.val_step_outputs_logits,
-                                    filename=f"val_roc_ovo_epoch_{self.current_epoch}")
+            # Plot ROC curve ovr and ovo FIXME : test on LR / 2d
+            # self.plot_roc_curve_ovr(Y_true_ie=self.val_step_targets_ie, Y_pred_logits=self.val_step_outputs_logits,
+            #                         filename=f"val_roc_ovr_epoch_{self.current_epoch}")
+            # self.plot_roc_curve_ovo(Y_true_ie=self.val_step_targets_ie, Y_pred_logits=self.val_step_outputs_logits,
+            #                         filename=f"val_roc_ovo_epoch_{self.current_epoch}")
 
         # Accuracy is a metric object, so we need to call `.compute()` to get the value
         acc = self.val_acc.compute()  # get current val acc
