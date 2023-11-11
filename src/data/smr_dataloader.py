@@ -1,7 +1,7 @@
 import gc
 import logging
 from typing import Optional
-
+import numpy as np
 import pyrootutils
 import torch
 from lightning import LightningDataModule
@@ -170,24 +170,24 @@ class SRM_DataModule(LightningDataModule):
             logging.info("Create train and validation sets.. ")
             # load and split datasets only if not loaded already
             if self.train_val_split:
-                self.training_set = SRMDataset(data=self.train_data)
+                self.training_set = SRMDataset(data=self.train_data, num_classes=self.num_classes)
                 print(self.training_set.statistical_info())
                 self.training_set.normalize_data(norm_type=self.normalize["norm_type"],
                                                  axis=self.normalize["norm_axis"])
                 logging.info("Normalized train trials")
                 print(self.training_set.statistical_info())
 
-                self.validation_set = SRMDataset(data=self.val_data)
+                self.validation_set = SRMDataset(data=self.val_data, num_classes=self.num_classes)
                 print(self.validation_set.statistical_info())
                 self.validation_set.normalize_data(norm_type=self.normalize["norm_type"],
                                                    axis=self.normalize["norm_axis"])
-                logging.info("Normalized test trials")
+                logging.info("Normalized Validation trials")
                 print(self.validation_set.statistical_info())
 
             elif self.cross_validation:
                 # Create datasets with specific indices
                 logging.info(f"Train indices: {self.train_idx}")
-                self.training_set = SRMDataset(data=self.data[self.train_idx])
+                self.training_set = SRMDataset(data=self.data[self.train_idx], num_classes=self.num_classes)
                 logging.info("Train dataset info")
                 print(self.training_set.statistical_info())
                 self.training_set.normalize_data(norm_type=self.normalize["norm_type"],
@@ -196,7 +196,7 @@ class SRM_DataModule(LightningDataModule):
                 print(self.training_set.statistical_info())
 
                 logging.info(f"Val indices: {self.val_idx}")
-                self.validation_set = SRMDataset(data=self.data[self.val_idx])
+                self.validation_set = SRMDataset(data=self.data[self.val_idx], num_classes=self.num_classes)
                 logging.info("Val dataset info")
                 print(self.validation_set.statistical_info())
                 self.validation_set.normalize_data(norm_type=self.normalize["norm_type"],
@@ -290,14 +290,15 @@ class SRM_DataModule(LightningDataModule):
 
 
 class SRMDataset(Dataset):
-    def __init__(self, data):
+    def __init__(self, data, num_classes=2):
         y = data.y
-        onehot_encoder = OneHotEncoder(sparse_output=False)
+        # One-hot encode the labels
+        onehot_encoder = OneHotEncoder(sparse=False, categories=[np.arange(num_classes)])
         integer_encoded = y.reshape(-1, 1)
         onehot_encoded = onehot_encoder.fit_transform(integer_encoded)
 
         self.data = torch.tensor(data).float()
-        self.y_oe = torch.tensor(onehot_encoded)
+        self.y_oe = torch.tensor(onehot_encoded).float()
 
     def __getitem__(self, index):
         x = self.data[index].unsqueeze(dim=0)
@@ -334,14 +335,6 @@ class SRMDataset(Dataset):
             else:
                 self.data, self.norm_params = None, None
                 ValueError("Only 'std' and 'minmax' are supported")
-
-    # def unnormalize(self, data_norm, norm_params):
-    #     data = None
-    #     if norm_params["norm_type"] == "std":
-    #         data = data_norm * norm_params["std"] + norm_params["mean"]
-    #     elif norm_params["norm_type"] == "minmax":
-    #         data = data_norm * (norm_params["max"] - norm_params["min"]) + norm_params["min"]
-    #     return data
 
     def classes_weights(self):
         """Compute classes weights for imbalanced dataset."""
