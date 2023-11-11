@@ -229,7 +229,9 @@ class SklearnTrainer(object):
 
                         # validation confusion matrix & metrics
                         y_pred = self.clf.predict(X_vali)
-                        cm_vali = confusion_matrix(y_true=y_vali, y_pred=y_pred, labels=list(self.classes_names_dict.keys()))
+                        cm_vali = confusion_matrix(y_true=y_vali, y_pred=y_pred,
+                                                   labels=list(self.classes_names_dict.keys()))
+                        
                         self.plot_confusion_matrix(cm_vali, title="cm_validation_fold_{}".format(foldNum))
                         val_cm_list.append(compute_percentages_cm(cm_vali))
 
@@ -242,7 +244,9 @@ class SklearnTrainer(object):
                         # test confusion matrix & metrics
                         test_set_name = "test_valid"
                         y_pred = self.clf.predict(self.test_data)
-                        cm_test = confusion_matrix(y_true=self.test_data.y, y_pred=y_pred, labels=self.classes_names_dict)
+                        cm_test = confusion_matrix(y_true=self.test_data.y, y_pred=y_pred,
+                                                   labels=list(self.classes_names_dict.keys()))
+
                         self.plot_confusion_matrix(conf_mat=cm_test,
                                                    title="cm_{}_fold_{}".format(test_set_name, foldNum))
                         test_cm_list.append(compute_percentages_cm(cm_test))
