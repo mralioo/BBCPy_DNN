@@ -38,16 +38,16 @@ model:
         decision_function_shape: ovo # ovo | ovr
 
 trainer:
-  train_val_split: False
-  cv:
-    _target_: sklearn.model_selection.StratifiedKFold
-    n_splits: 5
-    shuffle: False
+  train_val_split: { val_ratio: 0.2, random_seed: 42 }
+  cv: False
+#    _target_: sklearn.model_selection.StratifiedKFold
+#    n_splits: 5
+#    shuffle: False
 
 paths:
   root_dir: ${oc.env:PROJECT_ROOT}
   data_dir: /input-data
-  log_dir: ${oc.env:PROJECT_ROOT}/logs/11_11
+  log_dir: ${oc.env:PROJECT_ROOT}/logs/13_11
   output_dir: ${hydra:runtime.output_dir}
   work_dir: ${hydra:runtime.cwd}
   results_dir: ${paths.log_dir}/results # final results directory

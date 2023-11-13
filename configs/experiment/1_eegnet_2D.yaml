@@ -29,7 +29,7 @@ data:
   loading_data_mode: "within_subject"
   process_noisy_channels: True
   ignore_noisy_sessions: False
-  train_val_split: True
+  train_val_split: { val_ratio: 0.2, random_seed: 42 }
   cross_validation: False
   transform: False
   normalize: { norm_type: "std", norm_axis: 0 }
@@ -63,11 +63,10 @@ trainer:
 paths:
   root_dir: ${oc.env:PROJECT_ROOT}
   data_dir: /input-data
-  log_dir: ${oc.env:PROJECT_ROOT}/logs/11_11
+  log_dir: ${oc.env:PROJECT_ROOT}/logs/13_11
   output_dir: ${hydra:runtime.output_dir}
   work_dir: ${hydra:runtime.cwd}
   results_dir: ${paths.log_dir}/results # final results directory
-
 
 logger:
   mlflow:

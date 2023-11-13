@@ -40,12 +40,12 @@ logger:
 
 data:
 #  task_name: "2D"
-  trial_type: "valid"
+  trial_type: "forced"
   ival: 0s:10s:3ms
 #  chans: [ "*" ]
 #  bands: [ 8, 13 ]
   subject_sessions_dict:
-    S3: "all"
+    S1: "all"
 #  fallback_neighbors: 4
 #  loading_data_mode: "within_subject"
 #  process_noisy_channels: True
