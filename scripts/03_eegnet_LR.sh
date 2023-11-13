@@ -1,12 +1,12 @@
 #!/bin/bash
-#SBATCH --job-name=eegnet-LR
+#SBATCH --job-name=C3-LR-E
 #SBATCH --partition=gpu-2d
 #SBATCH --gpus-per-node=1
 #SBATCH --mem=50GB
 #SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=8
-#SBATCH --output=../jobs_outputs/eegnet-LR/%x_%j.o
-#SBATCH --error=../jobs_outputs/eegnet-LR/%x_%j.e
+#SBATCH --output=../jobs_outputs/C3-eegnet-LR/%x_%j.o
+#SBATCH --error=../jobs_outputs/C3-eegnet-LR/%x_%j.e
 
 # List of subjects
 CATEGORY="LR-C3"

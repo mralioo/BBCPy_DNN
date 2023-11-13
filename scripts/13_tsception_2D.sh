@@ -1,16 +1,16 @@
 #!/bin/bash
-#SBATCH --job-name=tsce-2D
+#SBATCH --job-name=C3-2D-tsce
 #SBATCH --partition=gpu-2d
 #SBATCH --gpus-per-node=1
 #SBATCH --mem=50GB
 #SBATCH --ntasks-per-node=1   # One main task that runs the trial and manages CV
 #SBATCH --cpus-per-task=6 # Assuming you want to run each CV fold in parallel
-#SBATCH --output=../jobs_outputs/tsception-2D/%x_%j.o
-#SBATCH --error=../jobs_outputs/tsception-2D/%x_%j.e
+#SBATCH --output=../jobs_outputs/C3-tsception-2D/%x_%j.o
+#SBATCH --error=../jobs_outputs/C3-tsception-2D/%x_%j.e
 
 # List of subjects
-CATEGORY="2D-C1"
-SUBJECTS=( "S52" "S51" "S38" "S39" "S57" "S9" "S49" "S30" "S36" "S20" "S60" "S4" "S23" "S28" "S5" "S8" "S2" "S29" "S26" "S1" )
+CATEGORY="2D-C3"
+SUBJECTS=( "S13" "S7" "S43" "S19" "S15" "S33" "S12" "S24" "S3" "S40" "S55" "S34" "S10" "S58" "S16" "S27" "S18" "S48" "S31" "S47" "S6" "S21" "S56" "S22" "S62")
 
 # Loop through each subject
 for SUBJECT in "${SUBJECTS[@]}"; do

@@ -1,14 +1,12 @@
 #!/bin/bash
-#SBATCH --job-name=triemann-LR
+#SBATCH --job-name=C2-LR-TR
 #SBATCH --partition=cpu-5h
 #SBATCH --gpus-per-node=0
 #SBATCH --ntasks-per-node=8
-#SBATCH --output=../jobs_outputs/riemann-tangent-LR/%x_%j.o
-#SBATCH --error=../jobs_outputs/riemann-tangent-LR/%x_%j.e
+#SBATCH --output=../jobs_outputs/C2-riemann-tangent-LR/%x_%j.o
+#SBATCH --error=../jobs_outputs/C2-riemann-tangent-LR/%x_%j.e
 
 # List of subjects
-#SUBJECTS=("S57" "S39" "S30" "S52" "S51" "S49" "S36")
-#SUBJECTS=( "S52" "S51" "S38" "S39" "S57")
 CATEGORY="LR-C2"
 SUBJECTS=( "S29" "S26" "S23" "S19" "S53" "S41" "S35" "S61" "S45" "S14" "S15" "S11" "S25" "S1" )
 

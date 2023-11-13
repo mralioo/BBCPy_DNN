@@ -1,12 +1,12 @@
 #!/bin/bash
-#SBATCH --job-name=eegnet-2d
+#SBATCH --job-name=C1-2D-tsce
 #SBATCH --partition=gpu-2d
 #SBATCH --gpus-per-node=1
 #SBATCH --mem=50GB
-#SBATCH --ntasks-per-node=1
-#SBATCH --cpus-per-task=8
-#SBATCH --output=../jobs_outputs/eegnet-2D/%x_%j.o
-#SBATCH --error=../jobs_outputs/eegnet-2D/%x_%j.e
+#SBATCH --ntasks-per-node=1   # One main task that runs the trial and manages CV
+#SBATCH --cpus-per-task=6 # Assuming you want to run each CV fold in parallel
+#SBATCH --output=../jobs_outputs/C1-tsception-2D/%x_%j.o
+#SBATCH --error=../jobs_outputs/C1-tsception-2D/%x_%j.e
 
 # List of subjects
 CATEGORY="2D-C1"
@@ -23,6 +23,6 @@ for SUBJECT in "${SUBJECTS[@]}"; do
 
     # ... (rest of your script remains unchanged, but ensure to change the run_name in the apptainer command)
 
-    apptainer run --nv -B /tmp/${SUBJECT}.sqfs:/input-data:image-src=/ ./../env_images/bbcpy_env.sif python ./src/dnn_train.py experiment=1_eegnet_2D +data.subject_sessions_dict="{$SUBJECT: "all"}" logger.mlflow.experiment_name="${CATEGORY}" logger.mlflow.run_name="${SUBJECT}-EEGNET"
+    apptainer run --nv -B /tmp/${SUBJECT}.sqfs:/input-data:image-src=/ ./../env_images/bbcpy_env.sif python ./src/dnn_train.py experiment=2_Tsception_2D +data.subject_sessions_dict="{$SUBJECT: "all"}" logger.mlflow.experiment_name="${CATEGORY}" logger.mlflow.run_name="${SUBJECT}-tsception"
 
 done

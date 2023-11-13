@@ -1,13 +1,12 @@
 #!/bin/bash
-#SBATCH --job-name=csp-LR
+#SBATCH --job-name=C3-LR-csp
 #SBATCH --partition=cpu-5h
 #SBATCH --gpus-per-node=0
 #SBATCH --ntasks-per-node=8
-#SBATCH --output=../jobs_outputs/csp-LR/%x_%j.o
-#SBATCH --error=../jobs_outputs/csp-LR/%x_%j.e
+#SBATCH --output=../jobs_outputs/C3-csp-LR/%x_%j.o
+#SBATCH --error=../jobs_outputs/C3-csp-LR/%x_%j.e
 
 # List of subjects
-
 CATEGORY="LR-C3"
 SUBJECTS=( "S13" "S10" "S54" "S32" "S7" "S58" "S56" "S48" "S62" "S34" "S12" "S33" "S55" "S22" "S47" "S16" "S27" "S18" "S42" "S31" "S21" "S24" "S17" "S6" "S40" "S3")
 

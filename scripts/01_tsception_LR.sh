@@ -1,12 +1,12 @@
 #!/bin/bash
-#SBATCH --job-name=tsce-LR
+#SBATCH --job-name=C1-LR-tsce
 #SBATCH --partition=gpu-2d
 #SBATCH --gpus-per-node=1
 #SBATCH --mem=50GB
 #SBATCH --ntasks-per-node=1   # One main task that runs the trial and manages CV
 #SBATCH --cpus-per-task=6 # Assuming you want to run each CV fold in parallel
-#SBATCH --output=../jobs_outputs/tsception-LR/%x_%j.o
-#SBATCH --error=../jobs_outputs/tsception-LR/%x_%j.e
+#SBATCH --output=../jobs_outputs/C1-tsception-LR/%x_%j.o
+#SBATCH --error=../jobs_outputs/C1-tsception-LR/%x_%j.e
 
 # List of subjects
 CATEGORY="LR-C1"

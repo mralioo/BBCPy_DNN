@@ -1,10 +1,10 @@
 #!/bin/bash
-#SBATCH --job-name=csp-2D
+#SBATCH --job-name=C1-2D-csp
 #SBATCH --partition=cpu-5h
 #SBATCH --gpus-per-node=0
 #SBATCH --ntasks-per-node=8
-#SBATCH --output=../jobs_outputs/csp-2D/%x_%j.o
-#SBATCH --error=../jobs_outputs/csp-2D/%x_%j.e
+#SBATCH --output=../jobs_outputs/C1-csp-2D/%x_%j.o
+#SBATCH --error=../jobs_outputs/C1-csp-2D/%x_%j.e
 
 # List of subjects
 #  Category 1 : 'S52', 'S51', 'S38', 'S39', 'S57', 'S9', 'S49', 'S30', 'S36', 'S20', 'S60', 'S4', 'S23', 'S28', 'S5', 'S8', 'S2', 'S29', 'S26', 'S1'
