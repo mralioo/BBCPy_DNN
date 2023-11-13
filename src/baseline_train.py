@@ -78,7 +78,6 @@ def train(cfg: DictConfig) -> Tuple[dict, dict]:
 
     metric_dict = {}
 
-
     object_dict = {
         "cfg": cfg,
         "datamodule": datamodule,
@@ -99,8 +98,8 @@ def train(cfg: DictConfig) -> Tuple[dict, dict]:
 
     if cfg.get("train"):
         log.info("Starting training!")
-        train_metric_dict = trainer.train(pipeline=pipeline,
-                                          hparams=hparams)
+        train_metric_dict = trainer.train_baseline(pipeline=pipeline,
+                                                   hparams=hparams)
         metric_dict.update(train_metric_dict)
         log.info("Training finished!")
 
