@@ -407,7 +407,6 @@ class SklearnTrainer(object):
             self.plot_confusion_matrix(conf_mat=cm_test, title="cm_test")
             self.compute_metrics(y_true=self.test_data.y, y_pred=y_pred_test, set_name="test")
 
-
             # ovo and ovr roc curve on validation data
             self.predict_prob(X=self.val_data, y=self.val_data.y, data_type="val")
 
@@ -419,6 +418,7 @@ class SklearnTrainer(object):
             log.info(f"Training completed!")
 
         return metrics
+
     def predict_prob(self, X, y, foldNum=None, data_type="val"):
         """Predict probabilities for each class for each sample."""
 

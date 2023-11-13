@@ -148,11 +148,11 @@ class SRM_DataModule(LightningDataModule):
             # TODO train split take the middle indices for validation
 
             train_runs_list, val_runs_list = train_valid_split(self.smr_datamodule.train_data_list,
-                                                               val_ratio=0.1,
-                                                               random_seed=42)
+                                                               val_ratio=self.train_val_split["val_ratio"],
+                                                               random_seed=self.train_val_split["random_seed"])
             self.train_data = train_runs_list[0]
             self.val_data = val_runs_list[0]
-            for i in range(1, 4):
+            for i in range(1, 5):
                 self.train_data = self.train_data.append(train_runs_list[i], axis=0)
                 self.val_data = self.val_data.append(val_runs_list[i], axis=0)
 
