@@ -27,7 +27,7 @@ hydra:
 
     # storage URL to persist optimization results
     # for example, you can use SQLite if you set 'sqlite:///example.db'
-#    storage: sqlite:////${oc.env:PROJECT_ROOT}/logs/${logger.mlflow.experiment_name}.db
+    #    storage: sqlite:////${oc.env:PROJECT_ROOT}/logs/${logger.mlflow.experiment_name}.db
     storage: null
 
     # name of the study to persist optimization results
@@ -49,7 +49,7 @@ hydra:
       _target_: optuna.samplers.TPESampler
       seed: 1234
       n_startup_trials: 5 # number of random sampling runs before optimization starts
-#      n_startup_trials: 5 # number of random sampling runs before optimization starts
+    #      n_startup_trials: 5 # number of random sampling runs before optimization starts
 
     # define hyperparameter search space
     params:
@@ -57,14 +57,9 @@ hydra:
       data.batch_size: choice(16, 32, 64)
       model.net.n_filters_time: choice(8, 16, 32, 64)
       model.net.filter_time_length: choice(25, 50, 75)
-      model.net.pool_time_length: choice(75, 125, 225, 325)
-      model.net.pool_time_stride: choice(15, 25, 50)
+#      model.net.pool_time_length: choice(75, 125, 225, 325)
+#      model.net.pool_time_stride: choice(15, 25, 50)
       model.net.att_heads: choice(2, 4, 8, 16)
       model.net.att_depth: choice(1, 2, 3, 4, 5)
 #      model.net.att_drop_prob: uniform(0.1, 0.5)
 #      model.net.drop_prob: uniform(0.1, 0.5)
-
-
-
-
-
