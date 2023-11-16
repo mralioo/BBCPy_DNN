@@ -2,6 +2,7 @@ import logging
 
 import numpy as np
 from sklearn.model_selection import BaseCrossValidator
+from sklearn.model_selection import StratifiedKFold
 
 import bbcpy
 
@@ -188,37 +189,31 @@ def train_valid_split(data_runs_list, val_ratio=0.1, random_seed=42):
 
 
 def cross_validation(data, kfold_idx):
-    kf = RunKFold(n_splits=5)
+    """ Split the data into train and validation sets and return indices. Split is done using StratifiedKFold
+    Parameters
+    ----------
+    data : numpy.ndarray
+        Data to split.
+    labels : numpy.ndarray
+        Labels to split.
+    kfold_idx : int
+        Index of the fold to use for validation.
 
-    all_splits_trial_kf = [k for k in kf.split(data)]
+    Returns
+    -------
+    train_indexes : list
+        List of indexes for training set.
+    val_indexes : list
+        List of indexes for validation set.
+    """
 
-    train_indexes, val_indexes = all_splits_trial_kf[kfold_idx]
+    # Initialize StratifiedKFold
+    skf = StratifiedKFold(n_splits=5)
 
-    # train_indexes, val_indexes = train_indexes.tolist(), val_indexes.tolist()
-    #
-    # train_data, val_data = (data[train_indexes],
-    #                         data[val_indexes])
+    # Split data using StratifiedKFold
+    all_splits_skf = [(train_index, val_index) for train_index, val_index in skf.split(data, data.y)]
+
+    # Retrieve train and validation indexes for the specified fold
+    train_indexes, val_indexes = all_splits_skf[kfold_idx]
 
     return train_indexes.tolist(), val_indexes.tolist()
-
-
-class RunKFold(BaseCrossValidator):
-    def __init__(self, n_splits=5):
-        self.n_splits = n_splits
-
-    def get_n_splits(self, X=None, y=None, groups=None):
-        return self.n_splits
-
-    def split(self, X, y=None, groups=None):
-        n_samples = len(X)
-        indices = np.arange(n_samples)
-        fold_sizes = np.full(self.n_splits, n_samples // self.n_splits, dtype=int)
-        fold_sizes[:n_samples % self.n_splits] += 1
-        current = 0
-
-        for fold_size in fold_sizes:
-            start, stop = current, current + fold_size
-            val_indices = indices[start:stop]
-            train_indices = np.concatenate([indices[:start], indices[stop:]])  # Define validation indices
-            yield train_indices, val_indices
-            current = stop

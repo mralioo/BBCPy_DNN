@@ -27,7 +27,7 @@ paths:
 
 logger:
   mlflow:
-    experiment_name: DEBUG-DNN-TRAIN
+    experiment_name: DEBUG-DNN-hpo
     #    run_name: EEGNet-v1
     #    run_name: TSCeption-v1
     tracking_uri: file:${paths.log_dir}/test/mlruns

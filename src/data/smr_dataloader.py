@@ -159,8 +159,7 @@ class SRM_DataModule(LightningDataModule):
         elif self.cross_validation:
             logging.info("Cross validation strategy: runs 1,2,3,4,5 for train/val and run 6 for test")
 
-            self.train_idx, self.val_idx = cross_validation(self.data,
-                                                            self.k)
+            self.train_idx, self.val_idx = cross_validation(self.data, self.k)
 
     def setup(self, stage: Optional[str] = None):
         """Load data. Set variables: num_classes."""
@@ -352,6 +351,7 @@ class SRMDataset(Dataset):
     def statistical_info(self):
         """Compute statistical info for dataset."""
         # Compute statistics
+        shape = self.data.shape
         min_val = float(torch.min(self.data).item())
         max_val = float(torch.max(self.data).item())
         std_val = float(torch.std(self.data).item())
@@ -359,6 +359,7 @@ class SRMDataset(Dataset):
         mean_val = float(torch.mean(self.data).item())
 
         stats = {
+            "shape": shape,
             "min": min_val,
             "max": max_val,
             "mean": mean_val,

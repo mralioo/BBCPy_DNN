@@ -348,11 +348,11 @@ def main(cfg: DictConfig) -> Optional[float]:
         convert_tensor_to_float(metric_dict)
 
     if cfg.data.cross_validation:
-        metric_dict, _ = train_cross_validation(cfg)
+        metric_dict, _ = tune(cfg)
         # Convert tensors to float values
         convert_tensor_to_float(metric_dict)
-    # Open the CSV file in write mode
 
+    # Open the CSV file in write mode
     flat_dict = {}
     for key, value in metric_dict.items():
         if isinstance(value, dict):
