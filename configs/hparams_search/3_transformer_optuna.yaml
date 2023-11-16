@@ -11,7 +11,7 @@ defaults:
 # choose metric which will be optimized by Optuna
 # make sure this is the correct name of some metric logged in lightning module!
 optimized_metric: "avg_val/f1_best"
-
+tune : True
 
 data:
   train_val_split: False
@@ -57,8 +57,8 @@ hydra:
       data.batch_size: choice(16, 32, 64)
       model.net.n_filters_time: choice(8, 16, 32, 64)
       model.net.filter_time_length: choice(25, 50, 75)
-#      model.net.pool_time_length: choice(75, 125, 225, 325)
-#      model.net.pool_time_stride: choice(15, 25, 50)
+      model.net.pool_time_length: choice(75, 125, 225, 325)
+      model.net.pool_time_stride: choice(15, 25, 50)
       model.net.att_heads: choice(2, 4, 8, 16)
       model.net.att_depth: choice(1, 2, 3, 4, 5)
 #      model.net.att_drop_prob: uniform(0.1, 0.5)
