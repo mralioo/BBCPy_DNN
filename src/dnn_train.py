@@ -237,11 +237,12 @@ def train_cross_validation(cfg: DictConfig) -> Tuple[dict, dict]:
 
 @utils.task_wrapper
 def tune(cfg: DictConfig) -> Tuple[dict, dict]:
-    """Performs hyperparameter optimization. using optuna."""
-
     # set seed for random number generators in pytorch, numpy and python.random
     if cfg.get("seed"):
         L.seed_everything(cfg.seed, workers=True)
+
+    log.info(f"Instantiating datamodule <{cfg.data._target_}>")
+    datamodule: LightningDataModule = hydra.utils.instantiate(cfg.data)
 
     log.info(f"Instantiating model <{cfg.model._target_}>")
     model: LightningModule = hydra.utils.instantiate(cfg.model)
@@ -249,77 +250,147 @@ def tune(cfg: DictConfig) -> Tuple[dict, dict]:
     log.info("Instantiating callbacks...")
     callbacks: List[Callback] = utils.instantiate_callbacks(cfg.get("callbacks"))
 
-    log.info(f"Instantiating datamodule <{cfg.data._target_}>")
-    datamodule: LightningDataModule = hydra.utils.instantiate(cfg.data)
-
-    avg_metrics = {}
-    object_dict = {}
-
+    log.info("Instantiating loggers...")
+    trial_id = HydraConfig.get().job.id
     run_name = cfg.get("logger").mlflow.run_name
+    log.info(f"Hydra Job ID: {trial_id}")
+    OmegaConf.update(cfg.get("logger").mlflow, "run_name", f"T{trial_id}_{run_name}", merge=True)
+    logger: List[Logger] = utils.instantiate_loggers(cfg.get("logger"))
+
+    log.info(f"Instantiating trainer <{cfg.trainer._target_}>")
+    trainer: Trainer = hydra.utils.instantiate(cfg.trainer, callbacks=callbacks, logger=logger)
+
+    object_dict = {
+        "cfg": cfg,
+        "datamodule": datamodule,
+        "model": model,
+        "callbacks": callbacks,
+        "logger": logger,
+        "trainer": trainer,
+    }
+
+    # load data
+    log.info("Loading data...")
+    datamodule.load_raw_data()
+
+    if logger:
+        log.info("Logging hyperparameters!")
+        utils.log_hyperparameters(object_dict)
+
+    if cfg.get("compile"):
+        log.info("Compiling model!")
+        model = torch.compile(model)
 
     if cfg.get("tune"):
-        log.info("Starting hyperparameter optimization!")
+        log.info("Starting training!")
+        trainer.fit(model,
+                    datamodule=datamodule,
+                    ckpt_path=cfg.get("ckpt_path"))
 
-        trial_id = HydraConfig.get().job.id
-        log.info(f"Hydra Job ID: {trial_id}")
+    train_metrics = trainer.callback_metrics
 
-        # load data
-        log.info("Loading data...")
-        datamodule.load_raw_data()
+    if cfg.get("test"):
+        log.info("Starting testing!")
+        ckpt_path = trainer.checkpoint_callback.best_model_path
+        log.info(f"Best ckpt path: {ckpt_path}")
+        if ckpt_path == "":
+            log.warning("Best ckpt not found! Using current weights for testing...")
 
-        cv_score = []
-        nums_folds = 5
-        for k in range(nums_folds):
+        trainer.test(model=model,
+                     dataloaders=datamodule,
+                     ckpt_path=ckpt_path)
 
-            log.info(f"Fold {k}...")
+    test_metrics = trainer.callback_metrics
 
-            # print memory usage
-            print_memory_usage()
-            # print cpu cores
-            print_cpu_cores()
-            # print gpu info
-            print_gpu_memory()
+    # merge train and test metrics
+    metric_dict = {**train_metrics, **test_metrics}
 
-            datamodule.update_kfold_index(k)
-            # here we train the model on given split...
-            # inti trainer again
-            log.info("Instantiating loggers...")
-            OmegaConf.update(cfg.get("logger").mlflow, "run_name", f"T{trial_id}_CV_{k}_{run_name}", merge=True)
-            logger: List[Logger] = utils.instantiate_loggers(cfg.get("logger"))
+    return metric_dict, object_dict
 
-            log.info(f"Instantiating trainer <{cfg.trainer._target_}>")
-            trainer: Trainer = hydra.utils.instantiate(cfg.trainer,
-                                                       callbacks=callbacks,
-                                                       logger=logger)
 
-            object_dict = {
-                "cfg": cfg,
-                "model": model,
-                "datamodule": datamodule,
-                "callbacks": callbacks,
-                "logger": logger,
-                "trainer": trainer,
-            }
+    # """Performs hyperparameter optimization. using optuna."""
+    #
+    # # set seed for random number generators in pytorch, numpy and python.random
+    # if cfg.get("seed"):
+    #     L.seed_everything(cfg.seed, workers=True)
+    #
+    # log.info(f"Instantiating model <{cfg.model._target_}>")
+    # model: LightningModule = hydra.utils.instantiate(cfg.model)
+    #
+    # log.info("Instantiating callbacks...")
+    # callbacks: List[Callback] = utils.instantiate_callbacks(cfg.get("callbacks"))
+    #
+    # log.info(f"Instantiating datamodule <{cfg.data._target_}>")
+    # datamodule: LightningDataModule = hydra.utils.instantiate(cfg.data)
+    #
+    # avg_metrics = {}
+    # object_dict = {}
+    #
+    # run_name = cfg.get("logger").mlflow.run_name
+    #
+    #
+    # log.info("Starting hyperparameter optimization!")
+    #
+    # trial_id = HydraConfig.get().job.id
+    # log.info(f"Hydra Job ID: {trial_id}")
+    #
+    # # load data
+    # log.info("Loading data...")
+    # datamodule.load_raw_data()
+    #
+    # cv_score = []
+    # nums_folds = 5
+    # for k in range(nums_folds):
+    #
+    #     log.info(f"Fold {k}...")
+    #
+    #     # print memory usage
+    #     print_memory_usage()
+    #     # print cpu cores
+    #     print_cpu_cores()
+    #     # print gpu info
+    #     print_gpu_memory()
+    #
+    #     datamodule.update_kfold_index(k)
+    #     # here we train the model on given split...
+    #     # inti trainer again
+    #     log.info("Instantiating loggers...")
+    #     OmegaConf.update(cfg.get("logger").mlflow, "run_name", f"T{trial_id}_CV_{k}_{run_name}", merge=True)
+    #     logger: List[Logger] = utils.instantiate_loggers(cfg.get("logger"))
+    #
+    #     log.info(f"Instantiating trainer <{cfg.trainer._target_}>")
+    #     trainer: Trainer = hydra.utils.instantiate(cfg.trainer,
+    #                                                callbacks=callbacks,
+    #                                                logger=logger)
+    #
+    #     object_dict = {
+    #         "cfg": cfg,
+    #         "model": model,
+    #         "datamodule": datamodule,
+    #         "callbacks": callbacks,
+    #         "logger": logger,
+    #         "trainer": trainer,
+    #     }
+    #
+    #     if logger:
+    #         log.info("Logging hyperparameters!")
+    #         utils.log_hyperparameters(object_dict)
+    #
+    #     trainer.fit(model,
+    #                 datamodule=datamodule,
+    #                 ckpt_path=cfg.get("ckpt_path"))
+    #
+    #     train_metrics = trainer.callback_metrics
+    #
+    #     cv_score.append(train_metrics)
+    #
+    # for key in cv_score[0].keys():
+    #     avg_metrics[f"avg_{key}"] = sum([fold[key].item() for fold in cv_score]) / len(cv_score)
+    #
+    # for key, value in avg_metrics.items():
+    #     trainer.logger.log_metrics({f"{key}": value})
 
-            if logger:
-                log.info("Logging hyperparameters!")
-                utils.log_hyperparameters(object_dict)
-
-            trainer.fit(model,
-                        datamodule=datamodule,
-                        ckpt_path=cfg.get("ckpt_path"))
-
-            train_metrics = trainer.callback_metrics
-
-            cv_score.append(train_metrics)
-
-        for key in cv_score[0].keys():
-            avg_metrics[f"avg_{key}"] = sum([fold[key].item() for fold in cv_score]) / len(cv_score)
-
-        for key, value in avg_metrics.items():
-            trainer.logger.log_metrics({f"{key}": value})
-
-    return avg_metrics, object_dict
+    # return avg_metrics, object_dict
 
 
 @hydra.main(version_base="1.3", config_path="../configs", config_name="dnn_train.yaml")
@@ -342,12 +413,14 @@ def main(cfg: DictConfig) -> Optional[float]:
 
     # train the model; there is 2 options : train/val split or cross_validation
     if cfg.data.train_val_split:
-        metric_dict, _ = train(cfg)
-        # Convert tensors to float values
-        # metrics = {key: value.item() if hasattr(value, 'item') else value for key, value in metric_dict.items()}
+        if cfg.get("tune"):
+            metric_dict, _ = tune(cfg)
+        elif cfg.get("train"):
+            metric_dict, _ = train(cfg)
         convert_tensor_to_float(metric_dict)
 
     if cfg.data.cross_validation:
+
         metric_dict, _ = tune(cfg)
         # Convert tensors to float values
         convert_tensor_to_float(metric_dict)

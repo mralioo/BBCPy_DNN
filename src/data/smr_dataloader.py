@@ -1,7 +1,7 @@
 import gc
 import logging
 from typing import Optional
-import numpy as np
+
 import pyrootutils
 import torch
 from lightning import LightningDataModule
@@ -158,7 +158,6 @@ class SRM_DataModule(LightningDataModule):
 
         elif self.cross_validation:
             logging.info("Cross validation strategy: runs 1,2,3,4,5 for train/val and run 6 for test")
-
             self.train_idx, self.val_idx = cross_validation(self.data, self.k)
 
     def setup(self, stage: Optional[str] = None):
