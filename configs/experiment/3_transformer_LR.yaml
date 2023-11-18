@@ -61,8 +61,8 @@ model:
     add_log_softmax: False #(bool)
 
 trainer:
-  min_epochs: 1
-  max_epochs: 1
+  min_epochs: 20
+  max_epochs: 30
   check_val_every_n_epoch: 1
 
 paths:
@@ -89,13 +89,13 @@ callbacks:
   model_checkpoint:
     dirpath: ${paths.output_dir}/${logger.mlflow.experiment_name}/${logger.mlflow.run_name}/checkpoints
     filename: "epoch_{epoch:03d}"
-    monitor: "val/acc_best"
+    monitor: "val/f1_best"
     mode: "max"
     save_last: True
     auto_insert_metric_name: False
 
   early_stopping:
-    monitor: "val/acc_best"
+    monitor: "val/f1_best"
     patience: 20
     mode: "max"
 
