@@ -356,6 +356,8 @@ def main(cfg: DictConfig) -> Optional[float]:
 
     log.info("Done!")
 
+    return metric_dict[cfg.optimized_metric]
+
 
 def convert_tensor_to_float(d):
     for key, value in d.items():
