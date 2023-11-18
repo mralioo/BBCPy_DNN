@@ -28,7 +28,7 @@ hydra:
     # storage URL to persist optimization results
     # for example, you can use SQLite if you set 'sqlite:///example.db'
     #    storage: sqlite:////${oc.env:PROJECT_ROOT}/logs/${logger.mlflow.experiment_name}.db
-    storage: null
+    storage: sqlite:////${oc.env:PROJECT_ROOT}/logs/${logger.mlflow.experiment_name}.db
 
     # name of the study to persist optimization results
     study_name: ${logger.mlflow.run_name}
@@ -55,7 +55,7 @@ hydra:
     params:
       model.optimizer.lr: interval(0.0001, 0.1)
       data.batch_size: choice(16, 32, 64)
-      model.net.n_filters_time: choice(8, 16, 32, 64)
+      model.net.n_filters_time: choice(16, 32, 64, 128)
       model.net.filter_time_length: choice(25, 50, 75)
       model.net.pool_time_length: choice(75, 125, 225, 325)
       model.net.pool_time_stride: choice(15, 25, 50)
