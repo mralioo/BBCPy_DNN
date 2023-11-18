@@ -10,6 +10,7 @@ defaults:
 # choose metric which will be optimized by Optuna
 # make sure this is the correct name of some metric logged in lightning module!
 optimized_metric: "val/f1_best"
+
 tune : True
 
 #data:
