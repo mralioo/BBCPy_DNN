@@ -114,6 +114,10 @@ class SklearnTrainer(object):
             # gc.collect()
 
         return metrics
+    
+    def hpo_optimize_optuna(self, pipeline, hparams):
+        """Train the model. using Optuna"""
+        pass
 
     def train_baseline_cv(self, pipeline, hparams):
         """Train the model. using cross validation"""

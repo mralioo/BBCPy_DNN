@@ -15,4 +15,4 @@ echo "current working directory is $(pwd)"
 cp ./../squashfs_smr_data/S5.sqfs /tmp/
 
 # 3. bind the squashed dataset to your apptainer environment and run your script with apptainer
-apptainer run --nv -B /tmp/S5.sqfs:/input-data:image-src=/ ./../env_images/bbcpy_env.sif python ./src/dnn_train.py experiment=3_transformer_LR +data.subject_sessions_dict='{S5: "all"}' hparams_search=3_transformer_optuna logger.mlflow.experiment_name="C1-LR" logger.mlflow.run_name="LR-C1-S5"
+apptainer run --nv -B /tmp/S5.sqfs:/input-data:image-src=/ ./../env_images/bbcpy_env.sif python ./src/dnn_train.py experiment=3_transformer_LR +data.subject_sessions_dict='{S5: "all"}' hparams_search=3_transformer_optuna logger.mlflow.experiment_name="C1-LR" logger.mlflow.run_name="hpo-LR-C1-S5"
