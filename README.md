@@ -2,14 +2,15 @@
 
 # BBCPy_DNN
 
-[![License](https://img.shields.io/github/license/ashleve/lightning-hydra-template?color=blue)](LICENSE)
-[![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
+[//]: # ([![License]&#40;https://img.shields.io/github/license/ashleve/lightning-hydra-template?color=blue&#41;]&#40;LICENSE&#41;)
+
+[//]: # ([![Code style: black]&#40;https://img.shields.io/badge/code%20style-black-000000.svg&#41;]&#40;https://github.com/psf/black&#41;)
 <a href="https://pytorch.org/get-started/locally/"><img alt="PyTorch" src="https://img.shields.io/badge/PyTorch-ee4c2c?logo=pytorch&logoColor=white"></a>
 <a href="https://pytorchlightning.ai/"><img alt="Lightning" src="https://img.shields.io/badge/-Lightning-792ee5?logo=pytorchlightning&logoColor=white"></a>
 <a href="https://hydra.cc/"><img alt="Config: Hydra" src="https://img.shields.io/badge/Config-Hydra-89b8cd"></a>
 <a href="https://github.com/ashleve/lightning-hydra-template"><img alt="Template" src="https://img.shields.io/badge/-Lightning--Hydra--Template-017F2F?style=flat&logo=github&labelColor=gray"></a><br>
-[![Paper](http://img.shields.io/badge/paper-arxiv.1001.2234-B31B1B.svg)](https://www.nature.com/articles/nature14539)
-[![Conference](http://img.shields.io/badge/AnyConference-year-4b44ce.svg)](https://papers.nips.cc/paper/2020)
+<a href="https://github.com/bbcpy/bbcpy"><img alt="BBCPy" src="https://img.shields.io/badge/-BBCPy-red?style=flat&logo=github&labelColor=gray"></a><br>
+
 
 </div>
 
@@ -54,15 +55,18 @@ BBCPy_DNN is built with the help of the following frameworks:
 ### Prerequisites
 
 - **BBCPy toolbox:** A Python-based toolbox for Brain-Computer Interface (BCI) research.
-- **Motor Imagery Dataset:** Supports various datasets, including the Continuous SMR BCI dataset, which includes EEG data from 62 healthy individuals for BCI studies.
+- **Motor Imagery Dataset:** 
+  * Supports the Continuous SMR BCI dataset, which includes EEG data from 62 healthy individuals for MI-BCI experiment with feedback  
+    of hand movements, it includes 4 classes (left , right , both hands and rest).
+    The dataset is available for download from [figshare](https://figshare.com/articles/dataset/Continuous_SMR_BCI_dataset/13123148).
 
-#### To download the Continuous SMR BCI dataset (351GB):
+    #### To download the Continuous SMR BCI dataset:
 
-```bash
-mkdir -p ~/data 
-wget https://figshare.com/ndownloader/articles/13123148/versions/1
-unzip 1
-```
+    ```bash
+    mkdir -p ~/data 
+    wget https://figshare.com/ndownloader/articles/13123148/versions/1
+    unzip 1
+    ```
 
 
 ## Installation
