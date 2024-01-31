@@ -2,11 +2,11 @@ hyperparam_opt:
   class: sklearn.model_selection.GridSearchCV
   params:
     param_grid:
-      averagevariance__excllev: [ 1.2, 1.5, 1.8 ]
+      averagevariance__excllev: [ null, 1.8, 4, 10, 20, 100 ]
       averagevariance__estimator: [ 'lwf', 'scm' ]
   scoring: f1_weighted
   cv:
-    _target_: sklearn.model_selection.KFold
-    n_splits: 10
-    shuffle: True
-#  n_jobs: 4
+    _target_: sklearn.model_selection.StratifiedKFold
+    n_splits: 5
+    shuffle: False
+

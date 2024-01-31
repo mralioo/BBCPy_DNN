@@ -1,0 +1,35 @@
+# Hydra config file for the csp classifier steps
+#StepName:
+#    _target_: <class to instantiate the step>
+#    param1: <step's first parameter>
+#    param2: <step's second parameter, etc.>
+
+_target_: src.models.baseline_models.classifier_pipeline
+steps_config: # use yaml list syntax to preserve to order
+  FeatureExtraction:
+    CSP-MNE:
+      applied: True
+      n_cmps: 4
+      reg: 0.2 #float | str | None (default None)allow regularization for covariance estimation|If float (between 0 and 1), shrinkage is used/
+      log: False  # None | bool (default None)
+      cov_est: concat #‘concat’ | ‘epoch’ (default ‘concat’)
+      transform_into: 'average_power' #‘average_power’ : the average power of each spatial filter| ‘csp_space’ :  the data in CSP space(default ‘average_power’)
+      norm_trace: True # bool (default False) Normalize class covariance by its trace.
+      cov_method_params: null #dict | None Parameters to pass to mne.compute_covariance().
+      rank: null #None | ‘info’ | ‘full’ | dict
+      component_order: mutual_info #‘mutual_info’ | ‘alternate’ (default ‘mutual_info’)
+  Transformation:
+    var:
+      applied: True
+      axis: 2
+    log:
+      applied: True
+  Classification:
+    LDA:
+      applied: True
+      solver: svd
+      shrinkage: null #'auto' or float, default=None ; Shrinkage parameter, possible values between 0 and 1. If None, no shrinkage is performed.
+      priors: null #array, shape (n_classes,), default=None ; Class priors.
+      n_components: null #int, default=None ; Number of components for dimensionality reduction.
+      store_covariance: False #bool, default=False ; If True, explicitely compute the weighted within-class covariance matrix when solver is 'svd'. The matrix is always computed and stored for the other solvers.
+      tol: 0.0001 #float, default=1e-4 ; Absolute threshold for a singular value of X to be considered significant, used to estimate the rank of X. Dimensions whose singular values are non-significant are discarded. Only used if solver is 'svd'.

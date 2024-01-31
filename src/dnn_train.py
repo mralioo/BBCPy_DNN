@@ -1,12 +1,13 @@
-import csv
 import os
 from pathlib import Path
 from typing import List, Optional, Tuple
 
 import hydra
 import lightning as L
+import pandas as pd
 import pyrootutils
 import torch
+from hydra.core.hydra_config import HydraConfig
 from lightning import Callback, LightningDataModule, LightningModule, Trainer
 from lightning.pytorch.loggers import Logger
 from omegaconf import DictConfig
@@ -116,7 +117,6 @@ def train(cfg: DictConfig) -> Tuple[dict, dict]:
     metric_dict = {**train_metrics, **test_metrics}
 
     return metric_dict, object_dict
-
 
 @utils.task_wrapper
 def train_cross_validation(cfg: DictConfig) -> Tuple[dict, dict]:
@@ -233,6 +233,77 @@ def train_cross_validation(cfg: DictConfig) -> Tuple[dict, dict]:
 
     return metric_dict, object_dict
 
+@utils.task_wrapper
+def tune(cfg: DictConfig) -> Tuple[dict, dict]:
+    # set seed for random number generators in pytorch, numpy and python.random
+    if cfg.get("seed"):
+        L.seed_everything(cfg.seed, workers=True)
+
+    log.info(f"Instantiating datamodule <{cfg.data._target_}>")
+    datamodule: LightningDataModule = hydra.utils.instantiate(cfg.data)
+
+    log.info(f"Instantiating model <{cfg.model._target_}>")
+    model: LightningModule = hydra.utils.instantiate(cfg.model)
+
+    log.info("Instantiating callbacks...")
+    callbacks: List[Callback] = utils.instantiate_callbacks(cfg.get("callbacks"))
+
+    log.info("Instantiating loggers...")
+    trial_id = HydraConfig.get().job.id
+    run_name = cfg.get("logger").mlflow.run_name
+    log.info(f"Hydra Job ID: {trial_id}")
+    OmegaConf.update(cfg.get("logger").mlflow, "run_name", f"T{trial_id}_{run_name}", merge=True)
+    logger: List[Logger] = utils.instantiate_loggers(cfg.get("logger"))
+
+    log.info(f"Instantiating trainer <{cfg.trainer._target_}>")
+    trainer: Trainer = hydra.utils.instantiate(cfg.trainer, callbacks=callbacks, logger=logger)
+
+    object_dict = {
+        "cfg": cfg,
+        "datamodule": datamodule,
+        "model": model,
+        "callbacks": callbacks,
+        "logger": logger,
+        "trainer": trainer,
+    }
+
+    # load data
+    log.info("Loading data...")
+    datamodule.load_raw_data()
+
+    if logger:
+        log.info("Logging hyperparameters!")
+        utils.log_hyperparameters(object_dict)
+
+    if cfg.get("compile"):
+        log.info("Compiling model!")
+        model = torch.compile(model)
+
+    if cfg.get("tune"):
+        log.info("Starting training!")
+        trainer.fit(model,
+                    datamodule=datamodule,
+                    ckpt_path=cfg.get("ckpt_path"))
+
+    train_metrics = trainer.callback_metrics
+
+    if cfg.get("test"):
+        log.info("Starting testing!")
+        ckpt_path = trainer.checkpoint_callback.best_model_path
+        log.info(f"Best ckpt path: {ckpt_path}")
+        if ckpt_path == "":
+            log.warning("Best ckpt not found! Using current weights for testing...")
+
+        trainer.test(model=model,
+                     dataloaders=datamodule,
+                     ckpt_path=ckpt_path)
+
+    test_metrics = trainer.callback_metrics
+
+    # merge train and test metrics
+    metric_dict = {**train_metrics, **test_metrics}
+
+    return metric_dict, object_dict
 
 @hydra.main(version_base="1.3", config_path="../configs", config_name="dnn_train.yaml")
 def main(cfg: DictConfig) -> Optional[float]:
@@ -254,38 +325,38 @@ def main(cfg: DictConfig) -> Optional[float]:
 
     # train the model; there is 2 options : train/val split or cross_validation
     if cfg.data.train_val_split:
-        metric_dict, _ = train(cfg)
-        # Convert tensors to float values
-        # metrics = {key: value.item() if hasattr(value, 'item') else value for key, value in metric_dict.items()}
+        if cfg.get("tune"):
+            metric_dict, _ = tune(cfg)
+        elif cfg.get("train"):
+            metric_dict, _ = train(cfg)
         convert_tensor_to_float(metric_dict)
 
     if cfg.data.cross_validation:
-        metric_dict, _ = train_cross_validation(cfg)
+
+        metric_dict, _ = tune(cfg)
         # Convert tensors to float values
         convert_tensor_to_float(metric_dict)
-    # Open the CSV file in write mode
 
+    # Open the CSV file in write mode
+    flat_dict = {}
+    for key, value in metric_dict.items():
+        if isinstance(value, dict):
+            for inner_key, inner_value in value.items():
+                flat_key = f"{key}@{inner_key}"
+                flat_dict[flat_key] = inner_value
+        else:
+            flat_dict[key] = value
+    # Convert to pandas DataFrame
+    df = pd.DataFrame([flat_dict])
+    # Open the CSV file in write mode
     with open(csv_file_path, mode='w', newline='') as file:
-        writer = csv.DictWriter(file, fieldnames=metric_dict.keys())
-        # Write the header
-        writer.writeheader()
-        # Write the metrics values
-        writer.writerow(metric_dict)
+        df.to_csv(file, index=False)
 
     log.info(f"Metrics saved to {csv_file_path}")
 
     log.info("Done!")
 
-    # # safely retrieve metric value for hydra-based hyperparameter optimization
-    # metric_value = utils.get_metric_value(
-    #     metric_dict=metric_dict, metric_name=cfg.get("optimized_metric")
-    # )
-    # optimized_metric = cfg.get("optimized_metric")
-    #
-    # log.info(f"{optimized_metric}: {metric_value}")
-    #
-    # # return optimized metric
-    # return metric_value
+    return metric_dict[cfg.optimized_metric]
 
 
 def convert_tensor_to_float(d):

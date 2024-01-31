@@ -147,20 +147,18 @@ class SRM_DataModule(LightningDataModule):
             logging.info("Train and validation split strategy: runs 1,2,3,4,5 for train/val and run 6 for test")
             # TODO train split take the middle indices for validation
 
-            train_runs_list, val_runs_list = train_valid_split(self.smr_datamodule.runs_data_list,
-                                                               val_ratio=0.1,
-                                                               random_seed=42)
+            train_runs_list, val_runs_list = train_valid_split(self.smr_datamodule.train_data_list,
+                                                               val_ratio=self.train_val_split["val_ratio"],
+                                                               random_seed=self.train_val_split["random_seed"])
             self.train_data = train_runs_list[0]
             self.val_data = val_runs_list[0]
-            for i in range(1, 4):
+            for i in range(1, 5):
                 self.train_data = self.train_data.append(train_runs_list[i], axis=0)
                 self.val_data = self.val_data.append(val_runs_list[i], axis=0)
 
         elif self.cross_validation:
             logging.info("Cross validation strategy: runs 1,2,3,4,5 for train/val and run 6 for test")
-
-            self.train_idx, self.val_idx = cross_validation(self.data,
-                                                            self.k)
+            self.train_idx, self.val_idx = cross_validation(self.data, self.k)
 
     def setup(self, stage: Optional[str] = None):
         """Load data. Set variables: num_classes."""
@@ -170,24 +168,24 @@ class SRM_DataModule(LightningDataModule):
             logging.info("Create train and validation sets.. ")
             # load and split datasets only if not loaded already
             if self.train_val_split:
-                self.training_set = SRMDataset(data=self.train_data)
+                self.training_set = SRMDataset(data=self.train_data, num_classes=self.num_classes)
                 print(self.training_set.statistical_info())
                 self.training_set.normalize_data(norm_type=self.normalize["norm_type"],
                                                  axis=self.normalize["norm_axis"])
                 logging.info("Normalized train trials")
                 print(self.training_set.statistical_info())
 
-                self.validation_set = SRMDataset(data=self.val_data)
+                self.validation_set = SRMDataset(data=self.val_data, num_classes=self.num_classes)
                 print(self.validation_set.statistical_info())
                 self.validation_set.normalize_data(norm_type=self.normalize["norm_type"],
                                                    axis=self.normalize["norm_axis"])
-                logging.info("Normalized test trials")
+                logging.info("Normalized Validation trials")
                 print(self.validation_set.statistical_info())
 
             elif self.cross_validation:
                 # Create datasets with specific indices
                 logging.info(f"Train indices: {self.train_idx}")
-                self.training_set = SRMDataset(data=self.data[self.train_idx])
+                self.training_set = SRMDataset(data=self.data[self.train_idx], num_classes=self.num_classes)
                 logging.info("Train dataset info")
                 print(self.training_set.statistical_info())
                 self.training_set.normalize_data(norm_type=self.normalize["norm_type"],
@@ -196,7 +194,7 @@ class SRM_DataModule(LightningDataModule):
                 print(self.training_set.statistical_info())
 
                 logging.info(f"Val indices: {self.val_idx}")
-                self.validation_set = SRMDataset(data=self.data[self.val_idx])
+                self.validation_set = SRMDataset(data=self.data[self.val_idx], num_classes=self.num_classes)
                 logging.info("Val dataset info")
                 print(self.validation_set.statistical_info())
                 self.validation_set.normalize_data(norm_type=self.normalize["norm_type"],
@@ -290,14 +288,16 @@ class SRM_DataModule(LightningDataModule):
 
 
 class SRMDataset(Dataset):
-    def __init__(self, data):
+    def __init__(self, data, num_classes=2):
         y = data.y
+        # One-hot encode the labels
+        # onehot_encoder = OneHotEncoder(sparse=False, categories=[np.arange(num_classes)])
         onehot_encoder = OneHotEncoder(sparse_output=False)
         integer_encoded = y.reshape(-1, 1)
         onehot_encoded = onehot_encoder.fit_transform(integer_encoded)
 
         self.data = torch.tensor(data).float()
-        self.y_oe = torch.tensor(onehot_encoded)
+        self.y_oe = torch.tensor(onehot_encoded).float()
 
     def __getitem__(self, index):
         x = self.data[index].unsqueeze(dim=0)
@@ -335,14 +335,6 @@ class SRMDataset(Dataset):
                 self.data, self.norm_params = None, None
                 ValueError("Only 'std' and 'minmax' are supported")
 
-    # def unnormalize(self, data_norm, norm_params):
-    #     data = None
-    #     if norm_params["norm_type"] == "std":
-    #         data = data_norm * norm_params["std"] + norm_params["mean"]
-    #     elif norm_params["norm_type"] == "minmax":
-    #         data = data_norm * (norm_params["max"] - norm_params["min"]) + norm_params["min"]
-    #     return data
-
     def classes_weights(self):
         """Compute classes weights for imbalanced dataset."""
         target_map_dict = {0: "R", 1: "L", 2: "U", 3: "D"}
@@ -358,6 +350,7 @@ class SRMDataset(Dataset):
     def statistical_info(self):
         """Compute statistical info for dataset."""
         # Compute statistics
+        shape = self.data.shape
         min_val = float(torch.min(self.data).item())
         max_val = float(torch.max(self.data).item())
         std_val = float(torch.std(self.data).item())
@@ -365,6 +358,7 @@ class SRMDataset(Dataset):
         mean_val = float(torch.mean(self.data).item())
 
         stats = {
+            "shape": shape,
             "min": min_val,
             "max": max_val,
             "mean": mean_val,

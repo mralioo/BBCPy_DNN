@@ -9,7 +9,6 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import pyrootutils
-import sklearn
 import torch
 import torch.nn.functional as F
 import torchmetrics
@@ -42,6 +41,7 @@ class DnnLitModule(LightningModule):
             scheduler: torch.optim.lr_scheduler,
             criterion: torch.nn.Module,
             plots_settings: dict,
+            # task_name: str,
 
     ):
         super().__init__()
@@ -51,16 +51,27 @@ class DnnLitModule(LightningModule):
 
         # set net
         self.net = net
-        self.num_classes = self.net.num_classes
+
+        if hasattr(self.net, "num_classes"):
+            self.num_classes = self.net.num_classes
+        elif hasattr(self.net, "n_classes"):
+            self.num_classes = self.net.n_classes
+        elif hasattr(self.net, "n_outputs"):
+            self.num_classes = self.net.n_outputs
+        else:
+            raise AttributeError("Model does not have 'num_classes' or 'n_classes' attribute")
 
         self.classes_names_dict = {}
         if self.num_classes == 2:
             self.classes_names_dict = {0: "R", 1: "L"}
-
         if self.num_classes == 4:
             self.classes_names_dict = {0: "R", 1: "L", 2: "U", 3: "D"}
 
         self.classes_names = [v for k, v in self.classes_names_dict.items()]
+
+        # init metrics
+        self.init_metrics()
+
 
         # set loss function
         self.criterion = self.hparams.criterion
@@ -71,15 +82,12 @@ class DnnLitModule(LightningModule):
         # weight initialization
         self.net.apply(xavier_initialize_weights)
 
-        # metrics
-        self.init_metrics()
 
     def forward(self, x: torch.Tensor):
 
         # FIXME
         if x.dim() <= 3:
             x = x.unsqueeze(dim=0)
-
 
         return self.net(x)
 
@@ -98,7 +106,7 @@ class DnnLitModule(LightningModule):
         # classes_weights_tensor = torch.tensor(self.calculate_sample_weights(y)).to(self.device)
         # loss = self.criterion(weight=classes_weights_tensor)(logits, y)
 
-        if y.dim() == 1 :
+        if y.dim() == 1:
             y = y.unsqueeze(dim=0)
 
         loss = self.criterion()(probs, y)
@@ -119,7 +127,7 @@ class DnnLitModule(LightningModule):
         if self.num_classes > 2:
             probs = F.softmax(logits, dim=1)
 
-        if y.dim() == 1 :
+        if y.dim() == 1:
             y = y.unsqueeze(dim=0)
 
         loss = self.criterion()(probs, y)
@@ -181,7 +189,7 @@ class DnnLitModule(LightningModule):
         # Calculate the confusion matrix and log it to mlflow
         if (self.current_epoch + 1) % self.plots_settings["plot_every_n_epoch"] == 0:
             # Calculate the confusion matrix and log it to mlflow
-            cm = confusion_matrix(train_all_targets, train_all_outputs)
+            cm = confusion_matrix(y_true=train_all_targets, y_pred=train_all_outputs, labels=list(self.classes_names_dict.keys()))
             title = f"Training Confusion matrix epoch_{self.current_epoch}"
             self.confusion_matrix_to_png(cm, title, f"train_cm_epo_{self.current_epoch}")
 
@@ -260,7 +268,7 @@ class DnnLitModule(LightningModule):
         # Calculate the confusion matrix and log it to mlflow
         if (self.current_epoch + 1) % self.plots_settings["plot_every_n_epoch"] == 0:
             # Calculate the confusion matrix and log it to mlflow
-            cm = confusion_matrix(val_all_targets, val_all_outputs)
+            cm = confusion_matrix(y_true=val_all_targets, y_pred=val_all_outputs,labels=list(self.classes_names_dict.keys()))
             title = f"Validation Confusion matrix epoch_{self.current_epoch}"
             self.confusion_matrix_to_png(cm, title, f"vali_cm_epo_{self.current_epoch}")
 
@@ -268,11 +276,11 @@ class DnnLitModule(LightningModule):
             self.roc.compute()
             self.plot_summary_advanced(all_results, image_name=f"val_summary_epoch_{self.current_epoch}")
 
-            # Plot ROC curve ovr and ovo FIXME : test on LR
-            self.plot_roc_curve_ovr(Y_true_ie=self.val_step_targets_ie, Y_pred_logits=self.val_step_outputs_logits,
-                                    filename=f"val_roc_ovr_epoch_{self.current_epoch}")
-            self.plot_roc_curve_ovo(Y_true_ie=self.val_step_targets_ie, Y_pred_logits=self.val_step_outputs_logits,
-                                    filename=f"val_roc_ovo_epoch_{self.current_epoch}")
+            # Plot ROC curve ovr and ovo FIXME : test on LR / 2d
+            # self.plot_roc_curve_ovr(Y_true_ie=self.val_step_targets_ie, Y_pred_logits=self.val_step_outputs_logits,
+            #                         filename=f"val_roc_ovr_epoch_{self.current_epoch}")
+            # self.plot_roc_curve_ovo(Y_true_ie=self.val_step_targets_ie, Y_pred_logits=self.val_step_outputs_logits,
+            #                         filename=f"val_roc_ovo_epoch_{self.current_epoch}")
 
         # Accuracy is a metric object, so we need to call `.compute()` to get the value
         acc = self.val_acc.compute()  # get current val acc
@@ -348,7 +356,7 @@ class DnnLitModule(LightningModule):
         test_all_outputs = self.test_step_outputs
         test_all_targets = self.test_step_targets
 
-        cm = confusion_matrix(y_true=test_all_targets,y_pred=test_all_outputs)
+        cm = confusion_matrix(y_true=test_all_targets, y_pred=test_all_outputs, labels=list(self.classes_names_dict.keys()))
         title = f"Testing Confusion matrix, Run 6"
         self.confusion_matrix_to_png(cm, title, f"test_cm_run_6")
 
@@ -403,7 +411,7 @@ class DnnLitModule(LightningModule):
             # set the font size of the text in the confusion matrix
             for i, j in itertools.product(range(conf_mat.shape[0]), range(conf_mat.shape[1])):
                 color = "red"
-                plt.text(j, i, labels[i, j], horizontalalignment="center", color=color, fontsize=15)
+                plt.text(j, i, labels[i, j], horizontalalignment="center", color=color, fontsize=12)
 
             plt.tight_layout()
             plt.ylabel('True label', fontsize=10)
@@ -448,7 +456,7 @@ class DnnLitModule(LightningModule):
             # thresh = mean_cm_val.max() / 2.0
             for i, j in itertools.product(range(mean_cm_val.shape[0]), range(mean_cm_val.shape[1])):
                 color = "red"
-            plt.text(j, i, labels[i, j], horizontalalignment="center", color=color)
+                plt.text(j, i, labels[i, j], horizontalalignment="center", color=color, fontsize=10)
 
             plt.tight_layout()
             plt.ylabel('True label', fontsize=10)
@@ -722,26 +730,26 @@ class DnnLitModule(LightningModule):
 
         if self.num_classes == 4:
             average_type = "weighted"
-            self.train_acc = Accuracy(task="multiclass", num_classes=self.num_classes, average=average_type)
-            self.train_f1 = F1Score(task="multiclass", num_classes=self.num_classes, average=average_type)
+            self.train_acc = Accuracy(task="multiclass", num_classes=4, average=average_type)
+            self.train_f1 = F1Score(task="multiclass", num_classes=4, average=average_type)
 
             # Validation metric objects for calculating and averaging accuracy across batches
-            self.val_acc = Accuracy(task="multiclass", num_classes=self.num_classes, average=average_type)
-            self.val_f1 = F1Score(task="multiclass", num_classes=self.num_classes, average=average_type)
+            self.val_acc = Accuracy(task="multiclass", num_classes=4, average=average_type)
+            self.val_f1 = F1Score(task="multiclass", num_classes=4, average=average_type)
 
             # Testing metric objects for calculating and averaging accuracy across batches
-            self.test_acc = Accuracy(task="multiclass", num_classes=self.num_classes, average=average_type)
-            self.test_f1 = F1Score(task="multiclass", num_classes=self.num_classes, average=average_type)
+            self.test_acc = Accuracy(task="multiclass", num_classes=4, average=average_type)
+            self.test_f1 = F1Score(task="multiclass", num_classes=4, average=average_type)
 
             # Define collection that is a mix of metrics that return a scalar tensors and not
             # self.confmat = torchmetrics.classification.MulticlassConfusionMatrix(num_classes=self.num_classes)
-            self.roc = torchmetrics.classification.MulticlassROC(num_classes=self.num_classes)
+            self.roc = torchmetrics.classification.MulticlassROC(num_classes=4)
             self.mean_roc = MeanMetric()
 
             self.collection = torchmetrics.MetricCollection(
-                torchmetrics.Accuracy(task="multiclass", num_classes=self.num_classes),
-                torchmetrics.Recall(task="multiclass", num_classes=self.num_classes),
-                torchmetrics.Precision(task="multiclass", num_classes=self.num_classes),
+                torchmetrics.Accuracy(task="multiclass", num_classes=4),
+                torchmetrics.Recall(task="multiclass", num_classes=4),
+                torchmetrics.Precision(task="multiclass", num_classes=4),
                 # self.confmat,
             )
 

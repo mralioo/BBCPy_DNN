@@ -1,0 +1,101 @@
+# @package _global_
+
+# to execute this experiment run:
+# python train.py experiment=example
+defaults:
+  - override /data: smr_datamodule.yaml
+  - override /model: eegconformer.yaml
+  - override /trainer: gpu.yaml
+  - override /paths: default.yaml
+  - override /extras: default.yaml
+  - override /hydra: default.yaml
+  - override /callbacks: default.yaml
+
+# all parameters below will be merged with parameters from default configurations set above
+# this allows you to overwrite only specified parameters
+
+tags: ["transformer-v1","Within-Subject", "RL"]
+
+seed: 12345
+
+optimized_metric: "val/acc_best"
+
+data:
+  task_name: "LR"
+  trial_type: "forced"
+  ival: 2s:10s:1ms
+  chans: [ "*" ]
+  bands: [ 8, 20 ]
+  loading_data_mode: "within_subject"
+  process_noisy_channels: True
+  ignore_noisy_sessions: False
+  train_val_split: { val_ratio: 0.2, random_seed: 42 }
+  cross_validation: False
+  transform: False
+  normalize: { norm_type: "std", norm_axis: 0 }
+  batch_size: 32
+  num_workers: 4
+  pin_memory: True
+
+model:
+  criterion:
+    _target_: torch.nn.BCEWithLogitsLoss
+    _partial_: true
+  plots_settings:
+    plot_every_n_epoch: 10
+  net:
+    _target_: src.models.components.EEG-Conformer.EEGConformer
+    n_outputs: 2  # (int) – Number of outputs of the model. This is the number of classes in the case of classification.
+    n_chans: 62   # (int) – Number of EEG channels.
+    n_filters_time: 32 # (int) – Number of temporal filters, defines also embedding size.
+    filter_time_length: 25  # (int) – Length of the temporal filter.
+    pool_time_length: 200 # (int) – Length of temporal pooling filter.
+    pool_time_stride: 20 # (int) – Length of stride between temporal pooling filters.
+    drop_prob: 0.5 #(float) – Dropout rate of the convolutional layer.
+    att_depth: 8 #(int) – Number of self-attention layers.
+    att_heads: 3 #(int) – Number of attention heads.
+    att_drop_prob: 0.5 #(float) – Dropout rate of the self-attention layer.
+    final_fc_length: auto #(int | str) – The dimension of the fully connected layer.
+    return_features: False #(bool) – If True, the forward method returns the features before the last classification layer. Defaults to False.
+    n_times: 8000 # (int) – Number of time samples of the input window.
+    add_log_softmax: False #(bool)
+
+trainer:
+  min_epochs: 20
+  max_epochs: 30
+  check_val_every_n_epoch: 1
+
+paths:
+  root_dir: ${oc.env:PROJECT_ROOT}
+  data_dir: /input-data
+  log_dir: ${oc.env:PROJECT_ROOT}/logs/16_11_hpo
+  output_dir: ${hydra:runtime.output_dir}
+  work_dir: ${hydra:runtime.cwd}
+  results_dir: ${paths.log_dir}/results # final results directory
+
+
+logger:
+  mlflow:
+    experiment_name: Transformer-v1
+    run_name: S1
+    tracking_uri: file:${paths.log_dir}/mlflow/mlruns
+  csv:
+    _target_: lightning.pytorch.loggers.csv_logs.CSVLogger
+    save_dir: ${paths.output_dir}/${logger.mlflow.experiment_name}/${logger.mlflow.run_name}
+    name: "csv/"
+    prefix: ""
+
+callbacks:
+  model_checkpoint:
+    dirpath: ${paths.output_dir}/${logger.mlflow.experiment_name}/${logger.mlflow.run_name}/checkpoints
+    filename: "epoch_{epoch:03d}"
+    monitor: "val/f1_best"
+    mode: "max"
+    save_last: True
+    auto_insert_metric_name: False
+
+  early_stopping:
+    monitor: "val/f1_best"
+    patience: 20
+    mode: "max"
+

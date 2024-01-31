@@ -9,16 +9,21 @@ steps_config: # use yaml list syntax to preserve to order
   FeatureExtraction:
     CSP:
       applied: True
-      n_cmps: 4
-      excllev: 1.8
-      estimator: 'scm'
+      n_cmps: 4 #int, default=4 ; Number of components to decompose M/EEG signals.
+      excllev: 1.8 #float, default=1.8 ; Exclusion level for variance estimation.
+      estimator: 'scm' #str, default='scm' ; Covariance estimator to use. Can be 'scm' (sample covariance matrix), 'lwf' (Ledoit-Wolf) or 'oas' (Oracle Approximating Shrinkage).
   Transformation:
     var:
       applied: True
-      axis: 1
+      axis: 2 #int, default=0 ; Axis along which variance is computed. If 0, compute variance across features, if 1, compute variance across samples, if 2, compute variance across channels.
     log:
       applied: True
   Classification:
     LDA:
       applied: True
-      solver: 'svd'
+      solver: svd
+      shrinkage: null #'auto' or float, default=None ; Shrinkage parameter, possible values between 0 and 1. If None, no shrinkage is performed.
+      priors: null #array, shape (n_classes,), default=None ; Class priors.
+      n_components: null #int, default=None ; Number of components for dimensionality reduction.
+      store_covariance: False #bool, default=False ; If True, explicitely compute the weighted within-class covariance matrix when solver is 'svd'. The matrix is always computed and stored for the other solvers.
+      tol: 0.0001 #float, default=1e-4 ; Absolute threshold for a singular value of X to be considered significant, used to estimate the rank of X. Dimensions whose singular values are non-significant are discarded. Only used if solver is 'svd'.

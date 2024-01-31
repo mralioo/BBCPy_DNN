@@ -5,7 +5,7 @@
 
 defaults:
   - override /data: srm_eeg.yaml
-  - override /model: csp_clf.yaml
+  - override /model: csp_MNE_clf.yaml
   - override /trainer: sklearn.yaml
   - override /logger: mlflow.yaml
   - override /paths: default.yaml
@@ -13,16 +13,16 @@ defaults:
 # all parameters below will be merged with parameters from default configurations set above
 # this allows you to overwrite only specified parameters
 
-tags: [ "baseline" , "alpha_band" , "Within-Subject" , "csp" , "2D"]
+tags: [ "baseline" , "alpha_band" , "Within-Subject" , "csp-MNE" , "2D" ]
 
 seed: 12345
 
 data:
   task_name: "2D"
   trial_type: "forced"
-  ival: 2s:10s:1ms
+  ival: 2s:10s:2ms
   chans: [ "*" ]
-  bands: [ 8, 13 ]
+  bands: [ 8, 20 ]
   loading_data_mode: "within_subject"
   process_noisy_channels: True
   ignore_noisy_sessions: False
@@ -30,15 +30,16 @@ data:
   normalize: { norm_type: "std", norm_axis: 0 }
 
 trainer:
-  train_val_split: False
-  cv:
-    _target_: src.utils.srm_utils.RunKFold
-    n_splits: 5
+  train_val_split: { val_ratio: 0.2, random_seed: 42 }
+  cv: False
+#    _target_: sklearn.model_selection.StratifiedKFold
+#    n_splits: 5
+#    shuffle: False
 
 paths:
   root_dir: ${oc.env:PROJECT_ROOT}
   data_dir: /input-data
-  log_dir: ${oc.env:PROJECT_ROOT}/logs/23_10
+  log_dir: ${oc.env:PROJECT_ROOT}/logs/13_11
   output_dir: ${hydra:runtime.output_dir}
   work_dir: ${hydra:runtime.cwd}
   results_dir: ${paths.log_dir}/results # final results directory

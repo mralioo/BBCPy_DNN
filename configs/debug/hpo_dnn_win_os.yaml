@@ -2,11 +2,12 @@
 
 # overwrite task name so debugging logs are stored in separate folder
 task_name: "debug-dnn-win"
+tune: True
 
 defaults:
   - override /data: smr_datamodule.yaml
 #  - override /model: eegnet.yaml
-  - override /model: TSCeption.yaml
+#  - override /model: TSCeption.yaml
   - override /trainer: gpu.yaml
   - override /paths: default.yaml
   - override /extras: default.yaml
@@ -26,9 +27,9 @@ paths:
 
 logger:
   mlflow:
-    experiment_name: DEBUG-DNN-TRAIN
+    experiment_name: DEBUG-DNN-hpo
 #    run_name: EEGNet-v1
-    run_name: TSCeption-v1
+    run_name: Transformer-v1
     tracking_uri: file:${paths.log_dir}/mlflow/mlruns
 
 model:
@@ -40,31 +41,31 @@ model:
 
 data:
 #  task_name: "LR"
-  ival: 1s:10s:10ms
-  chans: [ "*" ]
-  loading_data_mode: "cross_subject_hpo"
+#  ival: 1s:10s:10ms
+#  chans: [ "*" ]
+#  loading_data_mode: "cross_subject_hpo"
   #  loading_data_mode: "within_subject"
   subject_sessions_dict:
 #    S4: "all"
     S3: "all"
 #    S5: "all"
-  transform: "TSCeption"
+#  transform: "TSCeption"
 #  transform: False
-  normalize: { norm_type: "std", norm_axis: 0 }
-  train_val_split: False
-  cross_validation: { num_splits: 3, split_seed: 1234 }
-  batch_size: 15
-  num_workers: 1
-  pin_memory: False
+#  normalize: { norm_type: "std", norm_axis: 0 }
+#  train_val_split: False
+#  cross_validation: { num_splits: 3, split_seed: 1234 }
+#  batch_size: 15
+#  num_workers: 1
+#  pin_memory: False
 
 trainer:
   min_epochs: 1 # prevents early stopping
-  max_epochs: 10
+  max_epochs: 1
   check_val_every_n_epoch: 1 # perform a validation loop every N training epochs
-  precision: 16
-  num_sanity_val_steps: 1
-  deterministic: False
-  accumulate_grad_batches: 1
+#  precision: 16
+#  num_sanity_val_steps: 1
+#  deterministic: False
+#  accumulate_grad_batches: 1
 
 callbacks:
   early_stopping:

@@ -1,0 +1,12 @@
+hyperparam_opt:
+  class: sklearn.model_selection.GridSearchCV
+  params:
+    param_grid:
+      csp__n_components: [ 4, 6, 8, 10, 12, 14, 16]
+      csp__reg: [ 0.2, 0.4, 0.6, 0.8, 1.0]
+      csp__log: [ True, False]
+  scoring: f1_weighted
+  cv:
+    _target_: sklearn.model_selection.StratifiedKFold
+    n_splits: 5
+    shuffle: False
