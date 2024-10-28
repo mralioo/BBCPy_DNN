@@ -17,6 +17,44 @@ from src.utils.device import print_memory_usage, print_cpu_cores, print_gpu_info
 
 logging.getLogger().setLevel(logging.INFO)
 
+class DataConfig:
+    """Configuration holder for data parameters.
+
+    :param data_dir: path to the data directory
+    :param task_name: classification task name . choose from ["RL", "UD", "2D"]
+    :param trial_type: trail type. select from valid: include only trials within time window ; forced : include all trials
+    :param ival: time window for the trial
+    :param bands: frequency bands to be used for the analysis
+    :param chans: channels to be used for the analysis
+    :param subject_sessions_dict: dictionary containing subject and session information
+    :param loading_data_mode:
+    :param process_noisy_channels:
+    :param ignore_noisy_sessions:
+    :param fallback_neighbors:
+    :param transform:
+    :param normalize:
+    :param train_val_split:
+    :param cross_validation:
+    :param batch_size:
+    :param num_workers:
+    :param pin_memory:
+    """
+    def __init__(self, data_dir, task_name, trial_type, ival, bands, chans, subject_sessions_dict,
+                 loading_data_mode, process_noisy_channels, ignore_noisy_sessions, fallback_neighbors,
+                 transform, normalize):
+        self.data_dir = data_dir
+        self.task_name = task_name
+        self.trial_type = trial_type
+        self.ival = ival
+        self.bands = bands
+        self.chans = chans
+        self.subject_sessions_dict = subject_sessions_dict
+        self.loading_data_mode = loading_data_mode
+        self.process_noisy_channels = process_noisy_channels
+        self.ignore_noisy_sessions = ignore_noisy_sessions
+        self.fallback_neighbors = fallback_neighbors
+        self.transform = transform
+        self.normalize = normalize
 
 class SRM_DataModule(LightningDataModule):
     """ LightningDataModule for SRM dataset.
@@ -46,44 +84,35 @@ class SRM_DataModule(LightningDataModule):
     """
 
     def __init__(self,
-                 data_dir,
-                 task_name,
-                 trial_type,
-                 ival,
-                 bands,
-                 chans,
-                 subject_sessions_dict,
-                 loading_data_mode,
-                 process_noisy_channels,
-                 ignore_noisy_sessions,
-                 fallback_neighbors,
-                 transform,
-                 normalize,
+                 config: DataConfig,
                  train_val_split,
                  cross_validation,
                  batch_size,
                  num_workers,
                  pin_memory=False):
+
+
+
         super().__init__()
 
-        self.data_dir = data_dir
+        self.data_dir = config.data_dir
 
         # data params
-        self.task_name = task_name
-        self.trial_type = trial_type
-        self.process_noisy_channels = process_noisy_channels
-        self.ignore_noisy_sessions = ignore_noisy_sessions
-        self.fallback_neighbors = fallback_neighbors
+        self.task_name = config.task_name
+        self.trial_type = config.trial_type
+        self.process_noisy_channels = config.process_noisy_channels
+        self.ignore_noisy_sessions = config.ignore_noisy_sessions
+        self.fallback_neighbors = config.fallback_neighbors
         # preprocessing params
-        self.ival = ival
-        self.bands = bands
-        self.chans = chans
+        self.ival = config.ival
+        self.bands = config.bands
+        self.chans = config.chans
 
-        self.loading_data_mode = loading_data_mode
-        self.transform = transform
-        self.normalize = normalize
+        self.loading_data_mode = config.loading_data_mode
+        self.transform = config.transform
+        self.normalize = config.normalize
 
-        self.subject_sessions_dict = subject_sessions_dict
+        self.subject_sessions_dict = config.subject_sessions_dict
 
         self.train_val_split = train_val_split
         self.cross_validation = cross_validation

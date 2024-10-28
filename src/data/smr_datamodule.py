@@ -35,8 +35,21 @@ class SMR_Data():
                  process_noisy_channels,
                  ignore_noisy_sessions,
                  ):
-
-        """ Initialize the SMR datamodule
+        """
+        Initialize the SMR datamodule.
+        :param data_dir:
+        :param task_name:
+        :param trial_type:
+        :param subject_sessions_dict:
+        :param loading_data_mode:
+        :param ival:
+        :param bands:
+        :param chans:
+        :param fallback_neighbors:
+        :param transform:
+        :param normalize:
+        :param process_noisy_channels:
+        :param ignore_noisy_sessions:
         """
         # FIXME : parameter are in type  omegaconf
 
@@ -339,8 +352,6 @@ class SMR_Data():
         task_results = task_results.astype(bool)
 
         valid_task_trials_ids = np.array(task_trials_ids)[task_results]
-
-        # valid_trials_ids = np.where(task_results == True)[0]
 
         raw_data = srm_data[valid_task_trials_ids]
         time = np.arange(0, self.trial_maxlen)

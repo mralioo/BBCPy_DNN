@@ -111,6 +111,8 @@ def train(cfg: DictConfig) -> Tuple[dict, dict]:
     gc.collect()
 
     return metric_dict, object_dict
+
+
 @utils.task_wrapper
 def tune(cfg: DictConfig) -> Tuple[dict, dict]:
     """Trains the model. Can additionally evaluate on a testset, using best weights obtained during
@@ -173,7 +175,6 @@ def tune(cfg: DictConfig) -> Tuple[dict, dict]:
         model = hydra.utils.instantiate(cfg.model)
 
         log.info("Starting hyperparameter optimization!")
-
         cv_score = []
         nums_folds = 5
         for k in range(nums_folds):
@@ -253,6 +254,8 @@ def main(cfg: DictConfig) -> Optional[float]:
     model_name = cfg.get("tags")[-2]
     subject_name = list(cfg.data.subject_sessions_dict.keys())[0]
     task_name = cfg.data.task_name
+
+    # TODO : rewrite in function
     os.makedirs(cfg.paths.results_dir, exist_ok=True)
     csv_file_path = Path(f"{cfg.paths.results_dir}/{task_name}_{model_name}_{subject_name}.csv")
 
@@ -273,7 +276,6 @@ def main(cfg: DictConfig) -> Optional[float]:
         df.to_csv(file, index=False)
 
     # safely retrieve metric value for hydra-based hyperparameter optimization
-
     optimized_metric = cfg.get("optimized_metric")
     metric_value = metric_dict[optimized_metric]
     log.info(f"{optimized_metric}: {metric_value}")

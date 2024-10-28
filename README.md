@@ -23,6 +23,8 @@
       <ul>
         <li><a href="#built-with">Built With</a></li>
         <li><a href="#prerequisites">Prerequisites</a></li>
+        <li><a href="#Development">Development</a></li>
+        <li><a href="#Structure">Structure</a></li>
       </ul>
     </li>
     <li><a href="#installation">Installation</a></li>
@@ -67,6 +69,13 @@ BBCPy_DNN is built with the help of the following frameworks:
     wget https://figshare.com/ndownloader/articles/13123148/versions/1
     unzip 1
     ```
+
+### Development
+this project is build from a Machine learning Boilerplate [Lightning-Hydra-Template](https://github.com/ashleve/lightning-hydra-template)
+which is a template for ML projects using PyTorch Lightning and Hydra. It is designed to help you get started with 
+your machine learning project quickly, following best practices.
+
+### Structure
 
 
 ## Installation
